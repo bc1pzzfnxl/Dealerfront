@@ -1,0 +1,914 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IsoCanvas } from "./render/IsoCanvas";
+import { FACTION_SYMBOLS } from "./render/palette";
+import { Radar } from "./render/Radar";
+import {
+	BUILDINGS,
+	BUILDING_EFFECT_LABELS,
+	BUILD_TICKS,
+	BUILDING_TYPES,
+	chooseBuildType,
+	type BuildingType,
+	NO_BUILDING,
+} from "./sim/buildings";
+import { archetypeOf } from "./sim/city";
+import { SimClock } from "./sim/clock";
+import { DIPLOMACY } from "./sim/diplomacy";
+import { MODULES_W, MODULE_SIZE, SIM_HZ } from "./sim/constants";
+import { HITMAN, TECH, TECH_BRANCHES, TECH_LABELS, techCost } from "./sim/tech";
+import { POLICE_TIER_LABELS } from "./sim/police";
+import { NEUTRAL } from "./sim/territory";
+import { ZONE_LABELS } from "./sim/types";
+import { World } from "./sim/world";
+
+const ARCHETYPE_LABEL: Record<string, string> = {
+	nightlife: "Vie nocturne",
+	residential: "Résidentiel",
+	industrial: "Industriel",
+	student: "Étudiant",
+	port: "Portuaire",
+};
+
+function formatCost(type: BuildingType, factor = 1): string {
+	const spec = BUILDINGS[type];
+	if (spec.costMembers) return `${Math.round(spec.costMembers * factor)} membres`;
+	if (spec.costSale) return `${Math.round(spec.costSale * factor)} sale`;
+	if (spec.costClean) return `${Math.round(spec.costClean * factor)} propre`;
+	return "—";
+}
+
+function App() {
+	const [screen, setScreen] = useState<"select" | "play">(() =>
+		typeof window !== "undefined" && new URLSearchParams(window.location.search).has("play")
+			? "play"
+			: "select",
+	);
+	const [hubSeed, setHubSeed] = useState(1337);
+	const [seed, setSeed] = useState(1337);
+	const [running, setRunning] = useState(true);
+	const [version, setVersion] = useState(0);
+	const [selected, setSelected] = useState<number | null>(null);
+	const [api, setApi] = useState("…");
+	const [colorblind, setColorblind] = useState(() => {
+		try {
+			return localStorage.getItem("df-colorblind") === "1";
+		} catch {
+			return false;
+		}
+	});
+	/** Aide affichée à la première partie (rappel « but du jeu »). */
+	const [showHelp, setShowHelp] = useState(() => {
+		try {
+			return localStorage.getItem("df-help") !== "1";
+		} catch {
+			return true;
+		}
+	});
+
+	const world = useMemo(() => new World(seed), [seed]);
+	const rafRef = useRef<number | null>(null);
+	const lastRef = useRef(0);
+
+	// 3 propositions de ville (profil + seed), façon écran de sélection.
+	const proposals = useMemo(() => {
+		const list: { seed: number; archetype: string }[] = [];
+		for (let index = 0; index < 3; index += 1) {
+			const candidate = (hubSeed + index * 1013904223) >>> 0;
+			list.push({ seed: candidate, archetype: archetypeOf(candidate) });
+		}
+		return list;
+	}, [hubSeed]);
+
+	useEffect(() => {
+		try {
+			localStorage.setItem("df-colorblind", colorblind ? "1" : "0");
+		} catch {
+			// stockage indisponible : mode non persisté
+		}
+	}, [colorblind]);
+
+	// L'aide est marquée « vue » dès le premier affichage (rouvrable via le bouton Aide).
+	useEffect(() => {
+		try {
+			localStorage.setItem("df-help", "1");
+		} catch {
+			// stockage indisponible : aide re-affichée
+		}
+	}, []);
+
+	const focus = useMemo(() => {
+		for (let i = 0; i < world.territory.count; i += 1) {
+			if (world.territory.owner[i] === world.player.id) {
+				return {
+					x: (i % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2,
+					z: Math.floor(i / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2,
+				};
+			}
+		}
+		return { x: world.city.width / 2, z: world.city.height / 2 };
+	}, [world]);
+
+	useEffect(() => {
+		let cancelled = false;
+		fetch("/api/health")
+			.then((res) => res.json() as Promise<{ service: string; status: string }>)
+			.then((data) => {
+				if (!cancelled) setApi(`${data.service} · ${data.status}`);
+			})
+			.catch(() => {
+				if (!cancelled) setApi("indisponible");
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	// Sélectionne le quartier de départ du joueur (ouvre le menu de construction).
+	useEffect(() => {
+		for (let i = 0; i < world.territory.count; i += 1) {
+			if (world.territory.owner[i] === world.player.id) {
+				setSelected(i);
+				return;
+			}
+		}
+	}, [world]);
+
+	useEffect(() => {
+		if (!running || screen !== "play") return;
+		const clock = new SimClock(() => {
+			world.step();
+			if (world.outcome !== null) setRunning(false);
+			setVersion((value) => value + 1);
+		}, SIM_HZ);
+		lastRef.current = performance.now();
+		const loop = (now: number) => {
+			const delta = now - lastRef.current;
+			lastRef.current = now;
+			clock.advance(delta);
+			rafRef.current = requestAnimationFrame(loop);
+		};
+		rafRef.current = requestAnimationFrame(loop);
+		return () => {
+			if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+			rafRef.current = null;
+		};
+	}, [running, world, screen]);
+
+	const player = world.player;
+	const selectedOwner = selected !== null ? world.ownerAt(selected) : NEUTRAL;
+	const isOwned = selected !== null && selectedOwner === player.id;
+	const selectedBuilding = selected !== null ? world.buildingAt(selected) : null;
+	const canAttack = selected !== null && world.playerCanAttack(selected);
+	const canHitman = selected !== null && world.playerCanHitman(selected);
+	const selectedOwnerName =
+		selectedOwner === NEUTRAL ? "Neutre" : (world.factions[selectedOwner]?.name ?? "—");
+
+	const build = useCallback(
+		(type: BuildingType) => {
+			if (selected === null) return;
+			if (world.playerBuild(selected, type)) setVersion((value) => value + 1);
+		},
+		[selected, world],
+	);
+
+	/** Action contextuelle (Q/A) : bâtir le type conseillé, sinon attaquer. */
+	const act = useCallback(() => {
+		if (selected === null) return;
+		if (world.ownerAt(selected) === world.player.id) {
+			if (world.territory.building[selected] === NO_BUILDING) {
+				const type = chooseBuildType(
+					world.buildingCounts(world.player.id),
+					world.modulesOwned(world.player.id),
+					(candidate) => world.playerCanBuild(selected, candidate),
+					{ atelier: TECH.maxLevel },
+				);
+				if (type !== null && world.playerBuild(selected, type)) {
+					setVersion((value) => value + 1);
+				}
+			}
+			return;
+		}
+		if (world.playerAttack(selected)) setVersion((value) => value + 1);
+	}, [selected, world]);
+
+	useEffect(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.code === "KeyQ" || event.code === "KeyA") {
+				event.preventDefault();
+				act();
+				return;
+			}
+			if (event.code === "KeyT" && selected !== null) {
+				event.preventDefault();
+				if (world.playerHitman(selected)) setVersion((value) => value + 1);
+			}
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [act, selected, world]);
+
+	const startCity = (citySeed: number) => {
+		setSeed(citySeed);
+		setSelected(null);
+		setVersion(0);
+		setRunning(true);
+		setScreen("play");
+	};
+
+	const regenerate = () => {
+		setRunning(true);
+		setVersion(0);
+		setSelected(null);
+		setSeed((value) => (value * 1103515245 + 12345) >>> 0);
+	};
+
+	const backToSelect = () => {
+		setHubSeed((value) => (value * 1103515245 + 12345) >>> 0);
+		setScreen("select");
+	};
+
+	const totalModules = world.city.modules.length;
+	const playerPct = Math.round(world.controlRatio(player.id) * 100);
+	const perSecond = Math.round(world.productionPerTick(player.id) * SIM_HZ * 10) / 10;
+	const afford = (type: BuildingType) => selected !== null && world.playerCanBuild(selected, type);
+	const costFactor = selected !== null ? world.buildCostFactor(selected) : 1;
+	const constructionLeft = selected !== null ? world.constructionLeft(selected) : 0;
+	const pendingType = selected !== null ? world.pendingBuilding(selected) : null;
+	const isConversion = selected !== null && world.isConversion(selected);
+	const policeTargeted = world.police.target === player.id;
+	const policeTargetName =
+		world.police.target >= 0 ? (world.factions[world.police.target]?.name ?? "—") : "—";
+	const policeTierLabel = POLICE_TIER_LABELS[world.policeLevel()];
+	const summary = world.summary();
+	const threshold = world.victoryControlThreshold();
+	const cleanGoal = world.cleanGoal();
+	const secondsLeft = Math.max(0, Math.ceil(world.ticksLeft() / SIM_HZ));
+	const timeLeft = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
+
+	/** Priorité stratégique d'amorçage : Labo → Point de vente → Façade. */
+	const advisedType: BuildingType | null =
+		world.buildingCount(player.id, "labo") === 0
+			? "labo"
+			: world.buildingCount(player.id, "vente") === 0
+				? "vente"
+				: world.buildingCount(player.id, "facade") === 0 && player.cashSale > 1500
+					? "facade"
+					: null;
+
+	/** Bâtiment suggéré sur le quartier sélectionné (priorité d'amorçage, sinon composition). */
+	const recommendedType =
+		isOwned && selectedBuilding === null && selected !== null
+			? advisedType !== null && world.playerCanBuild(selected, advisedType)
+				? advisedType
+				: chooseBuildType(
+						world.buildingCounts(player.id),
+						world.modulesOwned(player.id),
+						(candidate) => world.playerCanBuild(selected, candidate),
+						{ atelier: TECH.maxLevel },
+					)
+			: null;
+
+	const ownedQuarters = world.modulesOwned(player.id);
+	const idleQuarters = Math.max(0, ownedQuarters - player.buildings);
+	const advisor = (() => {
+		if (player.cashPropre >= cleanGoal && world.controlRatio(player.id) >= threshold) {
+			return "Objectif rempli : gardez la tête du classement.";
+		}
+		if (ownedQuarters < 2) {
+			return "Capturez un quartier adjacent (sélectionnez-le puis Q) : 1 bâtiment par quartier.";
+		}
+		if (advisedType !== null) {
+			const spec = BUILDINGS[advisedType];
+			if (spec.costSale && player.cashSale < spec.costSale) {
+				return `${BUILDINGS[advisedType].label} : ${spec.costSale} Cash sale requis — vendez du Produit ou agrandissez.`;
+			}
+			if (spec.costMembers && player.members < spec.costMembers) {
+				return `${BUILDINGS[advisedType].label} : ${spec.costMembers} Membres requis.`;
+			}
+			return `${BUILDINGS[advisedType].label} — ${BUILDING_EFFECT_LABELS[advisedType]} (à construire en priorité).`;
+		}
+		if (idleQuarters > 0) {
+			return `${idleQuarters} quartier(s) vide(s) : aménagez-les (Q sur un quartier possédé).`;
+		}
+		if (world.controlRatio(player.id) < threshold) {
+			return "Étendez le territoire : sélectionnez un quartier adjacent puis Attaquer (Q).";
+		}
+		return "Blanchissez encore du Cash propre pour valider la victoire.";
+	})();
+
+	/** Chaîne économique : bâtiment → ressource, pour rendre la boucle lisible. */
+	const chain: { type: BuildingType; label: string; count: number; value: string }[] = [
+		{
+			type: "logement",
+			label: "Logement",
+			count: world.buildingCount(player.id, "logement"),
+			value: `${Math.round(player.members).toLocaleString("fr-FR")} membres`,
+		},
+		{
+			type: "labo",
+			label: "Labo",
+			count: world.buildingCount(player.id, "labo"),
+			value: `${Math.round(player.produit)} produit`,
+		},
+		{
+			type: "vente",
+			label: "Point de vente",
+			count: world.buildingCount(player.id, "vente"),
+			value: `${Math.round(player.cashSale).toLocaleString("fr-FR")} sale`,
+		},
+		{
+			type: "facade",
+			label: "Façade",
+			count: world.buildingCount(player.id, "facade"),
+			value: `${Math.round(player.cashPropre).toLocaleString("fr-FR")} propre`,
+		},
+	];
+	const chainNext =
+		chain.find((step) => step.type !== "logement" && step.count === 0)?.type ?? null;
+
+	const adjacentTarget = selected !== null && world.canAttack(player.id, selected);
+	const engaged = Math.floor(player.members * world.commitRatio());
+	const targetDefense = selected !== null ? world.defenseAt(selected) : 1;
+	const targetControl = selected !== null ? Math.round(world.controlAt(selected)) : 0;
+	const selectedZoneLabel =
+		selected !== null ? (ZONE_LABELS[world.city.modules[selected]!] ?? "—") : "—";
+	const allowedHere = selected !== null ? world.allowedBuildings(selected) : [];
+	/** Raison d'indisponibilité d'un bâtiment sur le quartier sélectionné. */
+	const blockReason = (type: BuildingType): string | null => {
+		if (selected === null) return null;
+		if (!world.canBuildInZone(selected, type)) return "zone incompatible";
+		const spec = BUILDINGS[type];
+		if (spec.costMembers && player.members < spec.costMembers) {
+			return `${spec.costMembers} membres requis`;
+		}
+		if (spec.costSale && player.cashSale < spec.costSale) {
+			return `${spec.costSale} Cash sale requis`;
+		}
+		if (spec.costClean && player.cashPropre < spec.costClean) {
+			return `${spec.costClean} Cash propre requis`;
+		}
+		return null;
+	};
+	const attackReason = !adjacentTarget
+		? "Non adjacent — choisissez un quartier voisin de votre territoire."
+		: `Membres insuffisants (minimum ${world.minCommit()} engagés).`;
+	const pressure = world.police.pressure;
+	const raidFlash = world.police.lastRaidTick >= 0 && world.tick - world.police.lastRaidTick <= 10;
+	const alert = policeTargeted && (raidFlash || pressure >= 70);
+
+	if (screen === "select") {
+		return (
+			<div className="select-screen">
+				<h1>DealerFront</h1>
+				<p>
+					256 quartiers · 4 cartels · objectif : ≥ {Math.round(threshold * 100)} % et{" "}
+					{cleanGoal.toLocaleString("fr-FR")} de Cash propre
+				</p>
+				<div className="city-choices">
+					{proposals.map((proposal) => (
+						<button
+							key={proposal.seed}
+							type="button"
+							className="city-card"
+							onClick={() => startCity(proposal.seed)}
+						>
+							<strong>{ARCHETYPE_LABEL[proposal.archetype] ?? proposal.archetype}</strong>
+							<em>seed {proposal.seed}</em>
+							<span>Possession colorée · police anti-leader · 25 min</span>
+						</button>
+					))}
+				</div>
+				<p>Choisissez une ville pour lancer la partie.</p>
+			</div>
+		);
+	}
+
+	return (
+		<div className="game">
+			<div className="viewport">
+				<IsoCanvas
+					city={world.city}
+					territory={world.territory}
+					factions={world.factions}
+					attacks={world.attacks}
+					focus={focus}
+					selected={selected}
+					colorblind={colorblind}
+					version={version}
+					onModuleClick={(module) => setSelected(module)}
+				/>
+				<div
+					className={`vignette${alert ? " alert" : ""}`}
+					style={{ "--pressure": pressure / 100 } as React.CSSProperties}
+				/>
+				<Radar
+					city={world.city}
+					territory={world.territory}
+					factions={world.factions}
+					attacks={world.attacks}
+					selected={selected}
+					colorblind={colorblind}
+					version={version}
+					onSelect={(module) => setSelected(module)}
+				/>
+			</div>
+
+			<div className="hud">
+				<header className="topbar card">
+					<div className="brand">
+						<h1>DealerFront</h1>
+						<span className="brand-sub">
+							seed {world.city.seed} · {world.city.archetype}
+						</span>
+					</div>
+					<div className="top-stats">
+						<div className="stat">
+							<span>Membres</span>
+							<strong>{Math.round(player.members).toLocaleString("fr-FR")}</strong>
+						</div>
+						<div className="stat">
+							<span>Produit</span>
+							<strong>{Math.round(player.produit)}</strong>
+						</div>
+						<div className="stat">
+							<span>Cash sale</span>
+							<strong>{Math.round(player.cashSale).toLocaleString("fr-FR")}</strong>
+						</div>
+						<div className="stat">
+							<span>Cash propre</span>
+							<strong className="clean">
+								{Math.round(player.cashPropre).toLocaleString("fr-FR")}
+							</strong>
+						</div>
+						<div className="stat">
+							<span>Contrôle</span>
+							<strong>{playerPct}%</strong>
+						</div>
+						<div className="stat">
+							<span>Quartiers</span>
+							<strong>
+								{world.modulesOwned(player.id)}
+								<em>/{totalModules}</em>
+							</strong>
+						</div>
+						<div className="stat">
+							<span>Production</span>
+							<strong>+{perSecond}/s</strong>
+						</div>
+					</div>
+					<div className="top-right">
+						<span className="objective">
+							Objectif ≥ {Math.round(threshold * 100)} % ·{" "}
+							{Math.round(player.cashPropre).toLocaleString("fr-FR")}/
+							{cleanGoal.toLocaleString("fr-FR")} propre
+						</span>
+						<span className="timer">reste {timeLeft}</span>
+					</div>
+				</header>
+
+				<section className="card panel-left">
+					<p className="advisor">{advisor}</p>
+					<h2>
+						Quartier <em>{selected !== null ? `module ${selected}` : "—"}</em>
+					</h2>
+					<div className="line">
+						<span>Propriétaire</span>
+						<code
+							style={{
+								color: selectedOwner === NEUTRAL ? undefined : world.factions[selectedOwner]?.color,
+							}}
+						>
+							{selectedOwnerName}
+						</code>
+					</div>
+					<div className="line">
+						<span>Contrôle</span>
+						<code>{selected !== null ? Math.round(world.controlAt(selected)) : "—"}</code>
+					</div>
+					<div className="line">
+						<span>Bâtiment</span>
+						<code>{selectedBuilding ? BUILDINGS[selectedBuilding].label : "—"}</code>
+					</div>
+					<div className="line">
+						<span>Zone</span>
+						<code>{selectedZoneLabel}</code>
+					</div>
+
+					{isOwned ? (
+						constructionLeft > 0 ? (
+							<p className="hint-inline">
+								<strong>Chantier :</strong> {pendingType ? BUILDINGS[pendingType].label : "—"} —
+								encore {Math.ceil(constructionLeft / SIM_HZ)} s
+							</p>
+						) : selectedBuilding ? (
+							<p className="hint-inline">
+								{BUILDINGS[selectedBuilding].label} — {BUILDING_EFFECT_LABELS[selectedBuilding]}
+							</p>
+						) : (
+							<>
+								<div className="build-menu">
+									{BUILDING_TYPES.map((type) => {
+										const reason = blockReason(type);
+										const zoneBlocked = reason === "zone incompatible";
+										return (
+											<button
+												key={type}
+												type="button"
+												className={type === recommendedType ? "recommended" : undefined}
+												disabled={!afford(type)}
+												title={`${BUILDINGS[type].label} — ${BUILDING_EFFECT_LABELS[type]} · ${formatCost(type, costFactor)}${reason ? ` · ${reason}` : ""}`}
+												onClick={() => build(type)}
+											>
+												{BUILDINGS[type].label}
+												<em className={zoneBlocked ? "zone" : reason ? "lack" : undefined}>
+													{zoneBlocked ? "zone incompatible" : formatCost(type, costFactor)}
+												</em>
+											</button>
+										);
+									})}
+								</div>
+								{recommendedType ? (
+									<p className="hint-inline">
+										<strong>Conseillé :</strong> {BUILDINGS[recommendedType].label} —{" "}
+										{BUILDING_EFFECT_LABELS[recommendedType]}
+									</p>
+								) : null}
+								<p className="hint-inline">
+									Zone <strong>{selectedZoneLabel}</strong> —{" "}
+									{isConversion
+										? "conversion −50 % (immédiate)"
+										: `construction neuve (coût plein${recommendedType ? `, ${Math.round(BUILD_TICKS[recommendedType] / SIM_HZ)} s` : ""})`}{" "}
+									: {allowedHere.map((type) => BUILDINGS[type].label).join(", ")}.
+								</p>
+							</>
+						)
+					) : (
+						<>
+							<button type="button" disabled={!canAttack} onClick={act}>
+								{canAttack ? `Attaquer (Q) · ${engaged} engagés` : "Non attaquable"}
+							</button>
+							{canAttack ? (
+								<p className="hint-inline">
+									Contrôle {targetControl} · défense ×{targetDefense.toFixed(1)} (zone
+									{world.buildingAt(selected!) === "planque" ? " + planque" : ""})
+								</p>
+							) : (
+								<p className="hint-inline">{attackReason}</p>
+							)}
+							{canHitman ? (
+								<button
+									type="button"
+									className="hitman"
+									onClick={() => {
+										if (selected !== null && world.playerHitman(selected)) {
+											setVersion((value) => value + 1);
+										}
+									}}
+								>
+									Tueur à gage (T)
+								</button>
+							) : null}
+						</>
+					)}
+				</section>
+
+				<aside className="panel-right">
+					<section className={`card police${policeTargeted ? " targeted" : ""}`}>
+						<h2>
+							Police <em>{policeTierLabel}</em>
+						</h2>
+						<div className="line">
+							<span>Pression</span>
+							<div className="gauge" aria-hidden="true">
+								<div className="gauge-fill" style={{ width: `${pressure}%` }} />
+							</div>
+							<code>{Math.round(pressure)}</code>
+						</div>
+						<div className="line">
+							<span>Vise</span>
+							<code
+								style={{
+									color:
+										world.police.target >= 0
+											? world.factions[world.police.target]?.color
+											: undefined,
+								}}
+							>
+								{policeTargetName}
+								{policeTargeted ? " (vous)" : ""}
+							</code>
+						</div>
+						<div className="line">
+							<span>Raids</span>
+							<code>{world.police.raids}</code>
+						</div>
+						<div className="line">
+							<span>Contact</span>
+							<code>{world.contactName}</code>
+						</div>
+						<button
+							type="button"
+							disabled={!world.playerCanCorrupt()}
+							onClick={() => {
+								if (world.playerCorrupt()) setVersion((value) => value + 1);
+							}}
+						>
+							Corrompre ({world.playerCorruptionCost().toLocaleString("fr-FR")})
+						</button>
+					</section>
+
+					<section className="card">
+						<h2>
+							Tech <em>{world.buildingCount(player.id, "atelier")} atelier(s)</em>
+						</h2>
+						{TECH_BRANCHES.map((branch) => {
+							const level = player.tech[branch];
+							const max = world.maxTechLevel(player.id);
+							const canUp = world.canUpgradeTech(player.id, branch);
+							return (
+								<div className="line" key={branch}>
+									<span>
+										{TECH_LABELS[branch]}{" "}
+										<em className="tech-level">
+											{level}/{TECH.maxLevel}
+										</em>
+									</span>
+									<button
+										type="button"
+										className="tech-up"
+										disabled={!canUp}
+										onClick={() => {
+											if (world.playerUpgradeTech(branch)) setVersion((value) => value + 1);
+										}}
+									>
+										{level >= max ? "—" : `${techCost(level + 1)}`}
+									</button>
+								</div>
+							);
+						})}
+						<p className="hint-inline">
+							Atelier requis (1 niveau par Atelier) · Tueur : Armement ≥ {HITMAN.requiredArmement}.
+						</p>
+					</section>
+
+					<section className="card">
+						<h2>
+							Diplomatie <em>{world.pacts.length} pacte(s)</em>
+						</h2>
+						{world.playerOffers().map((offer) => (
+							<div className="dip-row" key={`offer-${offer.from}`}>
+								<span>{world.factions[offer.from]?.name} propose un pacte</span>
+								<span className="offer-actions">
+									<button
+										type="button"
+										className="tech-up"
+										onClick={() => {
+											world.playerRespondToOffer(offer.from, true);
+											setVersion((value) => value + 1);
+										}}
+									>
+										Accepter
+									</button>
+									<button
+										type="button"
+										className="tech-up"
+										onClick={() => {
+											world.playerRespondToOffer(offer.from, false);
+											setVersion((value) => value + 1);
+										}}
+									>
+										Refuser
+									</button>
+								</span>
+							</div>
+						))}
+						{world.factions.map((faction) => {
+							const isSelf = faction.isPlayer;
+							const relation = Math.round(world.relationBetween(player.id, faction.id));
+							const pacted = !isSelf && world.playerHasPact(faction.id);
+							return (
+								<div className={`dip-row${isSelf ? " is-player" : ""}`} key={faction.id}>
+									<span className="faction-name">
+										<span className="swatch" style={{ backgroundColor: faction.color }}>
+											{FACTION_SYMBOLS[faction.id % FACTION_SYMBOLS.length]}
+										</span>
+										{faction.name}
+										{world.police.target === faction.id ? <span className="tag">leader</span> : null}
+										{!isSelf && world.isTraitor(faction.id) ? (
+											<span className="tag">traître</span>
+										) : null}
+										{!isSelf && world.playerHasEmbargo(faction.id) ? (
+											<span className="tag">embargo</span>
+										) : null}
+									</span>
+									<code>
+										{Math.round(world.controlRatio(faction.id) * 100)}%
+										{isSelf ? "" : ` · ${relation}`}
+									</code>
+									{isSelf ? (
+										<span />
+									) : pacted ? (
+										<button
+											type="button"
+											className="tech-up"
+											onClick={() => {
+												if (world.playerBreakPact(faction.id)) setVersion((value) => value + 1);
+											}}
+										>
+											Trahir
+										</button>
+									) : (
+										<span className="offer-actions">
+											<button
+												type="button"
+												className="tech-up"
+												disabled={!world.playerCanProposePact(faction.id)}
+												onClick={() => {
+													if (world.playerProposePact(faction.id)) setVersion((value) => value + 1);
+												}}
+											>
+												Pacte
+											</button>
+											<button
+												type="button"
+												className="tech-up"
+												disabled={!world.playerCanEmbargo(faction.id)}
+												onClick={() => {
+													if (world.playerEmbargo(faction.id)) setVersion((value) => value + 1);
+												}}
+											>
+												Embargo
+											</button>
+										</span>
+									)}
+								</div>
+							);
+						})}
+						<p className="hint-inline">
+							Relation 0–100 · pacte si ≥ {DIPLOMACY.acceptRelation} · trahir pénalise (défense ×
+							{DIPLOMACY.traitorDefense}).
+						</p>
+					</section>
+				</aside>
+
+				<footer className="panel-bottom">
+					<section className="card loop-card">
+						<h2>Boucle</h2>
+						{chain.map((step) => (
+							<div
+								className={`loop-row${step.type === chainNext ? " next" : ""}`}
+								key={step.type}
+							>
+								<span>
+									{step.label} <em>×{step.count}</em>
+								</span>
+								<code className={step.type === "facade" ? "clean" : undefined}>
+									{step.value}
+								</code>
+							</div>
+						))}
+					</section>
+					<section className="card journal-card">
+						<h2>Journal</h2>
+						<ul className="journal">
+							{world.log.length === 0 ? (
+								<li className="empty">—</li>
+							) : (
+								world.log.slice(-3).map((line, index) => <li key={index}>{line}</li>)
+							)}
+						</ul>
+					</section>
+					<div className="bottom-controls">
+						<p className="hud-keys">
+							<kbd>clic</kbd> sélectionner · <kbd>Q</kbd> attaquer / bâtir · <kbd>T</kbd> tueur ·
+							glisser = caméra
+						</p>
+						<div className="hud-actions">
+							<button type="button" onClick={() => setRunning((value) => !value)}>
+								{running ? "Pause" : "Démarrer"}
+							</button>
+							<button type="button" onClick={regenerate}>
+								Nouvelle seed
+							</button>
+							<button
+								type="button"
+								className={`toggle${colorblind ? " active" : ""}`}
+								onClick={() => setColorblind((value) => !value)}
+							>
+								Daltonien
+							</button>
+							<button type="button" className="toggle" onClick={() => setShowHelp(true)}>
+								Aide
+							</button>
+						</div>
+						<p className="hud-foot" title={`API ${api}`}>
+							tick {world.tick} · reste {timeLeft}
+						</p>
+					</div>
+				</footer>
+			</div>
+
+			{showHelp ? (
+				<div className="help-overlay">
+					<div className="help-card card">
+						<h2>Comment jouer</h2>
+						<p>
+							<strong>But :</strong> détenir <strong>≥ {Math.round(threshold * 100)} %</strong> des
+							quartiers <em>et</em> <strong>{cleanGoal.toLocaleString("fr-FR")} de Cash propre</strong>{" "}
+							avant la fin du temps.
+						</p>
+						<h3>La boucle économique</h3>
+						<ol>
+							<li>
+								<strong>Logement</strong> → +Membres (vos troupes, pour attaquer).
+							</li>
+							<li>
+								<strong>Labo</strong> → Produit.
+							</li>
+							<li>
+								<strong>Point de vente</strong> → Produit devient Cash sale.
+							</li>
+							<li>
+								<strong>Façade</strong> → Cash sale devient <strong>Cash propre</strong> (l'objectif).
+							</li>
+						</ol>
+						<p>
+							<strong>Atelier</strong> débloque la tech · <strong>Planque</strong> défend un quartier ·
+							un seul bâtiment par quartier.
+						</p>
+						<p>
+							<strong>Zones :</strong> on convertit le bâti existant — chaque quartier n'accepte que
+							certains bâtiments (parc → planque, police → contre-espionnage, terrain vague →
+							construction neuve…). Le détail est affiché sous le menu de construction.
+						</p>
+						<h3>Conquête</h3>
+						<p>
+							Sélectionnez un quartier <strong>adjacent</strong> puis <kbd>Q</kbd> pour l'attaquer
+							(20 % de vos Membres engagés).
+						</p>
+						<h3>Police</h3>
+						<p>
+							Dominer fait monter la Pression : <strong>Corrompre</strong> la réduit, sinon raids puis
+							liquidation.
+						</p>
+						<p className="help-keys">
+							<kbd>clic</kbd> sélectionner · <kbd>Q</kbd> attaquer / bâtir · <kbd>T</kbd> tueur ·
+							glisser = caméra
+						</p>
+						<button type="button" onClick={() => setShowHelp(false)}>
+							Compris, jouer
+						</button>
+					</div>
+				</div>
+			) : null}
+
+			{world.outcome !== null ? (
+				<div className="end-banner">
+					<h2>{world.outcome === "victory" ? "Victoire" : "Défaite"}</h2>
+					<p className="end-cause">{world.endReason}</p>
+					<div className="end-score">
+						<strong>{Math.round(summary.cashPropre).toLocaleString("fr-FR")}</strong>
+						<span>cash propre</span>
+					</div>
+					<ul className="end-lines">
+						<li>
+							<span>Contrôle</span>
+							<code>
+								{playerPct}% · {summary.quarters}/{totalModules} quartiers
+							</code>
+						</li>
+						<li>
+							<span>Score</span>
+							<code>
+								{Math.round(summary.score).toLocaleString("fr-FR")} · rang {summary.rank}
+							</code>
+						</li>
+						<li>
+							<span>Quartiers pris</span>
+							<code>{summary.captures}</code>
+						</li>
+						<li>
+							<span>Gangs éliminés</span>
+							<code>{summary.eliminations}</code>
+						</li>
+						<li>
+							<span>Raids subis</span>
+							<code>
+								{summary.raidsSuffered} · {summary.seizures} saisie(s)
+							</code>
+						</li>
+						<li>
+							<span>Temps</span>
+							<code>{Math.floor(world.tick / SIM_HZ / 60)} min</code>
+						</li>
+					</ul>
+					<button type="button" onClick={backToSelect}>
+						Nouvelle partie
+					</button>
+				</div>
+			) : null}
+		</div>
+	);
+}
+
+export default App;
