@@ -264,3 +264,8 @@ Un quartier possédé et **vide** ne peut être converti que vers les types **co
 
 - Le joueur règle un **ratio de blanchiment 0–100 %** (curseur) : la capacité effective des façades est `façades × 60 × ratio`.
 - À **0 %**, le Cash sale s'accumule (pour acheter) ; à **100 %**, tout part en Cash propre (objectif). Compromis central de la boucle.
+
+### Réglages P15 — chantiers
+
+- **Construction neuve** : `BUILD_TICKS` ≈ **9–24 s** (90–240 ticks).
+- **Conversion** (bâti existant) : **coût −50 %** et **temps ÷2**, mais **plus instantanée** (chantier malgré tout).

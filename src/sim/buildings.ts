@@ -73,15 +73,18 @@ export const CONVERSION_COST = 0.5;
 
 /** Durée d'une **construction neuve** (terrain vague), en ticks. La conversion est instantanée. */
 export const BUILD_TICKS: Record<BuildingType, number> = {
-	logement: 30,
-	labo: 40,
-	vente: 40,
-	facade: 60,
-	planque: 60,
-	depot: 60,
-	atelier: 80,
-	contre: 80,
+	logement: 90,
+	labo: 120,
+	vente: 120,
+	facade: 180,
+	planque: 180,
+	depot: 180,
+	atelier: 240,
+	contre: 240,
 };
+
+/** La conversion (bâti existant) prend la moitié du temps d'une construction neuve. */
+export const CONVERSION_TIME = 0.5;
 
 /** Description courte de l'effet (aide à la décision / infobulles). */
 export const BUILDING_EFFECT_LABELS: Record<BuildingType, string> = {

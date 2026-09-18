@@ -4,7 +4,15 @@ import { MODULES_W } from "./constants";
 import { NEUTRAL } from "./territory";
 import { World } from "./world";
 
-/** Donne à `factionId` un quartier vide **bâti** (conversion instantanée) acceptant `type`. */
+/** Avance la simulation jusqu'à la fin des chantiers donnés. */
+function finishBuild(world: World, ...modules: number[]): void {
+	for (let i = 0; i < 3000; i += 1) {
+		if (modules.every((module) => world.constructionLeft(module) === 0)) return;
+		world.step();
+	}
+}
+
+/** Donne à `factionId` un quartier vide **bâti** (conversion à moitié temps) acceptant `type`. */
 function ownFor(world: World, factionId: number, type: BuildingType, skip = 0): number {
 	let seen = 0;
 	for (let i = 0; i < world.territory.count; i += 1) {
@@ -88,6 +96,7 @@ describe("territory", () => {
 		const beforeProd = world.productionPerTick(player.id);
 		const beforeMembers = player.members;
 		expect(world.playerBuild(module, "logement")).toBe(true);
+		finishBuild(world, module);
 		expect(world.buildingAt(module)).toBe("logement");
 		expect(player.housing).toBe(1);
 		expect(player.members).toBeLessThan(beforeMembers);
@@ -113,6 +122,7 @@ describe("territory", () => {
 
 		const laboModule = 1 * MODULES_W + 1;
 		expect(world.playerBuild(laboModule, "labo")).toBe(true);
+		finishBuild(world, laboModule);
 		for (let i = 0; i < 20; i += 1) world.step();
 		expect(player.produit).toBeGreaterThan(0);
 	});
@@ -144,6 +154,7 @@ describe("territory", () => {
 		const m = ownFor(world, player.id, "atelier");
 
 		expect(world.playerBuild(m, "atelier")).toBe(true);
+		finishBuild(world, m);
 		expect(world.maxTechLevel(player.id)).toBe(1);
 		expect(world.playerUpgradeTech("armement")).toBe(true);
 		expect(player.tech.armement).toBe(1);
@@ -162,6 +173,7 @@ describe("territory", () => {
 		const b = ownFor(world, player.id, "atelier");
 		world.playerBuild(a, "atelier");
 		world.playerBuild(b, "atelier");
+		finishBuild(world, a, b);
 		world.playerUpgradeTech("armement");
 		world.playerUpgradeTech("armement");
 		expect(player.tech.armement).toBe(2);
@@ -238,15 +250,17 @@ describe("construction neuve vs conversion", () => {
 		return -1;
 	}
 
-	it("la conversion est instantanée et coûte −50 %", () => {
+	it("la conversion coûte −50 % et prend la moitié du temps", () => {
 		const world = new World(1, "nightlife");
 		world.player.cashSale = 10000;
 		const module = ownFor(world, world.player.id, "labo");
 		const before = world.player.cashSale;
 		expect(world.playerBuild(module, "labo")).toBe(true);
 		expect(world.player.cashSale).toBe(before - 1000 * 0.5);
+		expect(world.buildingAt(module)).toBeNull();
+		expect(world.constructionLeft(module)).toBeGreaterThan(0);
+		finishBuild(world, module);
 		expect(world.buildingAt(module)).toBe("labo");
-		expect(world.constructionLeft(module)).toBe(0);
 	});
 
 	it("la construction neuve sur terrain vague est chronométrée", () => {
@@ -276,6 +290,7 @@ describe("blanchiment contrôlé", () => {
 		player.cashSale = 10_000;
 		const module = ownFor(world, player.id, "facade");
 		expect(world.playerBuild(module, "facade")).toBe(true);
+		finishBuild(world, module);
 		world.territory.control[module] = 100;
 
 		world.playerSetLaunderRatio(0);
@@ -340,6 +355,7 @@ describe("renseignement", () => {
 		const far = Math.min(world.territory.count - 1, module + MODULES_W * 2 + 2);
 		expect(world.isKnown(far)).toBe(false);
 		expect(world.playerBuild(module, "contre")).toBe(true);
+		finishBuild(world, module);
 		expect(world.isKnown(far)).toBe(true);
 	});
 });

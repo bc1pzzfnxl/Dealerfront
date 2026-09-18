@@ -12,6 +12,7 @@ import {
 	BUILDING_TYPES,
 	BUILD_TICKS,
 	BUILT_ZONES,
+	CONVERSION_TIME,
 	canBuildInZone,
 	chooseBuildType,
 	CONVERSION_COST,
@@ -36,15 +37,21 @@ import {
 import { createTerritory, NEUTRAL, neighborsOf, type Territory } from "./territory";
 import type { Archetype, CityGrid, ZoneType } from "./types";
 
-const NEUTRAL_GARRISON = 40;
+const NEUTRAL_GARRISON = 60;
 const CAPTURE_CONTROL = 30;
 const START_MEMBERS = 3000;
 const COMMIT_RATIO = 0.2;
-const DAMAGE_PER_TROOP = 0.001;
-const ATTACK_LOSS = 6;
-const CONTROL_REGEN = 1.0;
+const DAMAGE_PER_TROOP = 0.0004;
+/** Plafond de dégâts par tick : empêche les prises instantanées (sièges obligatoires). */
+const MAX_DAMAGE_PER_TICK = 5;
+const ATTACK_LOSS = 8;
+const CONTROL_REGEN = 1.2;
+/** Assauts simultanés max par faction : pas de « clique-partout ». */
+const MAX_ASSAULTS = 3;
 const AI_INTERVAL = 25;
 const MIN_COMMIT = 400;
+/** Raid : affaiblit un quartier adjacent sans le capturer. */
+const RAID = { costSale: 2500, costMembers: 800, control: 35, cooldownTicks: 300 } as const;
 /** Vision : un Contre-espionnage révèle un rayon autour de lui. */
 const VISION = { contreRadius: 2 } as const;
 /** Reconnaissance payante (renseignement). */
@@ -875,6 +882,50 @@ export class World {
 		return true;
 	}
 
+	/** Quartiers d'une faction que le joueur connaît (vision/renseignement). */
+	knownModulesOwned(factionId: number): number {
+		let count = 0;
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (this.known[i] === 1 && this.territory.owner[i] === factionId) count += 1;
+		}
+		return count;
+	}
+
+	/** Contrôle **connu** d'une faction (0 si inconnu) — pour une diplomatie réaliste. */
+	knownControlRatio(factionId: number): number {
+		return this.knownModulesOwned(factionId) / this.city.modules.length;
+	}
+
+	raidCost(): { sale: number; members: number } {
+		return { sale: RAID.costSale, members: RAID.costMembers };
+	}
+
+	playerCanRaid(module: number): boolean {
+		if (this.outcome !== null) return false;
+		if (!this.canAttack(this.player.id, module)) return false;
+		if (this.player.cashSale < RAID.costSale) return false;
+		if (this.player.members < RAID.costMembers) return false;
+		return this.player.hitmanCooldown <= 0;
+	}
+
+	/** Raid : affaiblit un quartier adjacent (Contrôle + bâtiments) sans le capturer. */
+	playerRaid(module: number): boolean {
+		if (!this.playerCanRaid(module)) return false;
+		this.player.cashSale -= RAID.costSale;
+		this.player.members -= RAID.costMembers;
+		this.player.hitmanCooldown = RAID.cooldownTicks;
+		this.territory.control[module] = Math.max(
+			5,
+			this.territory.control[module]! - RAID.control,
+		);
+		this.territory.building[module] = NO_BUILDING;
+		this.cancelConstruction(module);
+		this.recount();
+		this.events.push("hitman");
+		this.pushLog(`Raid sur le module ${module}`);
+		return true;
+	}
+
 	/** Ratio de blanchiment du joueur (0–1). */
 	playerLaunderRatio(): number {
 		return this.player.launderRatio;
@@ -888,6 +939,11 @@ export class World {
 	drainEvents(): GameEvent[] {
 		if (this.events.length === 0) return [];
 		return this.events.splice(0, this.events.length);
+	}
+
+	/** Nombre d'assauts simultanés autorisés par faction. */
+	maxAssaults(): number {
+		return MAX_ASSAULTS;
 	}
 
 	commitRatio(): number {
@@ -923,16 +979,14 @@ export class World {
 		return this.isConversion(module) ? CONVERSION_COST : 1;
 	}
 
-	/** Paie puis lance le chantier (instantané en conversion). */
+	/** Paie puis lance le chantier (conversion = moitié du temps, chantier malgré tout). */
 	private startBuild(factionId: number, module: number, type: BuildingType): void {
-		const conversion = this.isConversion(module);
 		this.pay(this.factions[factionId]!, type, this.buildCostFactor(module));
-		if (conversion) {
-			this.territory.building[module] = BUILDING_INDEX[type];
-		} else {
-			this.territory.pending[module] = BUILDING_INDEX[type];
-			this.territory.construction[module] = BUILD_TICKS[type];
-		}
+		const ticks = Math.round(
+			BUILD_TICKS[type] * (this.isConversion(module) ? CONVERSION_TIME : 1),
+		);
+		this.territory.pending[module] = BUILDING_INDEX[type];
+		this.territory.construction[module] = ticks;
 		this.recount();
 	}
 
@@ -973,6 +1027,10 @@ export class World {
 
 	private attackFrom(factionId: number, module: number): boolean {
 		const faction = this.factions[factionId]!;
+		// Pas plus de N assauts simultanés : il faut choisir ses fronts.
+		if (this.attacks.filter((attack) => attack.factionId === factionId).length >= MAX_ASSAULTS) {
+			return false;
+		}
 		const troops = Math.floor(faction.members * COMMIT_RATIO);
 		if (troops < MIN_COMMIT) return false;
 		this.registerAttack(factionId, this.territory.owner[module]!);
@@ -1077,7 +1135,10 @@ export class World {
 			const defense =
 				(ZONE_DEFENSE[zone] ?? 1) * planque * (1 + defenderBonus) * traitorDefense;
 			const attackBonus = 1 + this.attackBonus(attack.factionId);
-			const damage = Math.max(0.5, (attack.troops * DAMAGE_PER_TROOP * attackBonus) / defense);
+			const damage = Math.min(
+				MAX_DAMAGE_PER_TICK,
+				Math.max(0.5, (attack.troops * DAMAGE_PER_TROOP * attackBonus) / defense),
+			);
 			const control = this.territory.control[attack.target]! - damage;
 			attack.troops -= damage * ATTACK_LOSS;
 

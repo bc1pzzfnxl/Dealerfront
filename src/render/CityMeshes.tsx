@@ -106,6 +106,7 @@ export function CityMeshes({
 			<GroundTiles city={city} />
 			<Buildings city={city} />
 			<Landmarks city={city} />
+			<ZoneDetails city={city} />
 			<Lampposts city={city} />
 			<Cars city={city} />
 			<Trees city={city} />
@@ -245,6 +246,130 @@ function Buildings({ city }: { city: CityGrid }) {
 			<instancedMesh ref={corniceRef} args={[corniceGeometry, undefined, mainModules.length]} castShadow receiveShadow frustumCulled={false}>
 				<meshLambertMaterial flatShading />
 			</instancedMesh>
+		</>
+	);
+}
+
+/** Détails par zone : immeubles en gradins, enseignes, cheminées, néons. */
+function ZoneDetails({ city }: { city: CityGrid }) {
+	const residentialRef = useRef<THREE.InstancedMesh>(null);
+	const commercialRef = useRef<THREE.InstancedMesh>(null);
+	const nightlifeRef = useRef<THREE.InstancedMesh>(null);
+	const chimneyRef = useRef<THREE.InstancedMesh>(null);
+
+	const lists = useMemo(() => {
+		const residential: number[] = [];
+		const commercial: number[] = [];
+		const nightlife: number[] = [];
+		const industrial: number[] = [];
+		for (let i = 0; i < city.modules.length; i += 1) {
+			const zone = city.modules[i]!;
+			const moduleX = i % MODULES_W;
+			const moduleY = Math.floor(i / MODULES_W);
+			if (zone === "residential" && hash2(moduleX, moduleY, city.seed + 61) > 0.35) {
+				residential.push(i);
+			} else if (zone === "commercial") {
+				commercial.push(i);
+			} else if (zone === "nightlife") {
+				nightlife.push(i);
+			} else if (zone === "industrial") {
+				industrial.push(i);
+			}
+		}
+		return { residential, commercial, nightlife, industrial };
+	}, [city]);
+
+	useLayoutEffect(() => {
+		const dummy = new THREE.Object3D();
+		const color = new THREE.Color();
+		const residential = residentialRef.current;
+		const commercial = commercialRef.current;
+		const nightlife = nightlifeRef.current;
+		const chimney = chimneyRef.current;
+		if (!residential || !commercial || !nightlife || !chimney) return;
+
+		// Immeubles en gradins (résidentiel) : second volume en retrait.
+		lists.residential.forEach((module, index) => {
+			const center = buildingCenter(city, module);
+			const h = buildingHeight(city, module);
+			const f = buildingFootprint(city, module);
+			const setback = h * 0.45;
+			dummy.position.set(center.x, LOT_TOP + h + setback / 2 - 0.1, center.z);
+			dummy.scale.set(f * 0.55, setback, f * 0.55);
+			dummy.updateMatrix();
+			residential.setMatrixAt(index, dummy.matrix);
+			residential.setColorAt(index, color.setScalar(0.5));
+		});
+
+		// Enseignes (commerce) : auvent plat, plus clair.
+		lists.commercial.forEach((module, index) => {
+			const center = buildingCenter(city, module);
+			const h = buildingHeight(city, module);
+			const f = buildingFootprint(city, module);
+			dummy.position.set(center.x, LOT_TOP + h + 0.22, center.z);
+			dummy.scale.set(f * 1.15, 0.4, f * 0.45);
+			dummy.updateMatrix();
+			commercial.setMatrixAt(index, dummy.matrix);
+			commercial.setColorAt(index, color.setScalar(0.9));
+		});
+
+		// Néons (vie nocturne) : bande lumineuse en façade.
+		lists.nightlife.forEach((module, index) => {
+			const center = buildingCenter(city, module);
+			const h = buildingHeight(city, module);
+			const f = buildingFootprint(city, module);
+			dummy.position.set(center.x, LOT_TOP + h * 0.72, center.z);
+			dummy.scale.set(f * 1.08, 0.5, f * 1.08);
+			dummy.updateMatrix();
+			nightlife.setMatrixAt(index, dummy.matrix);
+			nightlife.setColorAt(index, color.setScalar(0.98));
+		});
+
+		// Cheminées (industriel).
+		lists.industrial.forEach((module, index) => {
+			const center = buildingCenter(city, module);
+			const h = buildingHeight(city, module);
+			const f = buildingFootprint(city, module);
+			const stack = h + 1.6;
+			dummy.position.set(center.x + f * 0.42, LOT_TOP + stack / 2, center.z - f * 0.42);
+			dummy.scale.set(1, stack, 1);
+			dummy.updateMatrix();
+			chimney.setMatrixAt(index, dummy.matrix);
+			chimney.setColorAt(index, color.setScalar(0.42));
+		});
+
+		for (const mesh of [residential, commercial, nightlife, chimney]) {
+			mesh.instanceMatrix.needsUpdate = true;
+			if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+		}
+	}, [city, lists]);
+
+	return (
+		<>
+			{lists.residential.length > 0 ? (
+				<instancedMesh ref={residentialRef} args={[undefined, undefined, lists.residential.length]} castShadow receiveShadow frustumCulled={false}>
+					<boxGeometry args={[1, 1, 1]} />
+					<meshLambertMaterial flatShading />
+				</instancedMesh>
+			) : null}
+			{lists.commercial.length > 0 ? (
+				<instancedMesh ref={commercialRef} args={[undefined, undefined, lists.commercial.length]} castShadow receiveShadow frustumCulled={false}>
+					<boxGeometry args={[1, 1, 1]} />
+					<meshLambertMaterial flatShading />
+				</instancedMesh>
+			) : null}
+			{lists.nightlife.length > 0 ? (
+				<instancedMesh ref={nightlifeRef} args={[undefined, undefined, lists.nightlife.length]} frustumCulled={false}>
+					<boxGeometry args={[1, 1, 1]} />
+					<meshBasicMaterial />
+				</instancedMesh>
+			) : null}
+			{lists.industrial.length > 0 ? (
+				<instancedMesh ref={chimneyRef} args={[undefined, undefined, lists.industrial.length]} castShadow frustumCulled={false}>
+					<cylinderGeometry args={[0.28, 0.34, 1, 8]} />
+					<meshLambertMaterial flatShading />
+				</instancedMesh>
+			) : null}
 		</>
 	);
 }

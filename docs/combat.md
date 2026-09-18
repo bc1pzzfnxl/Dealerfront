@@ -201,3 +201,10 @@ Adapté de la branche cible-joueur d'OpenFront. Soit `I_def` l'Influence défens
 - **BFS sur les rues / poches isolées** → adjacence de grille simple ; l'anti-snowball « clusters isolés » n'est pas encore en place.
 - **Retraite** (rend 75 % de l'Influence, `tickFraction` neutre) → non implémentées.
 - **Capture** : la spec annonce « transfère ses bâtiments » ; le code **détruit** le bâtiment (à trancher).
+
+### Réglages P15 — sièges et assauts
+
+- **Siège obligatoire** : dégâts `min(5 ; troupes × 0,0004 × (1+armement) / défense)` par tick ; régén de Contrôle **1,2/tick** ; troupes perdues `dégâts × 8`. Plus de prise instantanée.
+- **Assauts simultanés limités à 3** par faction : il faut **choisir ses fronts** (fini le « clique-partout »).
+- **Raids** : dégâts de zone, ne capturent pas. Le joueur a un **Raid** payant (2 500 Cash sale + 800 Membres, −35 Contrôle, **détruit le bâtiment**, recharge 30 s).
+- Garnison neutre **60** (l'expansion neutre reste possible mais coûteuse en temps).

@@ -78,6 +78,14 @@ function giveNeutral(world: World, factionId: number, count: number): void {
 }
 
 /** Empêche les IA d'attaquer (évite que leurs actions interfèrent avec un chantier). */
+/** Avance jusqu'à la fin des chantiers donnés. */
+function finishBuild(world: World, ...modules: number[]): void {
+	for (let i = 0; i < 3000; i += 1) {
+		if (modules.every((module) => world.constructionLeft(module) === 0)) return;
+		world.step();
+	}
+}
+
 function disarmAi(world: World): void {
 	for (let f = 1; f < world.factions.length; f += 1) world.factions[f]!.members = 0;
 }
@@ -179,16 +187,18 @@ describe("construction — refus", () => {
 });
 
 describe("construction — conversion vs chantier", () => {
-	it("la conversion est instantanée et coûte −50 %", () => {
+	it("la conversion coûte −50 % et prend la moitié du temps", () => {
 		const world = new World(1, "nightlife");
 		world.player.cashSale = 10000;
 		const module = ownConversion(world, world.player.id, "facade");
 		expect(module).toBeGreaterThanOrEqual(0);
 		expect(world.playerBuild(module, "facade")).toBe(true);
 		expect(world.player.cashSale).toBe(10000 - BUILDINGS.facade.costSale! * CONVERSION_COST);
+		expect(world.buildingAt(module)).toBeNull();
+		expect(world.constructionLeft(module)).toBe(Math.round(BUILD_TICKS.facade * 0.5));
+		expect(world.pendingBuilding(module)).toBe("facade");
+		finishBuild(world, module);
 		expect(world.buildingAt(module)).toBe("facade");
-		expect(world.constructionLeft(module)).toBe(0);
-		expect(world.pendingBuilding(module)).toBeNull();
 	});
 
 	it("la construction neuve sur terrain vague suit BUILD_TICKS", () => {
@@ -410,6 +420,7 @@ describe("tech", () => {
 		const first = ownConversion(world, player.id, "atelier");
 		expect(first).toBeGreaterThanOrEqual(0);
 		expect(world.playerBuild(first, "atelier")).toBe(true);
+		finishBuild(world, first);
 		expect(world.maxTechLevel(player.id)).toBe(1);
 
 		const before = player.cashPropre;
@@ -422,6 +433,7 @@ describe("tech", () => {
 		const second = ownConversion(world, player.id, "atelier");
 		expect(second).toBeGreaterThanOrEqual(0);
 		expect(world.playerBuild(second, "atelier")).toBe(true);
+		finishBuild(world, second);
 		expect(world.maxTechLevel(player.id)).toBe(2);
 		const beforeSecond = player.cashPropre;
 		expect(world.playerUpgradeTech("armement")).toBe(true);
@@ -434,6 +446,7 @@ describe("tech", () => {
 		player.cashPropre = BUILDINGS.atelier.costClean! * CONVERSION_COST;
 		const module = ownConversion(world, player.id, "atelier");
 		expect(world.playerBuild(module, "atelier")).toBe(true);
+		finishBuild(world, module);
 		player.cashPropre = 0;
 		expect(world.maxTechLevel(player.id)).toBe(1);
 		expect(world.canUpgradeTech(player.id, "armement")).toBe(false);
@@ -735,6 +748,7 @@ describe("cohérence de l'état", () => {
 		const base = world.defenseAt(module);
 		world.player.cashSale = 100000;
 		expect(world.playerBuild(module, "planque")).toBe(true);
+		finishBuild(world, module);
 		const withPlanque = world.defenseAt(module);
 		expect(withPlanque).toBeCloseTo(base * BUILDING_EFFECTS.planqueDefense);
 
@@ -754,6 +768,7 @@ describe("cohérence de l'état", () => {
 		world.player.cashSale = 100000;
 		const module = ownConversion(world, world.player.id, "labo");
 		expect(world.playerBuild(module, "labo")).toBe(true);
+		finishBuild(world, module);
 		expect(world.buildingCount(world.player.id, "labo")).toBe(1);
 		expect(world.buildingCounts(world.player.id).labo).toBe(1);
 	});
@@ -795,5 +810,46 @@ describe("régressions (bugs corrigés)", () => {
 		world.player.cashPropre = 100_000;
 		forceVictory(world);
 		expect(world.canUpgradeTech(0, "armement")).toBe(false);
+	});
+});
+
+describe("raid & assauts simultanés", () => {
+	it("le raid affaiblit un quartier adjacent sans le capturer", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.cashSale = 100_000;
+		player.members = 100_000;
+		const target = ADJACENT;
+		world.territory.owner[target] = 1;
+		world.territory.control[target] = 100;
+		world.territory.building[target] = BUILDING_INDEX.planque;
+
+		expect(world.playerCanRaid(target)).toBe(true);
+		const sale = player.cashSale;
+		expect(world.playerRaid(target)).toBe(true);
+		expect(world.ownerAt(target)).toBe(1);
+		expect(world.controlAt(target)).toBe(65);
+		expect(world.buildingAt(target)).toBeNull();
+		expect(player.cashSale).toBe(sale - world.raidCost().sale);
+		expect(world.playerCanRaid(target)).toBe(false);
+	});
+
+	it("limite les assauts simultanés", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.members = 100_000;
+		// Possède une ligne (indices 32..35) et vise la ligne du dessous (48..51).
+		for (let i = 32; i <= 35; i += 1) {
+			world.territory.owner[i] = player.id;
+			world.territory.control[i] = 100;
+		}
+		for (const target of [48, 49, 50, 51]) {
+			world.territory.owner[target] = NEUTRAL;
+			world.territory.control[target] = 100;
+		}
+		expect(world.playerAttack(48)).toBe(true);
+		expect(world.playerAttack(49)).toBe(true);
+		expect(world.playerAttack(50)).toBe(true);
+		expect(world.playerAttack(51)).toBe(false);
 	});
 });

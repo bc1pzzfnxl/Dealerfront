@@ -187,3 +187,7 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
   - **Reconnaître** (bouton sur un quartier inconnu) : coûte **1 500 Cash sale**, révèle un carré de rayon 2 pendant **60 s**, cooldown **30 s**.
   - **Contre-espionnage** : révèle en permanence un rayon de 2 autour de lui (en plus de son effet anti-tueur).
 - La **minimap** applique la même règle (inconnu = sombre, notre base = nette, adverses connus = atténués).
+
+### Diplomatie et information (P15)
+
+- Le panneau **Diplomatie** ne montre **plus** les % de contrôle des rivaux non renseignés : il affiche `?` (inconnu) ou `~X %` (partiellement connu via la vision/reconnaissance).

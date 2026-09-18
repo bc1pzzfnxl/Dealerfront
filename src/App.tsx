@@ -15,7 +15,7 @@ import {
 import { archetypeOf } from "./sim/city";
 import { SimClock } from "./sim/clock";
 import { MODULES_W, MODULE_SIZE, SIM_HZ } from "./sim/constants";
-import { TECH, TECH_BRANCHES, TECH_LABELS, techCost } from "./sim/tech";
+import { HITMAN, TECH, TECH_BRANCHES, TECH_LABELS, techCost } from "./sim/tech";
 import { POLICE_TIER_LABELS } from "./sim/police";
 import { NEUTRAL } from "./sim/territory";
 import { ZONE_LABELS } from "./sim/types";
@@ -116,6 +116,7 @@ function App() {
 
 	const world = useMemo(() => new World(seed), [seed]);
 	const [hovered, setHovered] = useState<number | null>(null);
+	const [notice, setNotice] = useState<string | null>(null);
 	const hoverRef = useRef<HTMLDivElement>(null);
 	const rafRef = useRef<number | null>(null);
 	const lastRef = useRef(0);
@@ -137,6 +138,13 @@ function App() {
 			// stockage indisponible : mode non persisté
 		}
 	}, [colorblind]);
+
+	// Message transitoire (retour d'action refusée).
+	useEffect(() => {
+		if (!notice) return;
+		const timer = setTimeout(() => setNotice(null), 3200);
+		return () => clearTimeout(timer);
+	}, [notice]);
 
 	// Infobulle : suit le curseur sans re-render (transform impératif).
 	useEffect(() => {
@@ -250,7 +258,6 @@ function App() {
 	const isOwned = selected !== null && selectedOwner === player.id;
 	const selectedBuilding = selected !== null ? world.buildingAt(selected) : null;
 	const canAttack = selected !== null && world.playerCanAttack(selected);
-	const canHitman = selected !== null && world.playerCanHitman(selected);
 	const selectedOwnerName =
 		selectedOwner === NEUTRAL ? "Neutre" : (world.factions[selectedOwner]?.name ?? "—");
 
@@ -282,6 +289,32 @@ function App() {
 		if (world.playerAttack(selected)) setVersion((value) => value + 1);
 	}, [selected, world]);
 
+	const hitmanReason = useCallback((): string | null => {
+		if (selected === null) return "aucune cible";
+		const owner = world.ownerAt(selected);
+		if (owner === player.id) return "déjà à vous";
+		if (owner === NEUTRAL) return "cible neutre";
+		if (player.tech.armement < HITMAN.requiredArmement) {
+			return `Armement ≥ ${HITMAN.requiredArmement} requis`;
+		}
+		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		if (player.cashPropre < HITMAN.costClean) return `${HITMAN.costClean} Cash propre requis`;
+		if (player.members < HITMAN.costMembers) return `${HITMAN.costMembers} membres requis`;
+		return null;
+	}, [selected, world, player]);
+
+	const raidReason = useCallback((): string | null => {
+		if (selected === null) return "aucune cible";
+		if (world.ownerAt(selected) === NEUTRAL) return "cible neutre";
+		if (world.ownerAt(selected) === player.id) return "déjà à vous";
+		if (!world.canAttack(player.id, selected)) return "non adjacent";
+		const cost = world.raidCost();
+		if (player.cashSale < cost.sale) return `${cost.sale} sale requis`;
+		if (player.members < cost.members) return `${cost.members} membres requis`;
+		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		return null;
+	}, [selected, world, player]);
+
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (event.code === "KeyQ" || event.code === "KeyA") {
@@ -289,14 +322,19 @@ function App() {
 				act();
 				return;
 			}
-			if (event.code === "KeyT" && selected !== null) {
+			if (event.code === "KeyT") {
 				event.preventDefault();
+				if (selected === null) {
+					setNotice("Tueur à gage : sélectionnez d'abord un quartier ennemi.");
+					return;
+				}
 				if (world.playerHitman(selected)) setVersion((value) => value + 1);
+				else setNotice(`Tueur à gage : ${hitmanReason() ?? "impossible"}.`);
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [act, selected, world]);
+	}, [act, selected, world, hitmanReason]);
 
 	const startCity = (citySeed: number) => {
 		setSeed(citySeed);
@@ -596,6 +634,7 @@ function App() {
 
 				<section className="card panel-left">
 					<p className="advisor">{advisor}</p>
+					{notice ? <p className="notice">{notice}</p> : null}
 					<h2>
 						Quartier <em>{selected !== null ? `module ${selected}` : "—"}</em>
 					</h2>
@@ -704,27 +743,48 @@ function App() {
 					) : (
 						<>
 							<button type="button" disabled={!canAttack} onClick={act}>
-								{canAttack ? `Attaquer (Q) · ${engaged} engagés` : "Non attaquable"}
+								{canAttack ? `Assaut (Q) · ${engaged} engagés` : "Non attaquable"}
 							</button>
 							{canAttack ? (
 								<p className="hint-inline">
-									Contrôle {targetControl} · défense ×{targetDefense.toFixed(1)} (zone
-									{world.buildingAt(selected!) === "planque" ? " + planque" : ""})
+									Siège : contrôle {targetControl} · défense ×{targetDefense.toFixed(1)}
+									{world.buildingAt(selected!) === "planque" ? " (planque)" : ""} · max{" "}
+									{world.maxAssaults()} assauts simultanés
 								</p>
 							) : (
 								<p className="hint-inline">{attackReason}</p>
 							)}
-							{canHitman ? (
+							{selectedOwner !== player.id && selectedOwner !== NEUTRAL ? (
 								<button
 									type="button"
-									className="hitman"
+									disabled={raidReason() !== null}
+									title={raidReason() ?? "Détruit le contrôle et les bâtiments, sans capturer"}
 									onClick={() => {
-										if (selected !== null && world.playerHitman(selected)) {
+										if (selected !== null && world.playerRaid(selected)) {
 											setVersion((value) => value + 1);
+										} else {
+											setNotice(`Raid : ${raidReason() ?? "impossible"}.`);
 										}
 									}}
 								>
-									Tueur à gage (T)
+									Raid ({world.raidCost().sale} sale{raidReason() ? ` · ${raidReason()}` : ""})
+								</button>
+							) : null}
+							{selectedOwner !== player.id ? (
+								<button
+									type="button"
+									className="hitman"
+									disabled={hitmanReason() !== null}
+									title={hitmanReason() ?? "Affaiblit un quartier (Armement ≥ 2)"}
+									onClick={() => {
+										if (selected !== null && world.playerHitman(selected)) {
+											setVersion((value) => value + 1);
+										} else {
+											setNotice(`Tueur à gage : ${hitmanReason() ?? "impossible"}.`);
+										}
+									}}
+								>
+									Tueur à gage (T){hitmanReason() ? ` · ${hitmanReason()}` : ""}
 								</button>
 							) : null}
 						</>
@@ -859,8 +919,11 @@ function App() {
 										) : null}
 									</span>
 									<code>
-										{Math.round(world.controlRatio(faction.id) * 100)}%
-										{isSelf ? "" : ` · ${relation}`}
+										{isSelf
+											? `${Math.round(world.controlRatio(faction.id) * 100)}%`
+											: world.knownModulesOwned(faction.id) > 0
+												? `~${Math.round(world.knownControlRatio(faction.id) * 100)}% · ${relation}`
+												: `? · ${relation}`}
 									</code>
 									{isSelf ? (
 										<span />
