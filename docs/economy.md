@@ -259,3 +259,8 @@ Un quartier possédé et **vide** ne peut être converti que vers les types **co
 - **Construction neuve** (terrain vague) : **coût plein** + **chantier** (`BUILD_TICKS` ≈ 3–8 s selon le type, 10 Hz).
 - **Chantier** : payé à l'ordre, **parallèle** (un par quartier), **perdu** si le quartier est capturé ou le bâtiment détruit (raid police, tueur). Le quartier ne produit rien pendant les travaux.
 - Rendu : bloc **ambre réduit** sur la carte ; panneau Quartier → « Chantier : X — encore N s ».
+
+### Blanchiment contrôlé (P13)
+
+- Le joueur règle un **ratio de blanchiment 0–100 %** (curseur) : la capacité effective des façades est `façades × 60 × ratio`.
+- À **0 %**, le Cash sale s'accumule (pour acheter) ; à **100 %**, tout part en Cash propre (objectif). Compromis central de la boucle.

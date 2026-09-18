@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { play, setEnabled, setVolume, type SoundName } from "cuelume";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IsoCanvas } from "./render/IsoCanvas";
 import { FACTION_SYMBOLS } from "./render/palette";
 import { Radar } from "./render/Radar";
@@ -13,13 +14,29 @@ import {
 } from "./sim/buildings";
 import { archetypeOf } from "./sim/city";
 import { SimClock } from "./sim/clock";
-import { DIPLOMACY } from "./sim/diplomacy";
 import { MODULES_W, MODULE_SIZE, SIM_HZ } from "./sim/constants";
-import { HITMAN, TECH, TECH_BRANCHES, TECH_LABELS, techCost } from "./sim/tech";
+import { TECH, TECH_BRANCHES, TECH_LABELS, techCost } from "./sim/tech";
 import { POLICE_TIER_LABELS } from "./sim/police";
 import { NEUTRAL } from "./sim/territory";
 import { ZONE_LABELS } from "./sim/types";
-import { World } from "./sim/world";
+import { World, type GameEvent } from "./sim/world";
+
+/** Retour sonore par événement de jeu (cuelume). */
+const EVENT_SOUND: Record<GameEvent, SoundName> = {
+	attack: "pulse",
+	capture: "success",
+	lost: "error",
+	raid: "error",
+	hitman: "scan",
+	tech: "ready",
+	pact: "toggle",
+	betray: "error",
+	embargo: "scan",
+	corrupt: "droplet",
+	build: "press",
+	victory: "arrival",
+	defeat: "error",
+};
 
 const ARCHETYPE_LABEL: Record<string, string> = {
 	nightlife: "Vie nocturne",
@@ -35,6 +52,30 @@ function formatCost(type: BuildingType, factor = 1): string {
 	if (spec.costSale) return `${Math.round(spec.costSale * factor)} sale`;
 	if (spec.costClean) return `${Math.round(spec.costClean * factor)} propre`;
 	return "—";
+}
+
+/** Carte repliable — allège l'IHM en masquant les panneaux secondaires. */
+function Section({
+	title,
+	aside,
+	defaultOpen = true,
+	children,
+}: {
+	title: string;
+	aside?: string;
+	defaultOpen?: boolean;
+	children: ReactNode;
+}) {
+	const [open, setOpen] = useState(defaultOpen);
+	return (
+		<section className="card">
+			<h2 className="collapsible" onClick={() => setOpen((value) => !value)}>
+				{title} {aside ? <em>{aside}</em> : null}
+				<span className="chevron">{open ? "▾" : "▸"}</span>
+			</h2>
+			{open ? children : null}
+		</section>
+	);
 }
 
 function App() {
@@ -57,6 +98,13 @@ function App() {
 		}
 	});
 	/** Aide affichée à la première partie (rappel « but du jeu »). */
+	const [sound, setSound] = useState(() => {
+		try {
+			return localStorage.getItem("df-sound") !== "0";
+		} catch {
+			return true;
+		}
+	});
 	const [showHelp, setShowHelp] = useState(() => {
 		try {
 			return localStorage.getItem("df-help") !== "1";
@@ -86,6 +134,34 @@ function App() {
 			// stockage indisponible : mode non persisté
 		}
 	}, [colorblind]);
+
+	// Volume + activation des sons (préférence locale).
+	useEffect(() => {
+		setVolume(0.5);
+		setEnabled(sound);
+		try {
+			localStorage.setItem("df-sound", sound ? "1" : "0");
+		} catch {
+			// stockage indisponible : préférence non persistée
+		}
+	}, [sound]);
+
+	// Sons des événements de jeu (file drainée à chaque rendu).
+	useEffect(() => {
+		const events = world.drainEvents();
+		if (!sound) return;
+		for (const event of events) play(EVENT_SOUND[event]);
+	}, [version, world, sound]);
+
+	// Clic sur n'importe quel bouton → feedback « press ».
+	useEffect(() => {
+		if (!sound) return;
+		const onClick = (event: MouseEvent) => {
+			if ((event.target as HTMLElement).closest("button")) play("press", { volume: 0.35 });
+		};
+		document.addEventListener("click", onClick);
+		return () => document.removeEventListener("click", onClick);
+	}, [sound]);
 
 	// L'aide est marquée « vue » dès le premier affichage (rouvrable via le bouton Aide).
 	useEffect(() => {
@@ -134,7 +210,7 @@ function App() {
 	}, [world]);
 
 	useEffect(() => {
-		if (!running || screen !== "play") return;
+		if (!running || screen !== "play" || showHelp) return;
 		const clock = new SimClock(() => {
 			world.step();
 			if (world.outcome !== null) setRunning(false);
@@ -152,7 +228,7 @@ function App() {
 			if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
 			rafRef.current = null;
 		};
-	}, [running, world, screen]);
+	}, [running, world, screen, showHelp]);
 
 	const player = world.player;
 	const selectedOwner = selected !== null ? world.ownerAt(selected) : NEUTRAL;
@@ -533,12 +609,15 @@ function App() {
 										{BUILDING_EFFECT_LABELS[recommendedType]}
 									</p>
 								) : null}
-								<p className="hint-inline">
+								<p
+									className="hint-inline"
+									title={allowedHere.map((type) => BUILDINGS[type].label).join(", ")}
+								>
 									Zone <strong>{selectedZoneLabel}</strong> —{" "}
 									{isConversion
-										? "conversion −50 % (immédiate)"
-										: `construction neuve (coût plein${recommendedType ? `, ${Math.round(BUILD_TICKS[recommendedType] / SIM_HZ)} s` : ""})`}{" "}
-									: {allowedHere.map((type) => BUILDINGS[type].label).join(", ")}.
+										? "conversion −50 %"
+										: `chantier${recommendedType ? ` ${Math.round(BUILD_TICKS[recommendedType] / SIM_HZ)} s` : ""}`}
+									.
 								</p>
 							</>
 						)
@@ -617,10 +696,10 @@ function App() {
 						</button>
 					</section>
 
-					<section className="card">
-						<h2>
-							Tech <em>{world.buildingCount(player.id, "atelier")} atelier(s)</em>
-						</h2>
+					<Section
+						title="Tech"
+						aside={`${world.buildingCount(player.id, "atelier")} atelier(s)`}
+					>
 						{TECH_BRANCHES.map((branch) => {
 							const level = player.tech[branch];
 							const max = world.maxTechLevel(player.id);
@@ -646,15 +725,13 @@ function App() {
 								</div>
 							);
 						})}
-						<p className="hint-inline">
-							Atelier requis (1 niveau par Atelier) · Tueur : Armement ≥ {HITMAN.requiredArmement}.
-						</p>
-					</section>
+					</Section>
 
-					<section className="card">
-						<h2>
-							Diplomatie <em>{world.pacts.length} pacte(s)</em>
-						</h2>
+					<Section
+						title="Diplomatie"
+						aside={`${world.pacts.length} pacte(s)`}
+						defaultOpen={false}
+					>
 						{world.playerOffers().map((offer) => (
 							<div className="dip-row" key={`offer-${offer.from}`}>
 								<span>{world.factions[offer.from]?.name} propose un pacte</span>
@@ -744,11 +821,7 @@ function App() {
 								</div>
 							);
 						})}
-						<p className="hint-inline">
-							Relation 0–100 · pacte si ≥ {DIPLOMACY.acceptRelation} · trahir pénalise (défense ×
-							{DIPLOMACY.traitorDefense}).
-						</p>
-					</section>
+					</Section>
 				</aside>
 
 				<footer className="panel-bottom">
@@ -767,6 +840,24 @@ function App() {
 								</code>
 							</div>
 						))}
+						<label className="slider-row" title="Part de la capacité des façades blanchie">
+							<span>Blanchiment</span>
+							<input
+								type="range"
+								min={0}
+								max={100}
+								step={5}
+								value={Math.round(world.playerLaunderRatio() * 100)}
+								onChange={(event) => {
+									world.playerSetLaunderRatio(Number(event.target.value) / 100);
+									setVersion((value) => value + 1);
+								}}
+							/>
+							<code>{Math.round(world.playerLaunderRatio() * 100)}%</code>
+						</label>
+						<p className="hint-inline">
+							Baissez pour garder du Cash sale (achats), montez pour l'objectif de victoire.
+						</p>
 					</section>
 					<section className="card journal-card">
 						<h2>Journal</h2>
@@ -796,6 +887,13 @@ function App() {
 								onClick={() => setColorblind((value) => !value)}
 							>
 								Daltonien
+							</button>
+							<button
+								type="button"
+								className={`toggle${sound ? " active" : ""}`}
+								onClick={() => setSound((value) => !value)}
+							>
+								{sound ? "Son" : "Muet"}
 							</button>
 							<button type="button" className="toggle" onClick={() => setShowHelp(true)}>
 								Aide

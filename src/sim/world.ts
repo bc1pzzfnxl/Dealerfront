@@ -106,6 +106,22 @@ export interface Attack {
 
 export type Outcome = null | "victory" | "defeat";
 
+/** Événements **du joueur** (retour audio/UX), drainés par l'IHM. */
+export type GameEvent =
+	| "attack"
+	| "capture"
+	| "lost"
+	| "raid"
+	| "hitman"
+	| "tech"
+	| "pact"
+	| "betray"
+	| "embargo"
+	| "corrupt"
+	| "build"
+	| "victory"
+	| "defeat";
+
 export class World {
 	readonly city: CityGrid;
 	readonly territory: Territory;
@@ -125,6 +141,9 @@ export class World {
 	readonly pacts: Pact[] = [];
 	readonly offers: PactOffer[] = [];
 	readonly embargoes: Embargo[] = [];
+	/** Événements joueur en attente d'être consommés par l'IHM. */
+	private readonly events: GameEvent[] = [];
+	private outcomeRecorded = false;
 	/** Index du contact corrompu courant (change s'il est grillé). */
 	private contactIndex: number;
 	tick = 0;
@@ -274,6 +293,7 @@ export class World {
 		faction.cashPropre -= techCost(level + 1);
 		faction.tech[branch] = level + 1;
 		this.pushLog(`Tech ${branch} → ${level + 1}`);
+		if (factionId === this.player.id) this.events.push("tech");
 		return true;
 	}
 
@@ -300,6 +320,7 @@ export class World {
 	playerHitman(module: number): boolean {
 		if (!this.canHitman(this.player.id, module)) return false;
 		this.player.hitmanCooldown = HITMAN.cooldownTicks;
+		this.events.push("hitman");
 		this.payHitman(this.player.id);
 		this.applyHitman(this.player.id, module);
 		this.pushLog(`Tueur à gage envoyé (module ${module})`);
@@ -386,11 +407,13 @@ export class World {
 			);
 			this.contactIndex = (this.contactIndex + 1) % CONTACT_NAMES.length;
 			this.pushLog(`Contact grillé (${faction.name}) — nouveau contact : ${this.contactName}`);
+			if (faction.isPlayer) this.events.push("corrupt");
 			return true;
 		}
 		this.police.pressure = Math.max(0, this.police.pressure - POLICE.corruptionReduction);
 		this.police.window = POLICE.corruptionWindow;
 		this.pushLog(`${this.contactName} fait baisser la Pression (${faction.name})`);
+		if (faction.isPlayer) this.events.push("corrupt");
 		return true;
 	}
 
@@ -441,7 +464,9 @@ export class World {
 	}
 
 	playerProposePact(factionId: number): boolean {
-		return this.proposePact(this.player.id, factionId);
+		if (!this.proposePact(this.player.id, factionId)) return false;
+		this.events.push("pact");
+		return true;
 	}
 
 	playerRespondToOffer(from: number, accept: boolean): boolean {
@@ -454,6 +479,7 @@ export class World {
 		this.offers.splice(index, 1);
 		if (accept && !this.hasEmbargo(offer.from, offer.to)) {
 			this.formPact(offer.from, offer.to);
+			this.events.push("pact");
 		} else {
 			this.pushLog(`Pacte refusé (${this.factions[from]!.name})`);
 		}
@@ -504,6 +530,7 @@ export class World {
 			}
 		}
 		this.pushLog(`Embargo déclaré sur ${this.factions[factionId]!.name}`);
+		this.events.push("embargo");
 		return true;
 	}
 
@@ -514,6 +541,7 @@ export class World {
 		if (!pact) return false;
 		this.pacts.splice(this.pacts.indexOf(pact), 1);
 		this.betray(this.player.id, factionId);
+		this.events.push("betray");
 		return true;
 	}
 
@@ -688,6 +716,7 @@ export class World {
 		if (targets.length > 0) this.recount();
 		const leaderFaction = this.factions[leader]!;
 		leaderFaction.raidsSuffered += 1;
+		if (leaderFaction.isPlayer) this.events.push("raid");
 		if (multiple) {
 			leaderFaction.cashPropre *= 1 - POLICE.seizureRatio;
 			leaderFaction.seizures += 1;
@@ -729,7 +758,9 @@ export class World {
 	playerAttack(module: number): boolean {
 		if (this.outcome !== null) return false;
 		if (!this.canAttack(this.player.id, module)) return false;
-		return this.attackFrom(this.player.id, module);
+		if (!this.attackFrom(this.player.id, module)) return false;
+		this.events.push("attack");
+		return true;
 	}
 
 	playerCanAttack(module: number): boolean {
@@ -772,6 +803,7 @@ export class World {
 				? `${BUILDINGS[type].label} aménagé (module ${module})`
 				: `Chantier ${BUILDINGS[type].label} (module ${module})`,
 		);
+		this.events.push("build");
 		return true;
 	}
 
@@ -784,6 +816,21 @@ export class World {
 		const defenderBonus = owner === NEUTRAL ? 0 : this.defenseBonus(owner);
 		const traitor = owner !== NEUTRAL && this.isTraitor(owner) ? DIPLOMACY.traitorDefense : 1;
 		return (ZONE_DEFENSE[zone] ?? 1) * planque * (1 + defenderBonus) * traitor;
+	}
+
+	/** Ratio de blanchiment du joueur (0–1). */
+	playerLaunderRatio(): number {
+		return this.player.launderRatio;
+	}
+
+	playerSetLaunderRatio(ratio: number): void {
+		this.player.launderRatio = Math.max(0, Math.min(1, ratio));
+	}
+
+	/** Consomme les événements joueur accumulés depuis le dernier rendu. */
+	drainEvents(): GameEvent[] {
+		if (this.events.length === 0) return [];
+		return this.events.splice(0, this.events.length);
 	}
 
 	commitRatio(): number {
@@ -895,6 +942,10 @@ export class World {
 		this.updateTreasury();
 		this.updatePolice();
 		this.checkOutcome();
+		if (this.outcome !== null && !this.outcomeRecorded) {
+			this.outcomeRecorded = true;
+			this.events.push(this.outcome === "victory" ? "victory" : "defeat");
+		}
 	}
 
 	/** Production : membres (logements/quartiers) et produit (labos). */
@@ -927,8 +978,8 @@ export class World {
 	private launder(): void {
 		for (const faction of this.factions) {
 			const facades = this.buildingCount(faction.id, "facade");
-			if (facades === 0 || faction.cashSale <= 0) continue;
-			const capacity = facades * BUILDING_EFFECTS.cashPerFacade;
+			if (facades === 0 || faction.cashSale <= 0 || faction.launderRatio <= 0) continue;
+			const capacity = facades * BUILDING_EFFECTS.cashPerFacade * faction.launderRatio;
 			const laundered = Math.min(faction.cashSale, capacity);
 			faction.cashSale -= laundered;
 			faction.cashPropre += laundered * (1 - BUILDING_EFFECTS.commission);
@@ -994,6 +1045,8 @@ export class World {
 				const loser = previous === NEUTRAL ? "neutre" : this.factions[previous]!.name;
 				this.pushLog(`${taker} prend un quartier à ${loser}`);
 				this.police.crime += 1;
+				if (attack.factionId === this.player.id) this.events.push("capture");
+				else if (previous === this.player.id) this.events.push("lost");
 			} else if (attack.troops <= 0) {
 				this.territory.control[attack.target] = control;
 				this.attacks.splice(index, 1);

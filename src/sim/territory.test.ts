@@ -268,3 +268,33 @@ describe("construction neuve vs conversion", () => {
 		expect(world.constructionLeft(module)).toBe(0);
 	});
 });
+
+describe("blanchiment contrôlé", () => {
+	it("le ratio limite la conversion cash sale → cash propre", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.cashSale = 10_000;
+		const module = ownFor(world, player.id, "facade");
+		expect(world.playerBuild(module, "facade")).toBe(true);
+		world.territory.control[module] = 100;
+
+		world.playerSetLaunderRatio(0);
+		const saleBefore = player.cashSale;
+		world.step();
+		expect(player.cashSale).toBe(saleBefore);
+		expect(player.cashPropre).toBe(0);
+
+		world.playerSetLaunderRatio(1);
+		world.step();
+		expect(player.cashSale).toBeLessThan(saleBefore);
+		expect(player.cashPropre).toBeGreaterThan(0);
+	});
+
+	it("le ratio est borné à 0–1", () => {
+		const world = new World(1, "nightlife");
+		world.playerSetLaunderRatio(2);
+		expect(world.playerLaunderRatio()).toBe(1);
+		world.playerSetLaunderRatio(-1);
+		expect(world.playerLaunderRatio()).toBe(0);
+	});
+});
