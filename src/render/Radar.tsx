@@ -13,8 +13,6 @@ interface RadarProps {
 	territory: Territory;
 	factions: readonly Faction[];
 	attacks: readonly Attack[];
-	known: Uint8Array;
-	playerId: number;
 	selected: number | null;
 	colorblind: boolean;
 	version: number;
@@ -27,8 +25,6 @@ export function Radar({
 	territory,
 	factions,
 	attacks,
-	known,
-	playerId,
 	selected,
 	colorblind,
 	version,
@@ -80,15 +76,10 @@ export function Radar({
 			state.attacked[module] = underAttack[module]!;
 			const mx = module % MODULES_W;
 			const my = Math.floor(module / MODULES_W);
-			let fill = "#1B2026";
-			if (known[module] !== 1) {
-				fill = "#0B0E12";
-			} else if (owner !== NEUTRAL) {
+			let fill = "#242E3C";
+			if (owner !== NEUTRAL) {
 				const faction = factions[owner];
 				fill = faction ? factionDisplayColor(owner, faction.color, colorblind) : "#666";
-				if (owner !== playerId) {
-					ctx.globalAlpha = 0.45;
-				}
 			}
 			ctx.fillStyle = fill;
 			ctx.fillRect(mx * cell, my * cell, cell - 0.5, cell - 0.5);
@@ -106,7 +97,7 @@ export function Radar({
 		}
 		state.selected = selected;
 		state.colorblind = colorblind;
-	}, [city, territory, factions, attacks, known, playerId, selected, colorblind, version, count]);
+	}, [city, territory, factions, attacks, selected, colorblind, version, count]);
 
 	const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
 		const rect = event.currentTarget.getBoundingClientRect();

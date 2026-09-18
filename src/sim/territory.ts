@@ -20,6 +20,10 @@ export interface Territory {
 	readonly construction: Int16Array;
 	/** Bâtiment en chantier : NO_BUILDING sinon index. */
 	readonly pending: Int8Array;
+	/** Tick de livraison du bâtiment (animation de création). */
+	readonly builtAt: Int32Array;
+	/** Tick de la dernière capture (animation). */
+	readonly capturedAt: Int32Array;
 	readonly count: number;
 }
 
@@ -30,6 +34,8 @@ export function createTerritory(count: number): Territory {
 		building: new Int8Array(count).fill(NO_BUILDING),
 		construction: new Int16Array(count),
 		pending: new Int8Array(count).fill(NO_BUILDING),
+		builtAt: new Int32Array(count).fill(-999),
+		capturedAt: new Int32Array(count).fill(-999),
 		count,
 	};
 }

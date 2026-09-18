@@ -34,7 +34,6 @@ const EVENT_SOUND: Record<GameEvent, SoundName> = {
 	embargo: "scan",
 	corrupt: "droplet",
 	build: "press",
-	recon: "whisper",
 	victory: "arrival",
 	defeat: "error",
 };
@@ -452,7 +451,6 @@ function App() {
 			value: `${Math.round(player.cashPropre).toLocaleString("fr-FR")} propre`,
 		},
 	];
-	const hoverKnown = hovered !== null ? world.isKnown(hovered) : true;
 	const hoverOwner = hovered !== null ? world.ownerAt(hovered) : NEUTRAL;
 	const hoverOwnerName =
 		hoverOwner === NEUTRAL ? "Neutre" : (world.factions[hoverOwner]?.name ?? "—");
@@ -469,7 +467,6 @@ function App() {
 	const engaged = Math.floor(player.members * world.commitRatio());
 	const targetDefense = selected !== null ? world.defenseAt(selected) : 1;
 	const targetControl = selected !== null ? Math.round(world.controlAt(selected)) : 0;
-	const selectedKnown = selected !== null ? world.isKnown(selected) : true;
 	const selectedZoneLabel =
 		selected !== null ? (ZONE_LABELS[world.city.modules[selected]!] ?? "—") : "—";
 	const allowedHere = selected !== null ? world.allowedBuildings(selected) : [];
@@ -531,8 +528,7 @@ function App() {
 					territory={world.territory}
 					factions={world.factions}
 					attacks={world.attacks}
-					known={world.known}
-					playerId={player.id}
+					tick={world.tick}
 					focus={focus}
 					selected={selected}
 					colorblind={colorblind}
@@ -549,8 +545,6 @@ function App() {
 					territory={world.territory}
 					factions={world.factions}
 					attacks={world.attacks}
-					known={world.known}
-					playerId={player.id}
 					selected={selected}
 					colorblind={colorblind}
 					version={version}
@@ -562,19 +556,15 @@ function App() {
 				{hovered !== null ? (
 					<>
 						<span className="hover-owner">
-							{hoverKnown
-								? `${hoverOwnerName} · ${hoverZone ? ZONE_LABELS[hoverZone] : "—"} · contrôle ${hoverControl}`
-								: "Inconnu — reconnaissance requise"}
+							{hoverOwnerName} · {hoverZone ? ZONE_LABELS[hoverZone] : "—"} · contrôle {hoverControl}
 						</span>
-						{hoverKnown ? (
-							<span className="hover-line">
-								{hoverConstruction > 0
-									? `Chantier : ${hoverPending ? BUILDINGS[hoverPending].label : "—"} (${Math.ceil(hoverConstruction / SIM_HZ)} s)`
-									: hoverBuilding
-										? `${BUILDINGS[hoverBuilding].label} — ${BUILDING_EFFECT_LABELS[hoverBuilding]}`
-										: "Aucun bâtiment"}
-							</span>
-						) : null}
+						<span className="hover-line">
+							{hoverConstruction > 0
+								? `Chantier : ${hoverPending ? BUILDINGS[hoverPending].label : "—"} (${Math.ceil(hoverConstruction / SIM_HZ)} s)`
+								: hoverBuilding
+									? `${BUILDINGS[hoverBuilding].label} — ${BUILDING_EFFECT_LABELS[hoverBuilding]}`
+									: "Aucun bâtiment"}
+						</span>
 					</>
 				) : null}
 			</div>
@@ -638,56 +628,31 @@ function App() {
 					<h2>
 						Quartier <em>{selected !== null ? `module ${selected}` : "—"}</em>
 					</h2>
-					{selected !== null && !selectedKnown ? (
-						<>
-							<div className="line">
-								<span>Statut</span>
-								<code className="unknown">Inconnu</code>
-							</div>
-							<p className="hint-inline">
-								Zone non renseignée — propriétaire, contrôle et bâtiments sont masqués.
-							</p>
-						</>
-					) : (
-						<>
-							<div className="line">
-								<span>Propriétaire</span>
-								<code
-									style={{
-										color:
-											selectedOwner === NEUTRAL ? undefined : world.factions[selectedOwner]?.color,
-									}}
-								>
-									{selectedOwnerName}
-								</code>
-							</div>
-							<div className="line">
-								<span>Contrôle</span>
-								<code>{selected !== null ? Math.round(world.controlAt(selected)) : "—"}</code>
-							</div>
-							<div className="line">
-								<span>Bâtiment</span>
-								<code>{selectedBuilding ? BUILDINGS[selectedBuilding].label : "—"}</code>
-							</div>
-							<div className="line">
-								<span>Zone</span>
-								<code>{selectedZoneLabel}</code>
-							</div>
-						</>
-					)}
-
-					{selected !== null && !selectedKnown ? (
-						<button
-							type="button"
-							disabled={!world.playerCanRecon(selected)}
-							title="Révèle la zone pendant 60 s (cooldown 30 s)"
-							onClick={() => {
-								if (world.playerRecon(selected)) setVersion((value) => value + 1);
+					<div className="line">
+						<span>Propriétaire</span>
+						<code
+							style={{
+								color:
+									selectedOwner === NEUTRAL ? undefined : world.factions[selectedOwner]?.color,
 							}}
 						>
-							Reconnaître ({world.playerReconCost().toLocaleString("fr-FR")} sale)
-						</button>
-					) : isOwned ? (
+							{selectedOwnerName}
+						</code>
+					</div>
+					<div className="line">
+						<span>Contrôle</span>
+						<code>{selected !== null ? Math.round(world.controlAt(selected)) : "—"}</code>
+					</div>
+					<div className="line">
+						<span>Bâtiment</span>
+						<code>{selectedBuilding ? BUILDINGS[selectedBuilding].label : "—"}</code>
+					</div>
+					<div className="line">
+						<span>Zone</span>
+						<code>{selectedZoneLabel}</code>
+					</div>
+
+					{isOwned ? (
 						constructionLeft > 0 ? (
 							<p className="hint-inline">
 								<strong>Chantier :</strong> {pendingType ? BUILDINGS[pendingType].label : "—"} —
@@ -919,11 +884,8 @@ function App() {
 										) : null}
 									</span>
 									<code>
-										{isSelf
-											? `${Math.round(world.controlRatio(faction.id) * 100)}%`
-											: world.knownModulesOwned(faction.id) > 0
-												? `~${Math.round(world.knownControlRatio(faction.id) * 100)}% · ${relation}`
-												: `? · ${relation}`}
+										{Math.round(world.controlRatio(faction.id) * 100)}%
+										{isSelf ? "" : ` · ${relation}`}
 									</code>
 									{isSelf ? (
 										<span />
@@ -1081,12 +1043,6 @@ function App() {
 							<strong>Zones :</strong> on convertit le bâti existant — chaque quartier n'accepte que
 							certains bâtiments (parc → planque, police → contre-espionnage, terrain vague →
 							construction neuve…). Le détail est affiché sous le menu de construction.
-						</p>
-						<h3>Renseignement</h3>
-						<p>
-							Vous ne voyez que <strong>votre territoire et sa frontière</strong> ; le reste est{" "}
-							<strong>inconnu</strong>. Révélez une zone avec <strong>Reconnaître</strong> (payant) ou en
-							bâtissant un <strong>Contre-espionnage</strong> (révèle un rayon autour de lui).
 						</p>
 						<h3>Bâtiments (survol sur la carte)</h3>
 						<ul className="help-buildings">

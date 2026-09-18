@@ -33,8 +33,7 @@ interface IsoCanvasProps {
 	territory: Territory;
 	factions: readonly Faction[];
 	attacks: readonly Attack[];
-	known: Uint8Array;
-	playerId: number;
+	tick: number;
 	focus: { x: number; z: number };
 	selected: number | null;
 	colorblind: boolean;
@@ -105,8 +104,7 @@ export function IsoCanvas({
 	territory,
 	factions,
 	attacks,
-	known,
-	playerId,
+	tick,
 	focus,
 	selected,
 	colorblind,
@@ -157,8 +155,7 @@ export function IsoCanvas({
 					territory={territory}
 					factions={factions}
 					attacks={attacks}
-					known={known}
-					playerId={playerId}
+					tick={tick}
 					selected={selected}
 					colorblind={colorblind}
 					version={version}

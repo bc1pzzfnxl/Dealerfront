@@ -46,12 +46,12 @@ export interface Faction {
 
 /** Palette de factions (voir docs/art-direction.md). */
 export const FACTION_COLORS = [
-	"#6FB7E8",
-	"#E0A030",
-	"#7FD08A",
-	"#A97BD8",
-	"#E23B2E",
-	"#2FB0A0",
+	"#8FC7E8",
+	"#E8C57A",
+	"#8FD8A5",
+	"#B79DE0",
+	"#E88C80",
+	"#6FD0C4",
 ] as const;
 
 export const FACTION_NAMES = [

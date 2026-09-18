@@ -191,3 +191,7 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 ### Diplomatie et information (P15)
 
 - Le panneau **Diplomatie** ne montre **plus** les % de contrôle des rivaux non renseignés : il affiche `?` (inconnu) ou `~X %` (partiellement connu via la vision/reconnaissance).
+
+### P16 — retour à l'information complète
+
+- Le **fog / renseignement** (P14) est **abandonné** : possession, contrôle et bâtiments sont **visibles pour tous** (lisibilité type OpenFront). Les mécaniques de vision/reconnaissance ont été retirées.
