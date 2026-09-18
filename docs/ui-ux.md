@@ -173,3 +173,17 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 - **Panneau « Boucle »** (barre basse) : `Logement → Membres`, `Labo → Produit`, `Point de vente → Cash sale`, `Façade → Cash propre`, avec compteurs et **étape manquante mise en évidence**.
 - **Conseiller** réordonné : capturer un 2ᵉ quartier → Labo → Point de vente → Façade → aménager → étendre → blanchir ; il indique la **ressource manquante** quand un bâtiment est hors de portée.
 - **Contraste** : texte secondaire éclairci (`--muted`), coût des bâtiments lisible, boutons désactivés **lisibles** (bordure pointillée au lieu d'une opacité qui écrase le texte), coût en ambre quand il manque des fonds.
+
+---
+
+## Implémentation (P14) — Information, vision et renseignement
+
+> La couleur de possession n'est plus universelle : l'information est **limitée**.
+
+- **Vision de frontière** : le joueur connaît **ses quartiers + leurs voisins**, plus le rayon des **Contre-espionnages** qu'il possède, plus les zones **reconnaissées**.
+- **Zone inconnue** : aplat **gris sombre**, ni propriétaire, ni contrôle, ni bâtiment, ni contour d'attaque ; l'infobulle affiche « Inconnu — reconnaissance requise ».
+- **Code couleur de la base** : nos quartiers = **couleur pleine et lumineuse** ; connus mais adverses = **discrets** ; inconnus = **masqués**.
+- **Renseignement** :
+  - **Reconnaître** (bouton sur un quartier inconnu) : coûte **1 500 Cash sale**, révèle un carré de rayon 2 pendant **60 s**, cooldown **30 s**.
+  - **Contre-espionnage** : révèle en permanence un rayon de 2 autour de lui (en plus de son effet anti-tueur).
+- La **minimap** applique la même règle (inconnu = sombre, notre base = nette, adverses connus = atténués).

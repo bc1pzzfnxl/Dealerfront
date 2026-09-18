@@ -45,6 +45,10 @@ const ATTACK_LOSS = 6;
 const CONTROL_REGEN = 1.0;
 const AI_INTERVAL = 25;
 const MIN_COMMIT = 400;
+/** Vision : un Contre-espionnage révèle un rayon autour de lui. */
+const VISION = { contreRadius: 2 } as const;
+/** Reconnaissance payante (renseignement). */
+const RECON = { cost: 1500, radius: 2, duration: 600, cooldown: 300 } as const;
 
 const ZONE_DEFENSE: Record<ZoneType, number> = {
 	residential: 1.0,
@@ -119,6 +123,7 @@ export type GameEvent =
 	| "embargo"
 	| "corrupt"
 	| "build"
+	| "recon"
 	| "victory"
 	| "defeat";
 
@@ -144,6 +149,11 @@ export class World {
 	/** Événements joueur en attente d'être consommés par l'IHM. */
 	private readonly events: GameEvent[] = [];
 	private outcomeRecorded = false;
+	/** Fin de révélation payante par module (tick). */
+	private readonly reconUntil: Int32Array;
+	/** 1 = module connu du joueur (frontière, contre-espionnage ou reconnaissance). */
+	readonly known: Uint8Array;
+	private playerReconCooldown = 0;
 	/** Index du contact corrompu courant (change s'il est grillé). */
 	private contactIndex: number;
 	tick = 0;
@@ -195,6 +205,8 @@ export class World {
 			this.factions.map(() => DIPLOMACY.initialRelation),
 		);
 		this.proposalCooldown = this.factions.map(() => this.factions.map(() => 0));
+		this.reconUntil = new Int32Array(this.territory.count);
+		this.known = new Uint8Array(this.territory.count);
 		this.counts = this.factions.map(() => emptyCounts());
 		this.owned = this.factions.map(() => 0);
 		this.recount();
@@ -818,6 +830,51 @@ export class World {
 		return (ZONE_DEFENSE[zone] ?? 1) * planque * (1 + defenderBonus) * traitor;
 	}
 
+	/** Marque un carré de rayon `radius` autour de `center`. */
+	private markArea(center: number, radius: number, apply: (module: number) => void): void {
+		const cx = center % MODULES_W;
+		const cy = Math.floor(center / MODULES_W);
+		for (let dy = -radius; dy <= radius; dy += 1) {
+			for (let dx = -radius; dx <= radius; dx += 1) {
+				const x = cx + dx;
+				const y = cy + dy;
+				if (x < 0 || y < 0 || x >= MODULES_W || y >= MODULES_H) continue;
+				apply(y * MODULES_W + x);
+			}
+		}
+	}
+
+	/** Le joueur connaît-il ce quartier (frontière, contre-espionnage ou reconnaissance) ? */
+	isKnown(module: number): boolean {
+		return this.known[module] === 1;
+	}
+
+	playerReconCost(): number {
+		return RECON.cost;
+	}
+
+	playerCanRecon(module: number): boolean {
+		if (this.outcome !== null) return false;
+		if (this.playerReconCooldown > 0) return false;
+		if (this.isKnown(module)) return false;
+		return this.player.cashSale >= RECON.cost;
+	}
+
+	/** Reconnaissance : paie pour révéler durablement une zone inconnue. */
+	playerRecon(module: number): boolean {
+		if (!this.playerCanRecon(module)) return false;
+		this.player.cashSale -= RECON.cost;
+		this.playerReconCooldown = RECON.cooldown;
+		const until = this.tick + RECON.duration;
+		this.markArea(module, RECON.radius, (target) => {
+			this.reconUntil[target] = until;
+		});
+		this.recount();
+		this.events.push("recon");
+		this.pushLog(`Reconnaissance (module ${module})`);
+		return true;
+	}
+
 	/** Ratio de blanchiment du joueur (0–1). */
 	playerLaunderRatio(): number {
 		return this.player.launderRatio;
@@ -931,6 +988,7 @@ export class World {
 		for (const faction of this.factions) {
 			if (faction.hitmanCooldown > 0) faction.hitmanCooldown -= 1;
 		}
+		if (this.playerReconCooldown > 0) this.playerReconCooldown -= 1;
 		this.produce();
 		this.sell();
 		this.launder();
@@ -1208,6 +1266,23 @@ export class World {
 			const type = BUILDING_TYPES[buildIndex];
 			if (type) this.counts[owner]![type] += 1;
 		}
+		// Vision joueur : soi + voisins + rayon des contre-espionnages + reconnaissances.
+		this.known.fill(0);
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (this.reconUntil[i]! > this.tick) this.known[i] = 1;
+		}
+		const playerId = this.player.id;
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (this.territory.owner[i] !== playerId) continue;
+			this.known[i] = 1;
+			for (const neighbor of neighborsOf(i)) this.known[neighbor] = 1;
+			if (this.territory.building[i] === BUILDING_INDEX.contre) {
+				this.markArea(i, VISION.contreRadius, (m) => {
+					this.known[m] = 1;
+				});
+			}
+		}
+
 		for (const faction of this.factions) {
 			const c = this.counts[faction.id]!;
 			faction.housing = c.logement;

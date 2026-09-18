@@ -13,6 +13,8 @@ interface TerritoryOverlayProps {
 	territory: Territory;
 	factions: readonly Faction[];
 	attacks: readonly Attack[];
+	known: Uint8Array;
+	playerId: number;
 	selected: number | null;
 	colorblind: boolean;
 	version: number;
@@ -42,6 +44,7 @@ interface OverlayState {
 	building: Int16Array;
 	pending: Int16Array;
 	attacker: Int16Array;
+	known: Int16Array;
 	matricesDone: boolean;
 }
 
@@ -51,6 +54,8 @@ export function TerritoryOverlay({
 	territory,
 	factions,
 	attacks,
+	known,
+	playerId,
 	selected,
 	colorblind,
 	version,
@@ -100,6 +105,7 @@ export function TerritoryOverlay({
 			building: new Int16Array(count).fill(-2),
 			pending: new Int16Array(count).fill(-2),
 			attacker: new Int16Array(count).fill(-2),
+			known: new Int16Array(count).fill(-1),
 			matricesDone: false,
 		};
 	}
@@ -111,6 +117,7 @@ export function TerritoryOverlay({
 		const dummy = new THREE.Object3D();
 		const color = new THREE.Color();
 		const neutral = new THREE.Color("#0E1013");
+		const unknown = new THREE.Color("#0B0E12");
 
 		// Nouvelle ville ou changement de palette → repartir de zéro.
 		if (state.seed !== city.seed) {
@@ -120,6 +127,7 @@ export function TerritoryOverlay({
 			state.building.fill(-2);
 			state.pending.fill(-2);
 			state.attacker.fill(-2);
+			state.known.fill(-1);
 			state.matricesDone = false;
 		}
 		if (colorsRef.current !== colors) {
@@ -133,7 +141,8 @@ export function TerritoryOverlay({
 		for (let module = 0; module < count; module += 1) {
 			const owner = territory.owner[module]!;
 			const control = territory.control[module]!;
-			const controlQ = owner === NEUTRAL ? -1 : Math.round(control / CONTROL_STEP);
+			const isKnown = known[module] === 1 ? 1 : 0;
+			const controlQ = !isKnown || owner === NEUTRAL ? -1 : Math.round(control / CONTROL_STEP);
 
 			if (buildMatrices) {
 				const centerX = (module % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
@@ -144,13 +153,27 @@ export function TerritoryOverlay({
 				mesh.setMatrixAt(module, dummy.matrix);
 			}
 
-			if (owner !== state.owner[module] || controlQ !== state.control[module]) {
+			if (
+				owner !== state.owner[module] ||
+				controlQ !== state.control[module] ||
+				isKnown !== state.known[module]
+			) {
 				state.owner[module] = owner;
 				state.control[module] = controlQ;
-				if (owner === NEUTRAL) {
+				state.known[module] = isKnown;
+				const ratio = Math.max(0, Math.min(1, control / 100));
+				if (!isKnown) {
+					// Zone non renseignée : masquée (gris sombre, aucune info de faction).
+					mesh.setColorAt(module, color.copy(unknown));
+				} else if (owner === NEUTRAL) {
 					mesh.setColorAt(module, color.copy(neutral));
+				} else if (owner === playerId) {
+					// Notre base : couleur pleine et lumineuse (code couleur allié).
+					const shade = 0.7 + 0.3 * ratio;
+					mesh.setColorAt(module, color.copy(colors[owner] ?? neutral).multiplyScalar(shade));
 				} else {
-					const shade = 0.45 + 0.55 * Math.max(0, Math.min(1, control / 100));
+					// Connu mais adverse : discret.
+					const shade = 0.28 + 0.32 * ratio;
 					mesh.setColorAt(module, color.copy(colors[owner] ?? neutral).multiplyScalar(shade));
 				}
 				colorDirty = true;
@@ -175,6 +198,7 @@ export function TerritoryOverlay({
 				const pendingIndex = territory.pending[module]!;
 				state.building[module] = buildIndex;
 				state.pending[module] = pendingIndex;
+				if (known[module] !== 1) continue;
 				// Un chantier occupe l'emprise : bloc réduit, teinte ambre (information).
 				const underConstruction = buildIndex === NO_BUILDING && pendingIndex !== NO_BUILDING;
 				const effective = buildIndex !== NO_BUILDING ? buildIndex : pendingIndex;
@@ -226,7 +250,7 @@ export function TerritoryOverlay({
 			for (let module = 0; module < count; module += 1) {
 				const attackerId = attacker.get(module) ?? -1;
 				state.attacker[module] = attackerId;
-				if (attackerId < 0) continue;
+				if (attackerId < 0 || known[module] !== 1) continue;
 				const centerX = (module % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
 				const centerZ = Math.floor(module / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
 				dummy.position.set(centerX, 0.235, centerZ);
@@ -245,7 +269,7 @@ export function TerritoryOverlay({
 			borderMesh.instanceMatrix.needsUpdate = true;
 			if (borderMesh.instanceColor) borderMesh.instanceColor.needsUpdate = true;
 		}
-	}, [territory, colors, count, version, attacks, city.seed]);
+	}, [territory, colors, count, version, attacks, city.seed, known, playerId]);
 
 	const selectedCenter =
 		selected !== null
