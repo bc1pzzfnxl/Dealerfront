@@ -114,6 +114,8 @@ function App() {
 	});
 
 	const world = useMemo(() => new World(seed), [seed]);
+	const [hovered, setHovered] = useState<number | null>(null);
+	const hoverRef = useRef<HTMLDivElement>(null);
 	const rafRef = useRef<number | null>(null);
 	const lastRef = useRef(0);
 
@@ -134,6 +136,18 @@ function App() {
 			// stockage indisponible : mode non persisté
 		}
 	}, [colorblind]);
+
+	// Infobulle : suit le curseur sans re-render (transform impératif).
+	useEffect(() => {
+		const onMove = (event: MouseEvent) => {
+			const element = hoverRef.current;
+			if (element) {
+				element.style.transform = `translate(${event.clientX + 16}px, ${event.clientY + 16}px)`;
+			}
+		};
+		window.addEventListener("mousemove", onMove);
+		return () => window.removeEventListener("mousemove", onMove);
+	}, []);
 
 	// Volume + activation des sons (préférence locale).
 	useEffect(() => {
@@ -399,6 +413,15 @@ function App() {
 			value: `${Math.round(player.cashPropre).toLocaleString("fr-FR")} propre`,
 		},
 	];
+	const hoverOwner = hovered !== null ? world.ownerAt(hovered) : NEUTRAL;
+	const hoverOwnerName =
+		hoverOwner === NEUTRAL ? "Neutre" : (world.factions[hoverOwner]?.name ?? "—");
+	const hoverZone = hovered !== null ? world.city.modules[hovered]! : null;
+	const hoverBuilding = hovered !== null ? world.buildingAt(hovered) : null;
+	const hoverControl = hovered !== null ? Math.round(world.controlAt(hovered)) : 0;
+	const hoverPending = hovered !== null ? world.pendingBuilding(hovered) : null;
+	const hoverConstruction = hovered !== null ? world.constructionLeft(hovered) : 0;
+
 	const chainNext =
 		chain.find((step) => step.type !== "logement" && step.count === 0)?.type ?? null;
 
@@ -472,6 +495,7 @@ function App() {
 					colorblind={colorblind}
 					version={version}
 					onModuleClick={(module) => setSelected(module)}
+					onModuleHover={setHovered}
 				/>
 				<div
 					className={`vignette${alert ? " alert" : ""}`}
@@ -487,6 +511,28 @@ function App() {
 					version={version}
 					onSelect={(module) => setSelected(module)}
 				/>
+			</div>
+
+			<div ref={hoverRef} className={`hover-card${hovered !== null ? " show" : ""}`}>
+				{hovered !== null ? (
+					<>
+						<span
+							className="hover-owner"
+							style={{
+								color: hoverOwner === NEUTRAL ? undefined : world.factions[hoverOwner]?.color,
+							}}
+						>
+							{hoverOwnerName} · {hoverZone ? ZONE_LABELS[hoverZone] : "—"} · contrôle {hoverControl}
+						</span>
+						<span className="hover-line">
+							{hoverConstruction > 0
+								? `Chantier : ${hoverPending ? BUILDINGS[hoverPending].label : "—"} (${Math.ceil(hoverConstruction / SIM_HZ)} s)`
+								: hoverBuilding
+									? `${BUILDINGS[hoverBuilding].label} — ${BUILDING_EFFECT_LABELS[hoverBuilding]}`
+									: "Aucun bâtiment"}
+						</span>
+					</>
+				) : null}
 			</div>
 
 			<div className="hud">
@@ -578,7 +624,9 @@ function App() {
 							</p>
 						) : selectedBuilding ? (
 							<p className="hint-inline">
-								{BUILDINGS[selectedBuilding].label} — {BUILDING_EFFECT_LABELS[selectedBuilding]}
+								<strong>Occupé :</strong> {BUILDINGS[selectedBuilding].label} —{" "}
+								{BUILDING_EFFECT_LABELS[selectedBuilding]}.
+								<br />1 bâtiment par quartier — capturez un autre quartier pour en bâtir un autre.
 							</p>
 						) : (
 							<>
@@ -939,6 +987,14 @@ function App() {
 							certains bâtiments (parc → planque, police → contre-espionnage, terrain vague →
 							construction neuve…). Le détail est affiché sous le menu de construction.
 						</p>
+						<h3>Bâtiments (survol sur la carte)</h3>
+						<ul className="help-buildings">
+							{BUILDING_TYPES.map((type) => (
+								<li key={type}>
+									<strong>{BUILDINGS[type].label}</strong> — {BUILDING_EFFECT_LABELS[type]}
+								</li>
+							))}
+						</ul>
 						<h3>Conquête</h3>
 						<p>
 							Sélectionnez un quartier <strong>adjacent</strong> puis <kbd>Q</kbd> pour l'attaquer

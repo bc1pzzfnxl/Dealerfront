@@ -71,16 +71,21 @@ function buildingCenter(city: CityGrid, module: number): { x: number; z: number 
 export function CityMeshes({
 	city,
 	onModuleClick,
+	onModuleHover,
 }: {
 	city: CityGrid;
 	onModuleClick: (module: number) => void;
+	onModuleHover: (module: number | null) => void;
 }) {
+	const moduleOf = (event: ThreeEvent<MouseEvent>): number => {
+		const tileX = event.point.x + city.width / 2;
+		const tileY = event.point.z + city.height / 2;
+		return moduleAtTile(tileX, tileY, MODULE_SIZE);
+	};
 	const handleClick = (event: ThreeEvent<MouseEvent>) => {
 		event.stopPropagation();
 		if (event.delta > 6) return;
-		const tileX = event.point.x + city.width / 2;
-		const tileY = event.point.z + city.height / 2;
-		onModuleClick(moduleAtTile(tileX, tileY, MODULE_SIZE));
+		onModuleClick(moduleOf(event));
 	};
 
 	const width = city.width;
@@ -92,6 +97,8 @@ export function CityMeshes({
 				rotation={[-Math.PI / 2, 0, 0]}
 				position={[width / 2, 0.02, height / 2]}
 				onClick={handleClick}
+				onPointerMove={(event) => onModuleHover(moduleOf(event))}
+				onPointerLeave={() => onModuleHover(null)}
 			>
 				<planeGeometry args={[width, height]} />
 				<meshBasicMaterial transparent opacity={0} depthWrite={false} />

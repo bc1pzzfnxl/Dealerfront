@@ -38,6 +38,7 @@ interface IsoCanvasProps {
 	colorblind: boolean;
 	version: number;
 	onModuleClick: (module: number) => void;
+	onModuleHover: (module: number | null) => void;
 }
 
 /** Caméra god-view libre : pan + zoom, iso fixe, sans suivi de personnage. */
@@ -107,6 +108,7 @@ export function IsoCanvas({
 	colorblind,
 	version,
 	onModuleClick,
+	onModuleHover,
 }: IsoCanvasProps) {
 	const offset = useMemo<[number, number, number]>(
 		() => [-city.width / 2, 0, -city.height / 2],
@@ -145,7 +147,7 @@ export function IsoCanvas({
 				shadow-camera-far={400}
 			/>
 			<group position={offset}>
-				<MemoCityMeshes city={city} onModuleClick={onModuleClick} />
+				<MemoCityMeshes city={city} onModuleClick={onModuleClick} onModuleHover={onModuleHover} />
 				<TerritoryOverlay
 					city={city}
 					territory={territory}

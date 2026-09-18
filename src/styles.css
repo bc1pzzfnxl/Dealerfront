@@ -964,3 +964,49 @@ button:not(:disabled):active {
 		transform: none;
 	}
 }
+
+/* ---------- Infobulle au survol ---------- */
+.hover-card {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 15;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	max-width: 20rem;
+	padding: 0.45rem 0.6rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 6px;
+	background-color: var(--panel-solid);
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 100ms ease;
+}
+
+.hover-card.show {
+	opacity: 1;
+}
+
+.hover-owner {
+	font-size: 0.7rem;
+	font-weight: 600;
+}
+
+.hover-line {
+	font-size: 0.66rem;
+	color: var(--muted);
+}
+
+.help-buildings {
+	margin: 0.2rem 0 0;
+	padding-left: 1.1rem;
+	columns: 2;
+}
+
+.help-buildings li {
+	font-size: 0.7rem;
+	line-height: 1.5;
+	color: var(--text);
+}
