@@ -245,7 +245,7 @@ describe("construction — annulation du chantier", () => {
 		const module = ownVacant(world, world.player.id, "labo");
 		expect(world.playerBuild(module, "labo")).toBe(true);
 		world.territory.control[module] = 1;
-		world.attacks.push({ factionId: 1, target: module, troops: 100000 });
+		world.attacks.push({ factionId: 1, source: -1, target: module, troops: 100000, arrivesAt: 0 });
 		world.step();
 		expect(world.ownerAt(module)).toBe(1);
 		expect(world.constructionLeft(module)).toBe(0);

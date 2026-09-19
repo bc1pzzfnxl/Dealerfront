@@ -480,6 +480,7 @@ function App() {
 	/** Raison d'indisponibilité d'un bâtiment sur le quartier sélectionné. */
 	const blockReason = (type: BuildingType): string | null => {
 		if (selected === null) return null;
+		if (world.activeConstructions(player.id) >= world.buildCrews()) return "équipes occupées";
 		if (!world.canBuildInZone(selected, type)) return "zone incompatible";
 		const spec = BUILDINGS[type];
 		if (spec.costMembers && player.members < spec.costMembers) {
@@ -653,6 +654,12 @@ function App() {
 					<h2>
 						Quartier <em>{selected !== null ? `module ${selected}` : "—"}</em>
 					</h2>
+					<div className="line">
+						<span>Chantiers</span>
+						<code>
+							{world.activeConstructions(player.id)}/{world.buildCrews()}
+						</code>
+					</div>
 					<div className="line">
 						<span>Propriétaire</span>
 						<code

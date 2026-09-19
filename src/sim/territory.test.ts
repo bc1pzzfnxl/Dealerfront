@@ -139,8 +139,11 @@ describe("territory", () => {
 		const c = ownFor(world, player.id, "facade");
 
 		expect(world.playerBuild(a, "labo")).toBe(true);
+		finishBuild(world, a);
 		expect(world.playerBuild(b, "vente")).toBe(true);
+		finishBuild(world, b);
 		expect(world.playerBuild(c, "facade")).toBe(true);
+		finishBuild(world, c);
 
 		const cleanBefore = player.cashPropre;
 		for (let i = 0; i < 600; i += 1) world.step();

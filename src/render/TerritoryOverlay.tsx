@@ -5,7 +5,7 @@ import { MODULES_H, MODULES_W, MODULE_SIZE } from "../sim/constants";
 import type { Faction } from "../sim/factions";
 import { NEUTRAL, type Territory } from "../sim/territory";
 import type { CityGrid } from "../sim/types";
-import type { Attack } from "../sim/world";
+import { TRAVEL_TICKS, type Attack } from "../sim/world";
 import { CARTEL_MODELS, type CartelPart } from "./models";
 import { factionDisplayColor } from "./palette";
 
@@ -45,6 +45,7 @@ export function TerritoryOverlay({
 	const ref = useRef<THREE.InstancedMesh>(null);
 	const fillRef = useRef<THREE.InstancedMesh>(null);
 	const shockRef = useRef<THREE.InstancedMesh>(null);
+	const unitRef = useRef<THREE.InstancedMesh>(null);
 	const borderRef = useRef<THREE.InstancedMesh>(null);
 	const partRefs = useRef<Array<THREE.InstancedMesh | null>>([]);
 	const count = city.modules.length;
@@ -222,7 +223,41 @@ export function TerritoryOverlay({
 			});
 		}
 
-		// 3) Onde de choc (anneau à la capture).
+		// 3) Colonnes en mouvement (troupes en route vers la cible).
+		const unitMesh = unitRef.current;
+		if (unitMesh) {
+			let unitIndex = 0;
+			for (const attack of attacks) {
+				if (attack.arrivesAt <= tick || attack.source < 0) continue;
+				const fromX = (attack.source % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+				const fromZ = Math.floor(attack.source / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+				const toX = (attack.target % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+				const toZ = Math.floor(attack.target / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+				const t = Math.max(0, Math.min(1, 1 - (attack.arrivesAt - tick) / TRAVEL_TICKS));
+				for (let k = -1; k <= 1; k += 1) {
+					const tk = Math.max(0, Math.min(1, t - k * 0.08));
+					dummy.position.set(
+						fromX + (toX - fromX) * tk,
+						0.55,
+						fromZ + (toZ - fromZ) * tk,
+					);
+					dummy.rotation.set(0, 0, 0);
+					dummy.scale.set(0.5, 0.5, 0.5);
+					dummy.updateMatrix();
+					unitMesh.setMatrixAt(unitIndex, dummy.matrix);
+					unitMesh.setColorAt(
+						unitIndex,
+						color.copy(colors[attack.factionId] ?? neutral).multiplyScalar(1.2),
+					);
+					unitIndex += 1;
+				}
+			}
+			unitMesh.count = unitIndex;
+			unitMesh.instanceMatrix.needsUpdate = true;
+			if (unitMesh.instanceColor) unitMesh.instanceColor.needsUpdate = true;
+		}
+
+		// 4) Onde de choc (anneau à la capture).
 		const shockMesh = shockRef.current;
 		if (shockMesh) {
 			let shockIndex = 0;
@@ -250,7 +285,7 @@ export function TerritoryOverlay({
 			if (shockMesh.instanceColor) shockMesh.instanceColor.needsUpdate = true;
 		}
 
-		// 4) Remplissage d'assaut : la case se colore ∝ à la perte de contrôle.
+		// 5) Remplissage d'assaut : la case se colore ∝ à la perte de contrôle.
 		const fillMesh = fillRef.current;
 		const attacker = new Map<number, number>();
 		for (const attack of attacks) attacker.set(attack.target, attack.factionId);
@@ -277,7 +312,7 @@ export function TerritoryOverlay({
 			if (fillMesh.instanceColor) fillMesh.instanceColor.needsUpdate = true;
 		}
 
-		// 5) Grille sur le neutre + frontières + contours d'attaque (pulsés).
+		// 6) Grille sur le neutre + frontières + contours d'attaque (pulsés).
 		const borderMesh = borderRef.current;
 		const pulse = 1 + 0.1 * Math.sin(tick * 0.9);
 		if (borderMesh) {
@@ -362,6 +397,10 @@ export function TerritoryOverlay({
 					<meshLambertMaterial flatShading />
 				</instancedMesh>
 			))}
+			<instancedMesh ref={unitRef} args={[undefined, undefined, count]} frustumCulled={false} renderOrder={10}>
+				<boxGeometry args={[1, 1, 1]} />
+				<meshLambertMaterial flatShading />
+			</instancedMesh>
 			<instancedMesh
 				ref={shockRef}
 				args={[undefined, undefined, count]}

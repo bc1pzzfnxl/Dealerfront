@@ -48,6 +48,10 @@ const ATTACK_LOSS = 8;
 const CONTROL_REGEN = 1.2;
 /** Assauts simultanés max par faction : pas de « clique-partout ». */
 const MAX_ASSAULTS = 3;
+/** Déplacement des troupes avant le siège (ticks). */
+export const TRAVEL_TICKS = 12;
+/** Équipes de construction simultanées par faction. */
+const BUILD_CREWS = 2;
 const AI_INTERVAL = 25;
 const MIN_COMMIT = 400;
 /** Raid : affaiblit un quartier adjacent sans le capturer. */
@@ -107,8 +111,12 @@ function emptyCounts(): Record<BuildingType, number> {
 
 export interface Attack {
 	factionId: number;
+	/** Quartier d'origine (pour le déplacement des unités). */
+	source: number;
 	target: number;
 	troops: number;
+	/** Tick d'arrivée sur la cible (avant : troupes en route). */
+	arrivesAt: number;
 }
 
 export type Outcome = null | "victory" | "defeat";
@@ -791,6 +799,7 @@ export class World {
 		if (this.territory.owner[module] !== this.player.id) return false;
 		if (this.territory.building[module] !== NO_BUILDING) return false;
 		if (this.territory.construction[module]! > 0) return false;
+		if (this.activeConstructions(this.player.id) >= BUILD_CREWS) return false;
 		if (!canBuildInZone(this.city.modules[module]!, type)) return false;
 		return this.canAfford(this.player, type, this.buildCostFactor(module));
 	}
@@ -889,6 +898,20 @@ export class World {
 	drainEvents(): GameEvent[] {
 		if (this.events.length === 0) return [];
 		return this.events.splice(0, this.events.length);
+	}
+
+	/** Nombre de chantiers simultanés autorisés par faction. */
+	buildCrews(): number {
+		return BUILD_CREWS;
+	}
+
+	/** Chantiers en cours d'une faction. */
+	activeConstructions(factionId: number): number {
+		let count = 0;
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (this.territory.construction[i]! > 0 && this.territory.owner[i] === factionId) count += 1;
+		}
+		return count;
 	}
 
 	/** Nombre d'assauts simultanés autorisés par faction. */
@@ -993,9 +1016,27 @@ export class World {
 		}
 		const troops = Math.floor(faction.members * faction.attackRatio);
 		if (troops < MIN_COMMIT) return false;
+		// Origine = quartier possédé adjacent au contrôle le plus élevé.
+		let source = -1;
+		let best = -1;
+		for (const neighbor of neighborsOf(module)) {
+			if (this.territory.owner[neighbor] !== factionId) continue;
+			const control = this.territory.control[neighbor]!;
+			if (control > best) {
+				best = control;
+				source = neighbor;
+			}
+		}
+		if (source < 0) return false;
 		this.registerAttack(factionId, this.territory.owner[module]!);
 		faction.members -= troops;
-		this.attacks.push({ factionId, target: module, troops });
+		this.attacks.push({
+			factionId,
+			source,
+			target: module,
+			troops,
+			arrivesAt: this.tick + TRAVEL_TICKS,
+		});
 		return true;
 	}
 
@@ -1083,6 +1124,8 @@ export class World {
 	private resolveAttacks(): void {
 		for (let index = this.attacks.length - 1; index >= 0; index -= 1) {
 			const attack = this.attacks[index]!;
+			// Troupes encore en déplacement : aucun dégât avant l'arrivée.
+			if (attack.arrivesAt > this.tick) continue;
 			const owner = this.territory.owner[attack.target];
 			if (owner === attack.factionId) {
 				this.attacks.splice(index, 1);
@@ -1189,6 +1232,7 @@ export class World {
 
 	private aiBuild(factionId: number): boolean {
 		const faction = this.factions[factionId]!;
+		if (this.activeConstructions(factionId) >= BUILD_CREWS) return false;
 		const counts = this.buildingCounts(factionId);
 		const owned = this.modulesOwned(factionId);
 		// Amorçage : tant qu'il manque une étape de la chaîne, on ne bâtit qu'elle.
