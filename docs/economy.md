@@ -72,6 +72,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 **Contraintes :**
 - Le quartier doit être **possédé** par la faction (Contrôle ≥ seuil de possession, `territory.md`).
 - Le **type de zone** doit être compatible (tableau ci-dessus) ; une conversion incompatible est refusée.
+- **Recrutement** exige un **immeuble existant** (zone bâtie) : impossible sur terrain vague ou dans un parc.
 - Un bâtiment converti **remplace** la fonction d'origine (ex. appartements → Labos consomme la population du quartier, effet secondaire à équilibrer avec `city-sim.md`).
 - La conversion **réutilise** l'emprise : elle coûte et dure **moins cher** qu'une construction neuve, mais reste soumise au **coût croissant** par nombre de bâtiments du même type.
 
@@ -240,7 +241,7 @@ Un quartier possédé et **vide** ne peut être converti que vers les types **co
 | Laverie | Recrutement, Labo, Point de vente, Façade, Planque, Contre-espionnage |
 | **Poste de police** | **Contre-espionnage, Planque** uniquement |
 | **Parc** | **Planque** uniquement |
-| **Terrain vague** | Construction neuve : Recrutement, Labo, Point de vente, Façade, Planque, Dépôt, Atelier |
+| **Terrain vague** | Construction neuve uniquement : Labo, Point de vente, Façade, Planque, Dépôt, Atelier (**pas de Recrutement** : rien à réquisitionner) |
 
 - Le **spawn** de chaque faction est forcé sur une zone « bâtie » : on peut toujours amorcer.
 - **Amorçage** : tant que la chaîne (Labo → Point de vente → Façade) est incomplète, l'IA/le bot ne construisent **que** l'étape manquante (évite de gaspiller le budget).

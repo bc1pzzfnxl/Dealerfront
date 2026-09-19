@@ -314,3 +314,25 @@ describe("blanchiment contrôlé", () => {
 	});
 });
 
+
+describe("recrutement", () => {
+	it("exige un immeuble existant (refusé sur terrain vague)", () => {
+		const world = new World(1, "nightlife");
+		let vacant = -1;
+		for (let i = 0; i < world.territory.count; i += 1) {
+			if (world.city.modules[i] === "vacant") {
+				vacant = i;
+				break;
+			}
+		}
+		expect(vacant).toBeGreaterThanOrEqual(0);
+		world.player.members = 100_000;
+		world.territory.owner[vacant] = world.player.id;
+		world.territory.control[vacant] = 100;
+		expect(world.canBuildInZone(vacant, "logement")).toBe(false);
+		expect(world.playerCanBuild(vacant, "logement")).toBe(false);
+
+		const built = ownFor(world, world.player.id, "logement");
+		expect(world.canBuildInZone(built, "logement")).toBe(true);
+	});
+});

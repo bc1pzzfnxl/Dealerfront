@@ -537,7 +537,7 @@ function Trees({ city }: { city: CityGrid }) {
 		const list: { x: number; z: number; scale: number }[] = [];
 		for (let i = 0; i < city.modules.length; i += 1) {
 			const zone = city.modules[i]!;
-			if (zone !== "park" && zone !== "vacant") continue;
+			if (zone !== "park") continue;
 			const moduleX = i % MODULES_W;
 			const moduleY = Math.floor(i / MODULES_W);
 			const treeCount = zone === "park" ? 2 : 1;

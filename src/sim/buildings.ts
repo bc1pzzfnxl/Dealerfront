@@ -136,8 +136,8 @@ export const ZONE_BUILDINGS: Record<ZoneType, readonly BuildingType[]> = {
 	police: ["contre", "planque"],
 	// Parcs : seulement une planque dissimulée.
 	park: ["planque"],
-	// Terrains vagues : construction neuve, on y met ce qu'on veut (hors contre-espionnage).
-	vacant: ["logement", "labo", "vente", "facade", "planque", "depot", "atelier"],
+	// Terrains vagues : construction neuve seulement (rien à réquisitionner pour recruter).
+	vacant: ["labo", "vente", "facade", "planque", "depot", "atelier"],
 };
 
 export function canBuildInZone(zone: ZoneType, type: BuildingType): boolean {
