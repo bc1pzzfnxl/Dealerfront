@@ -4,6 +4,7 @@ import { EvilComposedChart } from "@/components/evilcharts/charts/recharts-compo
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { MapExample } from "./MapExample";
 import data from "./sim-data.json";
 
 interface Run {
@@ -167,6 +168,16 @@ export function Dashboard() {
 						<EvilComposedChart.Bar dataKey="clean" />
 						<EvilComposedChart.Line dataKey="control" />
 					</EvilComposedChart>
+				</CardContent>
+			</Card>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>Mapcn — exemple de carte</CardTitle>
+					<CardDescription>Fond de carte CARTO par défaut (rues, labels)</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<MapExample />
 				</CardContent>
 			</Card>
 
