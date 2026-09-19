@@ -275,3 +275,8 @@ Un quartier possédé et **vide** ne peut être converti que vers les types **co
 
 - Le bâtiment de production de Membres est **« Recrutement »** (on **réquisitionne un immeuble d'habitation** plutôt que d'en construire — plus crédible pour un cartel). Mécanique inchangée (+25 Membres/tick).
 - **Ratio d'assaut réglable** (curseur, 5–60 %) : part des Membres engagée à chaque attaque (OpenFront-like).
+
+### P19 — bâtiments objectifs (butin)
+
+- Capturer un quartier **bâti** rapporte **40 % de la valeur du bâtiment** (prélevé sur le défenseur, dans sa monnaie de coût), en plus du quartier. Les bâtiments deviennent donc des **cibles à valeur**.
+- Un **Contre-espionnage** adjacent à un quartier attaqué **alerte** son propriétaire (événement, texte flottant, son) : rôle de **guetteur**.

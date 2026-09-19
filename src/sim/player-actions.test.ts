@@ -927,3 +927,27 @@ describe("aménagement par lot", () => {
 		expect(world.queueLength()).toBeGreaterThanOrEqual(1);
 	});
 });
+
+describe("butin (bâtiments objectifs)", () => {
+	it("capturer un quartier bâti rapporte une part de la valeur du bâtiment", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.members = 100_000;
+		player.cashSale = 0;
+		world.playerSetAttackRatio(0.6);
+
+		const target = ADJACENT;
+		world.territory.owner[target] = 1;
+		world.territory.control[target] = 1;
+		world.territory.building[target] = BUILDING_INDEX.vente;
+		const victim = world.factions[1]!;
+		victim.cashSale = 10_000;
+
+		expect(world.playerAttack(target)).toBe(true);
+		for (let i = 0; i < 40 && world.ownerAt(target) !== player.id; i += 1) world.step();
+
+		expect(world.ownerAt(target)).toBe(player.id);
+		expect(player.cashSale).toBeCloseTo(1000 * 0.4);
+		expect(victim.cashSale).toBeCloseTo(10_000 - 1000 * 0.4);
+	});
+});

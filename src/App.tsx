@@ -34,6 +34,7 @@ const EVENT_SOUND: Record<GameEvent, SoundName> = {
 	embargo: "scan",
 	corrupt: "droplet",
 	build: "press",
+	alert: "error",
 	victory: "arrival",
 	defeat: "error",
 };
@@ -583,7 +584,17 @@ function App() {
 							{hoverConstruction > 0
 								? `Chantier : ${hoverPending ? BUILDINGS[hoverPending].label : "—"} (${Math.ceil(hoverConstruction / SIM_HZ)} s)`
 								: hoverBuilding
-									? `${BUILDINGS[hoverBuilding].label} — ${BUILDING_EFFECT_LABELS[hoverBuilding]}`
+									? `${BUILDINGS[hoverBuilding].label} — ${BUILDING_EFFECT_LABELS[hoverBuilding]}${
+											hoverOwner !== player.id && hoverOwner !== NEUTRAL
+												? ` · butin ${Math.round(
+														((BUILDINGS[hoverBuilding].costSale ??
+															BUILDINGS[hoverBuilding].costClean ??
+															BUILDINGS[hoverBuilding].costMembers ??
+															0) *
+															0.4),
+													).toLocaleString("fr-FR")}`
+												: ""
+										}`
 									: "Aucun bâtiment"}
 						</span>
 					</>
@@ -1138,6 +1149,13 @@ function App() {
 							<strong>Zones :</strong> on convertit le bâti existant — chaque quartier n'accepte que
 							certains bâtiments (parc → planque, police → contre-espionnage, terrain vague →
 							construction neuve…). Le détail est affiché sous le menu de construction.
+						</p>
+						<h3>Guerre de quartiers</h3>
+						<p>
+							Les bâtiments sont des <strong>objectifs à valeur</strong> : capturer un quartier bâti
+							rapporte du <strong>butin</strong> (40 % de la valeur du bâtiment, prélevé sur le
+							défenseur). Un <strong>Contre-espionnage</strong> adjacent te <strong>prévient</strong>{" "}
+							d'une descente ennemie (alerte + son).
 						</p>
 						<h3>Bâtiments (survol sur la carte)</h3>
 						<ul className="help-buildings">

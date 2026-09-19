@@ -54,6 +54,8 @@ export const TRAVEL_TICKS = 12;
 const BUILD_CREWS = 2;
 /** Longueur max de la file d'ordres par faction. */
 const QUEUE_MAX = 12;
+/** Part de la valeur d'un bâtiment prise en butin à la capture. */
+const LOOT_RATIO = 0.4;
 const AI_INTERVAL = 25;
 const MIN_COMMIT = 400;
 /** Raid : affaiblit un quartier adjacent sans le capturer. */
@@ -151,6 +153,7 @@ export type GameEvent =
 	| "embargo"
 	| "corrupt"
 	| "build"
+	| "alert"
 	| "victory"
 	| "defeat";
 
@@ -905,6 +908,27 @@ export class World {
 		if (this.floaters.length > 24) this.floaters.shift();
 	}
 
+	/** Butin : transfère une part de la valeur du bâtiment détruit vers l'attaquant. */
+	private loot(attackerId: number, victimId: number, type: BuildingType): { sale: number; clean: number; members: number } {
+		const spec = BUILDINGS[type];
+		const attacker = this.factions[attackerId]!;
+		const victim = this.factions[victimId]!;
+		const take = (cost: number | undefined, stock: number): number => {
+			if (!cost) return 0;
+			return Math.min(cost * LOOT_RATIO, stock);
+		};
+		const members = take(spec.costMembers, victim.members);
+		const sale = take(spec.costSale, victim.cashSale);
+		const clean = take(spec.costClean, victim.cashPropre);
+		victim.members -= members;
+		attacker.members += members;
+		victim.cashSale -= sale;
+		attacker.cashSale += sale;
+		victim.cashPropre -= clean;
+		attacker.cashPropre += clean;
+		return { sale, clean, members };
+	}
+
 	/** Consomme les événements joueur accumulés depuis le dernier rendu. */
 	drainEvents(): GameEvent[] {
 		if (this.events.length === 0) return [];
@@ -1181,6 +1205,20 @@ export class World {
 			troops,
 			arrivesAt: this.tick + TRAVEL_TICKS,
 		});
+		// Guetteur : un Contre-espionnage adjacent à la cible alerte le défenseur joueur.
+		const defender = this.territory.owner[module];
+		if (defender === this.player.id && factionId !== this.player.id) {
+			const lookout = neighborsOf(module).some(
+				(neighbor) =>
+					this.territory.owner[neighbor] === defender &&
+					this.territory.building[neighbor] === BUILDING_INDEX.contre,
+			);
+			if (lookout) {
+				this.events.push("alert");
+				this.float(module, "Descente !", "loss");
+				this.pushLog(`Alerte : descente ennemie (module ${module})`);
+			}
+		}
 		return true;
 	}
 
@@ -1294,6 +1332,7 @@ export class World {
 
 			if (control <= 0) {
 				const previous = this.territory.owner[attack.target];
+				const destroyed = this.buildingAt(attack.target);
 				this.territory.owner[attack.target] = attack.factionId;
 				this.territory.control[attack.target] = CAPTURE_CONTROL;
 				this.territory.building[attack.target] = NO_BUILDING;
@@ -1315,9 +1354,21 @@ export class World {
 				const loser = previous === NEUTRAL ? "neutre" : this.factions[previous]!.name;
 				this.pushLog(`${taker} prend un quartier à ${loser}`);
 				this.police.crime += 1;
+				// Butin : les bâtiments sont des objectifs à valeur.
+				if (destroyed && previous !== NEUTRAL && previous !== attack.factionId) {
+					const gained = this.loot(attack.factionId, previous, destroyed);
+					if (attack.factionId === this.player.id && (gained.sale || gained.clean || gained.members)) {
+						const label = gained.sale
+							? `+${Math.round(gained.sale)} sale`
+							: gained.clean
+								? `+${Math.round(gained.clean)} propre`
+								: `+${Math.round(gained.members)} membres`;
+						this.float(attack.target, `butin ${label}`, "gain");
+					}
+				}
 				if (attack.factionId === this.player.id) {
 					this.events.push("capture");
-					this.float(this.territory.count > 0 ? attack.target : attack.target, "+1 quartier", "gain");
+					this.float(attack.target, "+1 quartier", "gain");
 				} else if (previous === this.player.id) {
 					this.events.push("lost");
 					this.float(attack.target, "−1 quartier", "loss");
