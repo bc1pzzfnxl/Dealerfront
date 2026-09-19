@@ -56,6 +56,16 @@ const BUILD_CREWS = 2;
 const QUEUE_MAX = 12;
 /** Part de la valeur d'un bâtiment prise en butin à la capture. */
 const LOOT_RATIO = 0.4;
+/** Descente : coup de main pour voler le butin sans détruire (gaté Armement). */
+const DESCENT = { costSale: 2000, costMembers: 600, requiredArmement: 1, cooldownTicks: 250 } as const;
+/** Sabotage : production d'un bâtiment divisée par 2 pendant N ticks (gaté Armement). */
+const SABOTAGE = {
+	costSale: 1500,
+	requiredArmement: 2,
+	duration: 300,
+	cooldownTicks: 250,
+	factor: 0.5,
+} as const;
 const AI_INTERVAL = 25;
 const MIN_COMMIT = 400;
 /** Raid : affaiblit un quartier adjacent sans le capturer. */
@@ -153,6 +163,8 @@ export type GameEvent =
 	| "embargo"
 	| "corrupt"
 	| "build"
+	| "descent"
+	| "sabotage"
 	| "alert"
 	| "victory"
 	| "defeat";
@@ -204,6 +216,8 @@ export class World {
 	private counts: Array<Record<BuildingType, number>> = [];
 	/** Quartiers possédés par faction (recalculé une fois par tick). */
 	private owned: number[] = [];
+	/** Bâtiments sabotés par faction (recalculé une fois par tick). */
+	private sabotaged: Array<Record<BuildingType, number>> = [];
 
 	constructor(seed: number, archetype?: Archetype, options?: WorldOptions) {
 		this.city = generateCity(seed, archetype);
@@ -234,6 +248,7 @@ export class World {
 		);
 		this.proposalCooldown = this.factions.map(() => this.factions.map(() => 0));
 		this.counts = this.factions.map(() => emptyCounts());
+		this.sabotaged = this.factions.map(() => emptyCounts());
 		this.owned = this.factions.map(() => 0);
 		this.recount();
 	}
@@ -291,7 +306,8 @@ export class World {
 	productionPerTick(factionId: number): number {
 		const faction = this.factions[factionId]!;
 		const owned = this.modulesOwned(factionId);
-		const housing = this.buildingCount(factionId, "logement");
+		const housing =
+			this.buildingCount(factionId, "logement") * this.sabotageFactor(factionId, "logement");
 		const max = this.maxMembers(factionId);
 		if (faction.members >= max) return 0;
 		const logistique = 1 + TECH.logistiqueProduction * faction.tech.logistique;
@@ -908,14 +924,123 @@ export class World {
 		if (this.floaters.length > 24) this.floaters.shift();
 	}
 
+	/** Un Guetteur (contre-espionnage) couvre-t-il ce quartier (rayon 1) ? */
+	private guardedBy(owner: number, module: number): number {
+		let guards = 0;
+		if (
+			this.territory.owner[module] === owner &&
+			this.territory.building[module] === BUILDING_INDEX.contre
+		) {
+			guards += 1;
+		}
+		for (const neighbor of neighborsOf(module)) {
+			if (
+				this.territory.owner[neighbor] === owner &&
+				this.territory.building[neighbor] === BUILDING_INDEX.contre
+			) {
+				guards += 1;
+			}
+		}
+		return guards;
+	}
+
+	descentCost(): { sale: number; members: number } {
+		return { sale: DESCENT.costSale, members: DESCENT.costMembers };
+	}
+
+	playerCanDescent(module: number): boolean {
+		if (this.outcome !== null) return false;
+		if (!this.canAttack(this.player.id, module)) return false;
+		const owner = this.ownerAt(module);
+		if (owner === NEUTRAL || owner === this.player.id) return false;
+		if (!this.buildingAt(module)) return false;
+		if (this.player.tech.armement < DESCENT.requiredArmement) return false;
+		if (this.player.hitmanCooldown > 0) return false;
+		return (
+			this.player.cashSale >= DESCENT.costSale && this.player.members >= DESCENT.costMembers
+		);
+	}
+
+	/** Descente : vole le butin d'un bâtiment sans le détruire ni changer le contrôle. */
+	playerDescent(module: number): boolean {
+		if (!this.playerCanDescent(module)) return false;
+		const owner = this.ownerAt(module);
+		const type = this.buildingAt(module)!;
+		this.player.cashSale -= DESCENT.costSale;
+		this.player.members -= DESCENT.costMembers;
+		this.player.hitmanCooldown = DESCENT.cooldownTicks;
+		// Un Guetteur adverse gêne l'opération (butin réduit, échec si réseau dense).
+		const guards = this.guardedBy(owner, module);
+		if (guards >= 2) {
+			this.pushLog(`Descente éventée (guetteurs, module ${module})`);
+			this.events.push("alert");
+			return true;
+		}
+		const gained = this.loot(this.player.id, owner, type, guards >= 1 ? LOOT_RATIO * 0.5 : LOOT_RATIO);
+		this.events.push("descent");
+		this.float(
+			module,
+			gained.sale
+				? `descente +${Math.round(gained.sale)} sale`
+				: gained.clean
+					? `descente +${Math.round(gained.clean)} propre`
+					: `descente +${Math.round(gained.members)} membres`,
+			"gain",
+		);
+		this.pushLog(`Descente réussie (module ${module})`);
+		return true;
+	}
+
+	sabotageCost(): number {
+		return SABOTAGE.costSale;
+	}
+
+	playerCanSabotage(module: number): boolean {
+		if (this.outcome !== null) return false;
+		if (!this.canAttack(this.player.id, module)) return false;
+		const owner = this.ownerAt(module);
+		if (owner === NEUTRAL || owner === this.player.id) return false;
+		if (!this.buildingAt(module)) return false;
+		if (this.player.tech.armement < SABOTAGE.requiredArmement) return false;
+		if (this.territory.sabotageUntil[module]! > this.tick) return false;
+		if (this.player.hitmanCooldown > 0) return false;
+		return this.player.cashSale >= SABOTAGE.costSale;
+	}
+
+	/** Sabotage : divise la production d'un bâtiment ennemi pendant un temps. */
+	playerSabotage(module: number): boolean {
+		if (!this.playerCanSabotage(module)) return false;
+		const owner = this.ownerAt(module);
+		this.player.cashSale -= SABOTAGE.costSale;
+		this.player.hitmanCooldown = SABOTAGE.cooldownTicks;
+		if (this.guardedBy(owner, module) >= 1) {
+			this.pushLog(`Sabotage déjoué (guetteurs, module ${module})`);
+			this.events.push("alert");
+			return true;
+		}
+		this.territory.sabotageUntil[module] = this.tick + SABOTAGE.duration;
+		this.events.push("sabotage");
+		this.float(module, "saboté −50 %", "loss");
+		this.pushLog(`Sabotage (module ${module})`);
+		return true;
+	}
+
+	/** Facteur de production d'une faction (bâtiments sabotés = moitié). */
+	private sabotageFactor(factionId: number, type: BuildingType): number {
+		const total = this.buildingCount(factionId, type);
+		const hit = this.sabotaged[factionId]?.[type] ?? 0;
+		if (total === 0) return 0;
+		return (total - hit * (1 - SABOTAGE.factor)) / total;
+	}
+
 	/** Butin : transfère une part de la valeur du bâtiment détruit vers l'attaquant. */
-	private loot(attackerId: number, victimId: number, type: BuildingType): { sale: number; clean: number; members: number } {
+	private loot(attackerId: number, victimId: number, type: BuildingType, ratio = LOOT_RATIO): { sale: number; clean: number; members: number } {
 		const spec = BUILDINGS[type];
 		const attacker = this.factions[attackerId]!;
 		const victim = this.factions[victimId]!;
 		const take = (cost: number | undefined, stock: number): number => {
 			if (!cost) return 0;
-			return Math.min(cost * LOOT_RATIO, stock);
+			return Math.min(cost * ratio, stock);
 		};
 		const members = take(spec.costMembers, victim.members);
 		const sale = take(spec.costSale, victim.cashSale);
@@ -1258,7 +1383,8 @@ export class World {
 				max,
 				faction.members + Math.max(0, this.productionPerTick(faction.id)),
 			);
-			const labos = this.buildingCount(faction.id, "labo");
+			const labos =
+				this.buildingCount(faction.id, "labo") * this.sabotageFactor(faction.id, "labo");
 			if (labos > 0) faction.produit += labos * BUILDING_EFFECTS.produitPerLabo;
 		}
 	}
@@ -1266,7 +1392,8 @@ export class World {
 	/** Points de vente : Produit → Cash sale. */
 	private sell(): void {
 		for (const faction of this.factions) {
-			const ventes = this.buildingCount(faction.id, "vente");
+			const ventes =
+				this.buildingCount(faction.id, "vente") * this.sabotageFactor(faction.id, "vente");
 			if (ventes === 0 || faction.produit <= 0) continue;
 			const capacity = ventes * BUILDING_EFFECTS.produitPerVente;
 			const sold = Math.min(faction.produit, capacity);
@@ -1279,7 +1406,8 @@ export class World {
 	/** Façades : Cash sale → Cash propre (commission). */
 	private launder(): void {
 		for (const faction of this.factions) {
-			const facades = this.buildingCount(faction.id, "facade");
+			const facades =
+				this.buildingCount(faction.id, "facade") * this.sabotageFactor(faction.id, "facade");
 			if (facades === 0 || faction.cashSale <= 0 || faction.launderRatio <= 0) continue;
 			const capacity = facades * BUILDING_EFFECTS.cashPerFacade * faction.launderRatio;
 			const laundered = Math.min(faction.cashSale, capacity);
@@ -1323,8 +1451,9 @@ export class World {
 			const defense =
 				(ZONE_DEFENSE[zone] ?? 1) * planque * (1 + defenderBonus) * traitorDefense;
 			const attackBonus = 1 + this.attackBonus(attack.factionId);
+			// Le plafond de dégâts suit l'Armement : la tech reste utile au-delà du cap.
 			const damage = Math.min(
-				MAX_DAMAGE_PER_TICK,
+				MAX_DAMAGE_PER_TICK * attackBonus,
 				Math.max(0.5, (attack.troops * DAMAGE_PER_TROOP * attackBonus) / defense),
 			);
 			const control = this.territory.control[attack.target]! - damage;
@@ -1407,6 +1536,8 @@ export class World {
 			) {
 				this.corruptPolice(i);
 			}
+			// Opérations (descente/sabotage) : armement requis, donc investissement tech.
+			if (this.rng() < 0.3 && this.aiOperate(i)) continue;
 			// Tueur à gage occasionnel sur un quartier ennemi frontalier.
 			if (this.rng() < 0.25 && this.aiHitman(i)) continue;
 			const target = this.pickAiTarget(i);
@@ -1481,6 +1612,57 @@ export class World {
 		return false;
 	}
 
+	/** Opérations IA : descente/sabotage d'un bâtiment adverse (gatées Armement). */
+	private aiOperate(factionId: number): boolean {
+		const faction = this.factions[factionId]!;
+		if (faction.hitmanCooldown > 0) return false;
+		// On n'engage pas d'opérations avant d'avoir une économie établie et un surplus.
+		if (this.buildingCount(factionId, "labo") === 0 || this.buildingCount(factionId, "vente") === 0) {
+			return false;
+		}
+		if (faction.cashSale < 6000) return false;
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (!this.canAttack(factionId, i)) continue;
+			const owner = this.territory.owner[i]!;
+			if (owner === NEUTRAL || owner === factionId) continue;
+			const type = this.buildingAt(i);
+			if (!type) continue;
+			if (this.guardedBy(owner, i) > 0) continue;
+			if (
+				faction.tech.armement >= SABOTAGE.requiredArmement &&
+				faction.cashSale >= SABOTAGE.costSale &&
+				this.territory.sabotageUntil[i]! <= this.tick
+			) {
+				faction.cashSale -= SABOTAGE.costSale;
+				faction.hitmanCooldown = SABOTAGE.cooldownTicks;
+				this.territory.sabotageUntil[i] = this.tick + SABOTAGE.duration;
+				if (owner === this.player.id) {
+					this.events.push("sabotage");
+					this.float(i, "saboté −50 %", "loss");
+					this.pushLog(`Sabotage ennemi (module ${i})`);
+				}
+				return true;
+			}
+			if (
+				faction.tech.armement >= DESCENT.requiredArmement &&
+				faction.cashSale >= DESCENT.costSale &&
+				faction.members >= DESCENT.costMembers
+			) {
+				faction.cashSale -= DESCENT.costSale;
+				faction.members -= DESCENT.costMembers;
+				faction.hitmanCooldown = DESCENT.cooldownTicks;
+				this.loot(factionId, owner, type);
+				if (owner === this.player.id) {
+					this.events.push("descent");
+					this.float(i, "descente ennemie", "loss");
+					this.pushLog(`Descente ennemie (module ${i})`);
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private pickAiTarget(factionId: number): number | null {
 		const leader = this.police.target;
 		// Anti-snowball : une fraction des décisions vise le leader, ∝ à sa domination.
@@ -1516,6 +1698,15 @@ export class World {
 	private recount(): void {
 		for (let f = 0; f < this.factions.length; f += 1) {
 			const c = this.counts[f]!;
+			const sab = this.sabotaged[f]!;
+			sab.logement = 0;
+			sab.labo = 0;
+			sab.vente = 0;
+			sab.facade = 0;
+			sab.planque = 0;
+			sab.depot = 0;
+			sab.atelier = 0;
+			sab.contre = 0;
 			c.logement = 0;
 			c.labo = 0;
 			c.vente = 0;
@@ -1533,7 +1724,9 @@ export class World {
 			const buildIndex = this.territory.building[i]!;
 			if (buildIndex === NO_BUILDING) continue;
 			const type = BUILDING_TYPES[buildIndex];
-			if (type) this.counts[owner]![type] += 1;
+			if (!type) continue;
+			this.counts[owner]![type] += 1;
+			if (this.territory.sabotageUntil[i]! > this.tick) this.sabotaged[owner]![type] += 1;
 		}
 		for (const faction of this.factions) {
 			const c = this.counts[faction.id]!;

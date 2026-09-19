@@ -43,7 +43,7 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
 	planque: { type: "planque", label: "Planque", costSale: 1200, width: 1.6, height: 0.7 },
 	depot: { type: "depot", label: "Dépôt", costSale: 1200, width: 2.2, height: 1.4 },
 	atelier: { type: "atelier", label: "Atelier", costClean: 2500, width: 1.6, height: 1.1 },
-	contre: { type: "contre", label: "Contre-espionnage", costClean: 2000, width: 1.2, height: 1.3 },
+	contre: { type: "contre", label: "Guetteur", costClean: 2000, width: 1.2, height: 1.3 },
 };
 
 /** Effets chiffrés (par tick sauf mention). */
@@ -95,7 +95,7 @@ export const BUILDING_EFFECT_LABELS: Record<BuildingType, string> = {
 	planque: "défense ×1,5",
 	depot: "+2000 membres max",
 	atelier: "+1 niveau de tech",
-	contre: "−15 % dégâts de tueur",
+	contre: "alerte les descentes · −15 % tueur · gêne descentes/sabotages",
 };
 
 /** Ordre d'amorçage de la chaîne économique (à construire en priorité). */

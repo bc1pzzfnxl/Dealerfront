@@ -64,6 +64,13 @@ export function TerritoryOverlay({
 		[parts],
 	);
 	const borderGeometry = useMemo(() => makeBorderGeometry(), []);
+	const cornerGeometries = useMemo(() => {
+		const r = MODULE_SIZE / 2 - 0.05;
+		return [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map(
+			(start) => new THREE.RingGeometry(r - 0.5, r, 12, 1, start, Math.PI / 2),
+		);
+	}, []);
+	const cornerRefs = useRef<Array<THREE.InstancedMesh | null>>([]);
 
 	const colors = useMemo(
 		() =>
@@ -350,6 +357,49 @@ export function TerritoryOverlay({
 			if (borderMesh.instanceColor) borderMesh.instanceColor.needsUpdate = true;
 		}
 
+		// 6a) Coins arrondis : lisse les angles convexes d'un territoire (rendu « organique »).
+		for (let corner = 0; corner < 4; corner += 1) {
+			const cornerMesh = cornerRefs.current[corner];
+			if (!cornerMesh) continue;
+			let cornerIndex = 0;
+			for (let module = 0; module < count; module += 1) {
+				const owner = territory.owner[module]!;
+				if (owner === NEUTRAL) continue;
+				const x = module % MODULES_W;
+				const y = Math.floor(module / MODULES_W);
+				// Voisins N/S/E/O + diagonale, avec bords de carte sûrs.
+				const n = y > 0 ? territory.owner[module - MODULES_W] : owner;
+				const south = y < MODULES_H - 1 ? territory.owner[module + MODULES_W] : owner;
+				const w = x > 0 ? territory.owner[module - 1] : owner;
+				const e = x < MODULES_W - 1 ? territory.owner[module + 1] : owner;
+				const nw = x > 0 && y > 0 ? territory.owner[module - MODULES_W - 1] : owner;
+				const ne = x < MODULES_W - 1 && y > 0 ? territory.owner[module - MODULES_W + 1] : owner;
+				const sw = x > 0 && y < MODULES_H - 1 ? territory.owner[module + MODULES_W - 1] : owner;
+				const se =
+					x < MODULES_W - 1 && y < MODULES_H - 1 ? territory.owner[module + MODULES_W + 1] : owner;
+				// Coin convexe : deux voisins orthogonaux possédés, diagonale non possédée.
+				const convex =
+					(corner === 0 && n === owner && e === owner && ne !== owner) ||
+					(corner === 1 && n === owner && w === owner && nw !== owner) ||
+					(corner === 2 && south === owner && w === owner && sw !== owner) ||
+					(corner === 3 && south === owner && e === owner && se !== owner);
+				if (!convex) continue;
+				const cx = x * MODULE_SIZE + (corner === 0 || corner === 3 ? MODULE_SIZE : 0);
+				const cz = y * MODULE_SIZE + (corner === 2 || corner === 3 ? MODULE_SIZE : 0);
+				dummy.position.set(cx, 0.24, cz);
+				dummy.rotation.set(-Math.PI / 2, 0, 0);
+				dummy.scale.set(1, 1, 1);
+				dummy.updateMatrix();
+				cornerMesh.setMatrixAt(cornerIndex, dummy.matrix);
+				cornerMesh.setColorAt(cornerIndex, color.copy(colors[owner] ?? neutral).multiplyScalar(1.35));
+				cornerIndex += 1;
+			}
+			dummy.rotation.set(0, 0, 0);
+			cornerMesh.count = cornerIndex;
+			cornerMesh.instanceMatrix.needsUpdate = true;
+			if (cornerMesh.instanceColor) cornerMesh.instanceColor.needsUpdate = true;
+		}
+
 		// 6b) Arêtes de frontière : barres fines là où deux propriétaires se touchent
 		// (le territoire se lit comme une **région continue**, pas comme des carrés).
 		const edgeMesh = edgeRef.current;
@@ -446,6 +496,20 @@ export function TerritoryOverlay({
 				<boxGeometry args={[1, 1, 1]} />
 				<meshBasicMaterial transparent opacity={0.75} depthWrite={false} />
 			</instancedMesh>
+			{cornerGeometries.map((geometry, index) => (
+				<instancedMesh
+					key={`corner-${index}`}
+					ref={(element) => {
+						cornerRefs.current[index] = element;
+					}}
+					args={[undefined, undefined, count]}
+					frustumCulled={false}
+					renderOrder={8}
+				>
+					<primitive object={geometry} attach="geometry" />
+					<meshBasicMaterial transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} />
+				</instancedMesh>
+			))}
 			<instancedMesh ref={edgeRef} args={[undefined, undefined, count]} frustumCulled={false} renderOrder={8}>
 				<planeGeometry args={[1, 1]} />
 				<meshBasicMaterial transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} />

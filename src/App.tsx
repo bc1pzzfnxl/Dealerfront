@@ -34,6 +34,8 @@ const EVENT_SOUND: Record<GameEvent, SoundName> = {
 	embargo: "scan",
 	corrupt: "droplet",
 	build: "press",
+	descent: "scan",
+	sabotage: "whisper",
 	alert: "error",
 	victory: "arrival",
 	defeat: "error",
@@ -307,6 +309,32 @@ function App() {
 		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
 		if (player.cashPropre < HITMAN.costClean) return `${HITMAN.costClean} Cash propre requis`;
 		if (player.members < HITMAN.costMembers) return `${HITMAN.costMembers} membres requis`;
+		return null;
+	}, [selected, world, player]);
+
+	const descentReason = useCallback((): string | null => {
+		if (selected === null) return "aucune cible";
+		if (world.ownerAt(selected) === player.id) return "déjà à vous";
+		if (world.ownerAt(selected) === NEUTRAL) return "cible neutre";
+		if (!world.canAttack(player.id, selected)) return "non adjacent";
+		if (!world.buildingAt(selected)) return "pas de bâtiment";
+		if (player.tech.armement < 1) return "Armement ≥ 1 requis";
+		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		const cost = world.descentCost();
+		if (player.cashSale < cost.sale) return `${cost.sale} sale requis`;
+		if (player.members < cost.members) return `${cost.members} membres requis`;
+		return null;
+	}, [selected, world, player]);
+
+	const sabotageReason = useCallback((): string | null => {
+		if (selected === null) return "aucune cible";
+		if (world.ownerAt(selected) === player.id) return "déjà à vous";
+		if (world.ownerAt(selected) === NEUTRAL) return "cible neutre";
+		if (!world.canAttack(player.id, selected)) return "non adjacent";
+		if (!world.buildingAt(selected)) return "pas de bâtiment";
+		if (player.tech.armement < 2) return "Armement ≥ 2 requis";
+		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		if (player.cashSale < world.sabotageCost()) return `${world.sabotageCost()} sale requis`;
 		return null;
 	}, [selected, world, player]);
 
@@ -788,6 +816,38 @@ function App() {
 									}}
 								>
 									Raid ({world.raidCost().sale} sale{raidReason() ? ` · ${raidReason()}` : ""})
+								</button>
+							) : null}
+							{selectedOwner !== player.id && selectedBuilding ? (
+								<button
+									type="button"
+									disabled={descentReason() !== null}
+									title={descentReason() ?? "Coup de main : vole le butin sans détruire le bâtiment"}
+									onClick={() => {
+										if (selected !== null && world.playerDescent(selected)) {
+											setVersion((value) => value + 1);
+										} else {
+											setNotice(`Descente : ${descentReason() ?? "impossible"}.`);
+										}
+									}}
+								>
+									Descente{descentReason() ? ` · ${descentReason()}` : ` (+butin)`}
+								</button>
+							) : null}
+							{selectedOwner !== player.id && selectedBuilding ? (
+								<button
+									type="button"
+									disabled={sabotageReason() !== null}
+									title={sabotageReason() ?? "Divise la production du bâtiment pendant 30 s"}
+									onClick={() => {
+										if (selected !== null && world.playerSabotage(selected)) {
+											setVersion((value) => value + 1);
+										} else {
+											setNotice(`Sabotage : ${sabotageReason() ?? "impossible"}.`);
+										}
+									}}
+								>
+									Sabotage{sabotageReason() ? ` · ${sabotageReason()}` : ` (${world.sabotageCost()})`}
 								</button>
 							) : null}
 							{selectedOwner !== player.id ? (

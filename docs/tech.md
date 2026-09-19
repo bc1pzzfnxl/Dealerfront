@@ -173,3 +173,11 @@ Barème **croissant**, payé en **Cash sale** puis **Cash propre** pour les haut
 - **Effet** : −40 Contrôle sur le quartier visé, −20 sur les quartiers adjacents ; **détruit les bâtiments** touchés.
 - **Ne capture pas** (Contrôle plancher à 5) : il affaiblit, la conquête se fait ensuite par bagarre.
 - **Contre-espionnage** : réduit les dégâts de **15 % par unité** (plafond **60 %**).
+
+
+### P20 — Armement, Descente, Sabotage
+
+- **Armement** : +10 % dégâts **et** le **plafond de dégâts par tick suit l'Armement** (`5 × (1 + 0,1 × niveau)`) — sans ça la tech était inutile au-delà du cap.
+- **Descente** (Armement ≥ 1) : 2 000 Cash sale + 600 Membres, recharge 25 s → **vole le butin** d'un bâtiment adjacent **sans le détruire ni capturer**. Un **Guetteur** adverse réduit le butin de moitié.
+- **Sabotage** (Armement ≥ 2) : 1 500 Cash sale, recharge 25 s → **production du bâtiment ÷ 2 pendant 30 s**. **Bloqué** par un Guetteur.
+- **Guetteur** (ex-Contre-espionnage, 2 000 Cash propre) : **alerte** les descentes (rayon 1), **−15 % tueur**, **gêne descentes et sabotages**.

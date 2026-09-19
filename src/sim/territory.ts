@@ -24,6 +24,8 @@ export interface Territory {
 	readonly builtAt: Int32Array;
 	/** Tick de la dernière capture (animation). */
 	readonly capturedAt: Int32Array;
+	/** Fin du sabotage d'un bâtiment (production réduite), 0 = aucun. */
+	readonly sabotageUntil: Int32Array;
 	readonly count: number;
 }
 
@@ -36,6 +38,7 @@ export function createTerritory(count: number): Territory {
 		pending: new Int8Array(count).fill(NO_BUILDING),
 		builtAt: new Int32Array(count).fill(-999),
 		capturedAt: new Int32Array(count).fill(-999),
+		sabotageUntil: new Int32Array(count),
 		count,
 	};
 }

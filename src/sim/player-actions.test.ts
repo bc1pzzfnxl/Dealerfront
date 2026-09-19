@@ -951,3 +951,58 @@ describe("butin (bâtiments objectifs)", () => {
 		expect(victim.cashSale).toBeCloseTo(10_000 - 1000 * 0.4);
 	});
 });
+
+describe("descente & sabotage (armement)", () => {
+	it("la descente vole le butin sans détruire ni capturer (Armement ≥ 1)", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.cashSale = 100_000;
+		player.members = 100_000;
+		player.tech.armement = 1;
+		const target = ADJACENT;
+		world.territory.owner[target] = 1;
+		world.territory.control[target] = 100;
+		world.territory.building[target] = BUILDING_INDEX.vente;
+		world.factions[1]!.cashSale = 10_000;
+		const before = player.cashSale;
+
+		expect(world.playerCanDescent(target)).toBe(true);
+		expect(world.playerDescent(target)).toBe(true);
+		expect(world.ownerAt(target)).toBe(1);
+		expect(world.buildingAt(target)).toBe("vente");
+		expect(player.cashSale).toBeCloseTo(before - world.descentCost().sale + 400);
+	});
+
+	it("sans Armement suffisant, pas d'opération", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.cashSale = 100_000;
+		player.members = 100_000;
+		const target = ADJACENT;
+		world.territory.owner[target] = 1;
+		world.territory.control[target] = 100;
+		world.territory.building[target] = BUILDING_INDEX.vente;
+		expect(world.playerCanDescent(target)).toBe(false);
+		player.tech.armement = 1;
+		expect(world.playerCanDescent(target)).toBe(true);
+		expect(world.playerCanSabotage(target)).toBe(false);
+		player.tech.armement = 2;
+		expect(world.playerCanSabotage(target)).toBe(true);
+	});
+
+	it("un Guetteur adverse bloque le sabotage", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.cashSale = 100_000;
+		player.tech.armement = 2;
+		const target = ADJACENT;
+		world.territory.owner[target] = 1;
+		world.territory.control[target] = 100;
+		world.territory.building[target] = BUILDING_INDEX.vente;
+		world.territory.owner[ADJACENT + 1] = 1;
+		world.territory.building[ADJACENT + 1] = BUILDING_INDEX.contre;
+
+		expect(world.playerSabotage(target)).toBe(true);
+		expect(world.territory.sabotageUntil[target]).toBe(0);
+	});
+});
