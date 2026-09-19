@@ -22,6 +22,8 @@ export interface Faction {
 	buildings: number;
 	/** Niveaux de tech (Armement / Protection / Logistique). */
 	tech: { armement: number; protection: number; logistique: number };
+	/** Part des Membres engagée à chaque assaut (0,05–0,6). */
+	attackRatio: number;
 	/** Part de la capacité des façades effectivement blanchie (0–1). */
 	launderRatio: number;
 	/** Cooldown du tueur à gage (ticks). */
@@ -82,6 +84,7 @@ export function createFactions(count: number, startMembers: number): Faction[] {
 			buildings: 0,
 			tech: { armement: 0, protection: 0, logistique: 0 },
 			hitmanCooldown: 0,
+			attackRatio: 0.2,
 			launderRatio: 1,
 			corruptionUses: 0,
 			captures: 0,

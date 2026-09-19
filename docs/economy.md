@@ -16,7 +16,7 @@ Définir la **boucle économique du cartel** : produire du **Produit** dans les 
 | **Produit** | Ressource abstraite (pas d'inventaire par unité) | **Labos** (production/tick) | **Points de vente** (conversion) |
 | **Cash sale** | Monnaie non blanchie | **Points de vente** (Produit → Cash sale) | Bâtiments, conversions, paliers de tech |
 | **Cash propre** | Monnaie blanchied, compte au score | **Façades** (Cash sale → Cash propre, commission) | Tech haut de gamme, services stratégiques, objectif de victoire |
-| **Membres** | Ressource-troupe (pool de faction) | **Logement aménagé** + quartiers possédés | Conquête/défense de quartiers |
+| **Membres** | Ressource-troupe (pool de faction) | **Recrutement aménagé** + quartiers possédés | Conquête/défense de quartiers |
 
 Chaîne principale :
 
@@ -46,7 +46,7 @@ Valeurs **de départ proposées (« à équilibrer »)** ; durée exprimée en *
 | **Planque** | Défense du quartier | Défense du quartier **×5** (inspiré DefensePost OpenFront, portée locale) | `min(250 000, (n+1) × 5 000)` Cash sale | 50 ticks (5 s) | Idem |
 | **Atelier** | Débloque/monte la tech | Ouvre les 3 branches (`tech.md`) ; 1 canal de recherche par Atelier | 50 000 Cash propre | 50 ticks (5 s) | Quartier possédé, zone industrielle |
 | **Contre-espionnage** | Réduit tueurs/agents ennemis | −40 % d'efficacité des tueurs/agents ennemis dans un rayon de 3 quartiers | 75 000 Cash propre | 100 ticks (10 s) | Idem |
-| **Logement aménagé** | Production de Membres | +25 Membres/tick | 800 Membres | immédiat | Aménager un appartement/immeuble existant |
+| **Recrutement aménagé** | Production de Membres | +25 Membres/tick | 800 Membres | immédiat | Aménager un appartement/immeuble existant |
 
 **Interactions :**
 - Un **Point de vente** sans **Labo** à proximité tourne au ralenti (Produit manquant) ; un **Labo** sans Point de vente accumule du Produit plafonné (voir Cas limites).
@@ -188,7 +188,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 
 | Bâtiment | Coût | Effet / tick |
 |---|---|---|
-| **Logement** | 800 membres | +25 Membres |
+| **Recrutement** | 800 membres | +25 Membres |
 | **Labo** | 1 000 sale | +1,5 Produit |
 | **Point de vente** | 1 000 sale | convertit jusqu'à 2 Produit → 60 sale/unité |
 | **Façade** | 1 500 sale | blanchit jusqu'à **60** sale → propre (commission 20 %) |
@@ -209,7 +209,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 
 | Type | Part visée |
 |---|---|
-| Logement | 30 % |
+| Recrutement | 30 % |
 | Labo | 20 % |
 | Point de vente | 15 % |
 | Façade | 15 % |
@@ -233,14 +233,14 @@ Un quartier possédé et **vide** ne peut être converti que vers les types **co
 
 | Zone | Bâtiments convertibles |
 |---|---|
-| Résidentiel | Logement, Labo, Point de vente, Façade, Planque, Contre-espionnage |
+| Résidentiel | Recrutement, Labo, Point de vente, Façade, Planque, Contre-espionnage |
 | Commercial | idem (boutique/arrière-boutique) |
-| Vie nocturne | Logement, Labo, Point de vente, Façade, Planque |
+| Vie nocturne | Recrutement, Labo, Point de vente, Façade, Planque |
 | Industriel | + **Dépôt**, **Atelier** |
-| Laverie | Logement, Labo, Point de vente, Façade, Planque, Contre-espionnage |
+| Laverie | Recrutement, Labo, Point de vente, Façade, Planque, Contre-espionnage |
 | **Poste de police** | **Contre-espionnage, Planque** uniquement |
 | **Parc** | **Planque** uniquement |
-| **Terrain vague** | Construction neuve : Logement, Labo, Point de vente, Façade, Planque, Dépôt, Atelier |
+| **Terrain vague** | Construction neuve : Recrutement, Labo, Point de vente, Façade, Planque, Dépôt, Atelier |
 
 - Le **spawn** de chaque faction est forcé sur une zone « bâtie » : on peut toujours amorcer.
 - **Amorçage** : tant que la chaîne (Labo → Point de vente → Façade) est incomplète, l'IA/le bot ne construisent **que** l'étape manquante (évite de gaspiller le budget).
@@ -269,3 +269,8 @@ Un quartier possédé et **vide** ne peut être converti que vers les types **co
 
 - **Construction neuve** : `BUILD_TICKS` ≈ **9–24 s** (90–240 ticks).
 - **Conversion** (bâti existant) : **coût −50 %** et **temps ÷2**, mais **plus instantanée** (chantier malgré tout).
+
+### P17 — thème « recrutement » et ratio d'assaut
+
+- Le bâtiment de production de Membres est **« Recrutement »** (on **réquisitionne un immeuble d'habitation** plutôt que d'en construire — plus crédible pour un cartel). Mécanique inchangée (+25 Membres/tick).
+- **Ratio d'assaut réglable** (curseur, 5–60 %) : part des Membres engagée à chaque attaque (OpenFront-like).

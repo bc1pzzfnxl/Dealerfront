@@ -428,7 +428,7 @@ function App() {
 	const chain: { type: BuildingType; label: string; count: number; value: string }[] = [
 		{
 			type: "logement",
-			label: "Logement",
+			label: "Recrutement",
 			count: world.buildingCount(player.id, "logement"),
 			value: `${Math.round(player.members).toLocaleString("fr-FR")} membres`,
 		},
@@ -651,6 +651,22 @@ function App() {
 						<span>Zone</span>
 						<code>{selectedZoneLabel}</code>
 					</div>
+
+					<label className="slider-row" title="Part des Membres engagée à chaque assaut">
+						<span>Troupes</span>
+						<input
+							type="range"
+							min={5}
+							max={60}
+							step={5}
+							value={Math.round(world.playerAttackRatio() * 100)}
+							onChange={(event) => {
+								world.playerSetAttackRatio(Number(event.target.value) / 100);
+								setVersion((value) => value + 1);
+							}}
+						/>
+						<code>{Math.round(world.playerAttackRatio() * 100)}%</code>
+					</label>
 
 					{isOwned ? (
 						constructionLeft > 0 ? (

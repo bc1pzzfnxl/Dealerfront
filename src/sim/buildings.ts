@@ -36,7 +36,7 @@ export interface BuildingSpec {
 }
 
 export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
-	logement: { type: "logement", label: "Logement", costMembers: 800, width: 1.6, height: 1.2 },
+	logement: { type: "logement", label: "Recrutement", costMembers: 800, width: 1.6, height: 1.2 },
 	labo: { type: "labo", label: "Labo", costSale: 1000, width: 1.4, height: 1.6 },
 	vente: { type: "vente", label: "Point de vente", costSale: 1000, width: 1.8, height: 0.8 },
 	facade: { type: "facade", label: "Façade", costSale: 1500, width: 2.0, height: 1.0 },
@@ -88,7 +88,7 @@ export const CONVERSION_TIME = 0.5;
 
 /** Description courte de l'effet (aide à la décision / infobulles). */
 export const BUILDING_EFFECT_LABELS: Record<BuildingType, string> = {
-	logement: "+25 membres/tick",
+	logement: "recrute +25 membres/tick (immeuble récupéré)",
 	labo: "+1,5 produit/tick",
 	vente: "transforme le produit en cash sale",
 	facade: "blanchit 60 cash sale/tick",
@@ -159,7 +159,7 @@ export const BUILT_ZONES: readonly ZoneType[] = [
  * « le premier abordable » (qui remplissait tout de logements).
  */
 export const BUILD_TARGETS: Record<BuildingType, number> = {
-	logement: 0.3,
+	logement: 0.3, // recrutement
 	labo: 0.2,
 	vente: 0.15,
 	facade: 0.15,

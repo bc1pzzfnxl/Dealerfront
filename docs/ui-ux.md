@@ -170,7 +170,7 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 ### Onboarding (P10)
 
 - **Aide** affichée à la première partie (rouvrable via le bouton **Aide**) : but, boucle économique en 4 étapes, conquête, police, touches.
-- **Panneau « Boucle »** (barre basse) : `Logement → Membres`, `Labo → Produit`, `Point de vente → Cash sale`, `Façade → Cash propre`, avec compteurs et **étape manquante mise en évidence**.
+- **Panneau « Boucle »** (barre basse) : `Recrutement → Membres`, `Labo → Produit`, `Point de vente → Cash sale`, `Façade → Cash propre`, avec compteurs et **étape manquante mise en évidence**.
 - **Conseiller** réordonné : capturer un 2ᵉ quartier → Labo → Point de vente → Façade → aménager → étendre → blanchir ; il indique la **ressource manquante** quand un bâtiment est hors de portée.
 - **Contraste** : texte secondaire éclairci (`--muted`), coût des bâtiments lisible, boutons désactivés **lisibles** (bordure pointillée au lieu d'une opacité qui écrase le texte), coût en ambre quand il manque des fonds.
 

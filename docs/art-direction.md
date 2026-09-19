@@ -113,7 +113,7 @@ Proposée (à affiner en phase artistique), **distincte aussi en niveaux de gris
 ## Implémentation (P16) — pastel, code couleur et animations
 
 - **Factions** : palette **pastel** (`#8FC7E8`, `#E8C57A`, `#8FD8A5`, `#B79DE0`, `#E88C80`, `#6FD0C4`) sur la carte, la minimap et les pastilles UI.
-- **Bâtiments de cartel colorés par type** (`BUILDING_COLORS`) : Labo vert, Point de vente ambre, Façade rose, Planque lilas, Dépôt beige, Atelier bleu ciel, Contre-espionnage rouge poudré, Logement gris-bleu. La **forme** reste distincte (cylindre/cône/octaèdre…).
+- **Bâtiments de cartel colorés par type** (`BUILDING_COLORS`) : Labo vert, Point de vente ambre, Façade rose, Planque lilas, Dépôt beige, Atelier bleu ciel, Contre-espionnage rouge poudré, Recrutement gris-bleu. La **forme** reste distincte (cylindre/cône/octaèdre…).
 - **Grille de quartiers** : contour discret sur chaque module → la structure de la ville est lisible.
 - **Frontières** : contour épais coloré là où deux propriétaires se touchent (façon OpenFront).
 - **Animations** : contour de **siège** qui pulse (couleur de l'attaquant), **flash** à la capture, **croissance** du chantier puis **pop** à la livraison du bâtiment.

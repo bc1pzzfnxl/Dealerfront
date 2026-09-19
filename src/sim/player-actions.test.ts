@@ -853,3 +853,15 @@ describe("raid & assauts simultanés", () => {
 		expect(world.playerAttack(51)).toBe(false);
 	});
 });
+
+describe("ratio d'assaut", () => {
+	it("est borné et pilote l'engagement des troupes", () => {
+		const world = new World(1, "nightlife");
+		world.playerSetAttackRatio(2);
+		expect(world.playerAttackRatio()).toBe(0.6);
+		world.playerSetAttackRatio(0);
+		expect(world.playerAttackRatio()).toBe(0.05);
+		world.playerSetAttackRatio(0.3);
+		expect(world.commitRatio()).toBe(0.3);
+	});
+});

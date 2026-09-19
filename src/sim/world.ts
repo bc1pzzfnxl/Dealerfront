@@ -877,7 +877,16 @@ export class World {
 	}
 
 	commitRatio(): number {
-		return COMMIT_RATIO;
+		return this.player.attackRatio;
+	}
+
+	/** Part des Membres engagée à chaque assaut (0,05–0,6). */
+	playerSetAttackRatio(ratio: number): void {
+		this.player.attackRatio = Math.max(0.05, Math.min(0.6, ratio));
+	}
+
+	playerAttackRatio(): number {
+		return this.player.attackRatio;
 	}
 
 	minCommit(): number {
@@ -962,7 +971,7 @@ export class World {
 		if (this.attacks.filter((attack) => attack.factionId === factionId).length >= MAX_ASSAULTS) {
 			return false;
 		}
-		const troops = Math.floor(faction.members * COMMIT_RATIO);
+		const troops = Math.floor(faction.members * faction.attackRatio);
 		if (troops < MIN_COMMIT) return false;
 		this.registerAttack(factionId, this.territory.owner[module]!);
 		faction.members -= troops;

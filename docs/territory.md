@@ -53,7 +53,7 @@ Définir la **prise de contrôle de la ville** : qui possède quoi, comment on �
 | `maxMembres` | `2000 + quartiers × 1500 + logements × 2000 + dépôts × 2000` | à équilibrer |
 | Production de Membres | `(8 × quartiers + 25 × logements) × (1 − membres/max)` /tick | à équilibrer |
 | Coût d'aménagement d'un logement | 800 membres | à équilibrer |
-| Logement aménagé | +25 Membres/tick (perdu si le quartier est capturé) | à équilibrer |
+| Recrutement aménagé | +25 Membres/tick (perdu si le quartier est capturé) | à équilibrer |
 | Membres de départ (faction) | 3 000 | à équilibrer |
 | Garnison neutre (par quartier) | ~2 000 | à équilibrer |
 | Distance min entre factions (spawn) | ~5 quartiers | à équilibrer |

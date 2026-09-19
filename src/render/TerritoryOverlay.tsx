@@ -53,6 +53,7 @@ export function TerritoryOverlay({
 	version,
 }: TerritoryOverlayProps) {
 	const ref = useRef<THREE.InstancedMesh>(null);
+	const fillRef = useRef<THREE.InstancedMesh>(null);
 	const borderRef = useRef<THREE.InstancedMesh>(null);
 	const buildingRefs = useRef<Array<THREE.InstancedMesh | null>>([]);
 	const count = city.modules.length;
@@ -213,15 +214,41 @@ export function TerritoryOverlay({
 			});
 		}
 
-		// 3) Frontières (propriétaires différents) + contours d'attaque (pulsés).
-		const borderMesh = borderRef.current;
+		// 3) Remplissage d'assaut : la case se colore ∝ à la perte de contrôle.
+		const fillMesh = fillRef.current;
 		const attacker = new Map<number, number>();
 		for (const attack of attacks) attacker.set(attack.target, attack.factionId);
+		if (fillMesh) {
+			let fillIndex = 0;
+			for (const [module, factionId] of attacker) {
+				const owner = territory.owner[module]!;
+				if (owner === factionId) continue;
+				const control = Math.max(0, Math.min(100, territory.control[module]!));
+				const progress = owner === NEUTRAL ? 1 - control / 60 : 1 - control / 100;
+				const scale = (MODULE_SIZE - 0.2) * Math.max(0.08, Math.min(1, progress));
+				const centerX = (module % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+				const centerZ = Math.floor(module / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+				dummy.position.set(centerX, 0.205, centerZ);
+				dummy.rotation.set(0, 0, 0);
+				dummy.scale.set(scale, 0.06, scale);
+				dummy.updateMatrix();
+				fillMesh.setMatrixAt(fillIndex, dummy.matrix);
+				fillMesh.setColorAt(fillIndex, color.copy(colors[factionId] ?? neutral).multiplyScalar(1.15));
+				fillIndex += 1;
+			}
+			fillMesh.count = fillIndex;
+			fillMesh.instanceMatrix.needsUpdate = true;
+			if (fillMesh.instanceColor) fillMesh.instanceColor.needsUpdate = true;
+		}
+
+		// 4) Frontières (propriétaires différents) + contours d'attaque (pulsés).
+		const borderMesh = borderRef.current;
 		const pulse = 1 + 0.1 * Math.sin(tick * 0.9);
 		if (borderMesh) {
 			let borderIndex = 0;
-			// Grille discrète : rend la structure des quartiers lisible (façon OpenFront).
+			// Grille discrète **sur le neutre seulement** : les zones détenues se lisent fusionnées.
 			for (let module = 0; module < count; module += 1) {
+				if (territory.owner[module] !== NEUTRAL) continue;
 				const centerX = (module % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
 				const centerZ = Math.floor(module / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
 				dummy.position.set(centerX, 0.225, centerZ);
@@ -304,6 +331,15 @@ export function TerritoryOverlay({
 					<meshLambertMaterial flatShading />
 				</instancedMesh>
 			))}
+			<instancedMesh
+				ref={fillRef}
+				args={[undefined, undefined, count]}
+				frustumCulled={false}
+				renderOrder={6}
+			>
+				<boxGeometry args={[1, 1, 1]} />
+				<meshBasicMaterial transparent opacity={0.75} depthWrite={false} />
+			</instancedMesh>
 			<instancedMesh
 				ref={borderRef}
 				args={[undefined, undefined, count]}
