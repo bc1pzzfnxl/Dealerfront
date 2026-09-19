@@ -47,6 +47,7 @@ export function TerritoryOverlay({
 	const shockRef = useRef<THREE.InstancedMesh>(null);
 	const unitRef = useRef<THREE.InstancedMesh>(null);
 	const borderRef = useRef<THREE.InstancedMesh>(null);
+	const edgeRef = useRef<THREE.InstancedMesh>(null);
 	const partRefs = useRef<Array<THREE.InstancedMesh | null>>([]);
 	const count = city.modules.length;
 
@@ -331,7 +332,6 @@ export function TerritoryOverlay({
 			}
 			for (let module = 0; module < count; module += 1) {
 				const attack = attacker.get(module);
-				const owner = territory.owner[module]!;
 				const centerX = (module % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
 				const centerZ = Math.floor(module / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
 				if (attack !== undefined) {
@@ -342,28 +342,55 @@ export function TerritoryOverlay({
 					borderMesh.setMatrixAt(borderIndex, dummy.matrix);
 					borderMesh.setColorAt(borderIndex, color.copy(colors[attack] ?? neutral).multiplyScalar(1.25));
 					borderIndex += 1;
-				} else if (owner !== NEUTRAL) {
-					const x = module % MODULES_W;
-					const y = Math.floor(module / MODULES_W);
-					const border =
-						(x > 0 && territory.owner[module - 1] !== owner) ||
-						(x < MODULES_W - 1 && territory.owner[module + 1] !== owner) ||
-						(y > 0 && territory.owner[module - MODULES_W] !== owner) ||
-						(y < MODULES_H - 1 && territory.owner[module + MODULES_W] !== owner);
-					if (!border) continue;
-					dummy.position.set(centerX, 0.23, centerZ);
-					dummy.rotation.set(-Math.PI / 2, 0, 0);
-					dummy.scale.set(1, 1, 1);
-					dummy.updateMatrix();
-					borderMesh.setMatrixAt(borderIndex, dummy.matrix);
-					borderMesh.setColorAt(borderIndex, color.copy(colors[owner] ?? neutral).multiplyScalar(1.35));
-					borderIndex += 1;
 				}
 			}
 			dummy.rotation.set(0, 0, 0);
 			borderMesh.count = borderIndex;
 			borderMesh.instanceMatrix.needsUpdate = true;
 			if (borderMesh.instanceColor) borderMesh.instanceColor.needsUpdate = true;
+		}
+
+		// 6b) Arêtes de frontière : barres fines là où deux propriétaires se touchent
+		// (le territoire se lit comme une **région continue**, pas comme des carrés).
+		const edgeMesh = edgeRef.current;
+		if (edgeMesh) {
+			let edgeIndex = 0;
+			const thickness = 0.5;
+			for (let module = 0; module < count; module += 1) {
+				const owner = territory.owner[module]!;
+				if (owner === NEUTRAL) continue;
+				const x = module % MODULES_W;
+				const y = Math.floor(module / MODULES_W);
+				const centerX = x * MODULE_SIZE + MODULE_SIZE / 2;
+				const centerZ = y * MODULE_SIZE + MODULE_SIZE / 2;
+				const edges: [number, number, number, boolean][] = [];
+				if (y === 0 || territory.owner[module - MODULES_W] !== owner) {
+					edges.push([centerX, centerZ - MODULE_SIZE / 2, 0, true]);
+				}
+				if (y === MODULES_H - 1 || territory.owner[module + MODULES_W] !== owner) {
+					edges.push([centerX, centerZ + MODULE_SIZE / 2, 0, true]);
+				}
+				if (x === 0 || territory.owner[module - 1] !== owner) {
+					edges.push([centerX - MODULE_SIZE / 2, centerZ, Math.PI / 2, false]);
+				}
+				if (x === MODULES_W - 1 || territory.owner[module + 1] !== owner) {
+					edges.push([centerX + MODULE_SIZE / 2, centerZ, Math.PI / 2, false]);
+				}
+				for (const [ex, ez, rot, horizontal] of edges) {
+					dummy.position.set(ex, 0.235, ez);
+					dummy.rotation.set(-Math.PI / 2, rot, 0);
+					dummy.scale.set(MODULE_SIZE, thickness, 1);
+					dummy.updateMatrix();
+					edgeMesh.setMatrixAt(edgeIndex, dummy.matrix);
+					edgeMesh.setColorAt(edgeIndex, color.copy(colors[owner] ?? neutral).multiplyScalar(1.35));
+					edgeIndex += 1;
+					void horizontal;
+				}
+			}
+			dummy.rotation.set(0, 0, 0);
+			edgeMesh.count = edgeIndex;
+			edgeMesh.instanceMatrix.needsUpdate = true;
+			if (edgeMesh.instanceColor) edgeMesh.instanceColor.needsUpdate = true;
 		}
 	}, [territory, colors, partColors, partOffset, parts, count, version, attacks, city.seed, tick]);
 
@@ -418,6 +445,10 @@ export function TerritoryOverlay({
 			>
 				<boxGeometry args={[1, 1, 1]} />
 				<meshBasicMaterial transparent opacity={0.75} depthWrite={false} />
+			</instancedMesh>
+			<instancedMesh ref={edgeRef} args={[undefined, undefined, count]} frustumCulled={false} renderOrder={8}>
+				<planeGeometry args={[1, 1]} />
+				<meshBasicMaterial transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} />
 			</instancedMesh>
 			<instancedMesh
 				ref={borderRef}

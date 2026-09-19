@@ -53,7 +53,7 @@ export const TRAVEL_TICKS = 12;
 /** Équipes de construction simultanées par faction. */
 const BUILD_CREWS = 2;
 /** Longueur max de la file d'ordres par faction. */
-const QUEUE_MAX = 6;
+const QUEUE_MAX = 12;
 const AI_INTERVAL = 25;
 const MIN_COMMIT = 400;
 /** Raid : affaiblit un quartier adjacent sans le capturer. */
@@ -933,6 +933,71 @@ export class World {
 		if (!canBuildInZone(this.city.modules[module]!, type)) return false;
 		if (this.buildOrders.some((order) => order.module === module)) return false;
 		return this.queueLength() < QUEUE_MAX;
+	}
+
+	/**
+	 * Plan de construction par lot : aménage tous les quartiers possédés vides
+	 * (hors file/chantier) selon la composition cible. Chiffres pour prévisualisation.
+	 */
+	playerBatchPreview(): { count: number; sale: number; members: number; clean: number } {
+		const player = this.player;
+		const counts = this.buildingCounts(player.id);
+		const scratch = { ...counts };
+		const owned = this.modulesOwned(player.id);
+		const bootstrap = missingEconomyStep(scratch, (t) =>
+			this.canAfford(player, t, CONVERSION_COST),
+		);
+		let count = 0;
+		let sale = 0;
+		let members = 0;
+		let clean = 0;
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (this.ownerAt(i) !== player.id) continue;
+			if (this.territory.building[i] !== NO_BUILDING) continue;
+			if (this.territory.construction[i]! > 0) continue;
+			if (this.buildOrders.some((order) => order.module === i)) continue;
+			const type =
+				bootstrap ??
+				chooseBuildType(scratch, owned, (t) => canBuildInZone(this.city.modules[i]!, t));
+			if (type === null) continue;
+			if (!canBuildInZone(this.city.modules[i]!, type)) continue;
+			const factor = this.buildCostFactor(i);
+			const spec = BUILDINGS[type];
+			if (spec.costMembers) members += Math.round(spec.costMembers * factor);
+			if (spec.costSale) sale += Math.round(spec.costSale * factor);
+			if (spec.costClean) clean += Math.round(spec.costClean * factor);
+			scratch[type] += 1;
+			count += 1;
+		}
+		return { count, sale, members, clean };
+	}
+
+	/** Met en file le lot d'aménagement (dans la limite de la file). */
+	playerBatchBuild(): number {
+		const player = this.player;
+		const counts = this.buildingCounts(player.id);
+		const scratch = { ...counts };
+		const owned = this.modulesOwned(player.id);
+		let queued = 0;
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (this.queueLength() >= QUEUE_MAX) break;
+			if (this.ownerAt(i) !== player.id) continue;
+			if (this.territory.building[i] !== NO_BUILDING) continue;
+			if (this.territory.construction[i]! > 0) continue;
+			if (this.buildOrders.some((order) => order.module === i)) continue;
+			const bootstrap = missingEconomyStep(scratch, (t) =>
+				this.canAfford(player, t, CONVERSION_COST),
+			);
+			const type =
+				bootstrap ??
+				chooseBuildType(scratch, owned, (t) => canBuildInZone(this.city.modules[i]!, t));
+			if (type === null) continue;
+			if (this.playerQueueBuild(i, type)) {
+				scratch[type] += 1;
+				queued += 1;
+			}
+		}
+		return queued;
 	}
 
 	/** Met un ordre en file ; démarre immédiatement si une équipe est libre. */

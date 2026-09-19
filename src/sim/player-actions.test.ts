@@ -908,3 +908,22 @@ describe("file de construction", () => {
 		expect(world.constructionLeft(c)).toBe(0);
 	});
 });
+
+describe("aménagement par lot", () => {
+	it("chiffre puis file l'aménagement des quartiers vides", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.cashSale = 100_000;
+		player.cashPropre = 100_000;
+		ownConversion(world, player.id, "labo");
+		ownConversion(world, player.id, "labo");
+
+		const preview = world.playerBatchPreview();
+		expect(preview.count).toBeGreaterThanOrEqual(2);
+		expect(preview.sale + preview.members + preview.clean).toBeGreaterThan(0);
+
+		const queued = world.playerBatchBuild();
+		expect(queued).toBeGreaterThanOrEqual(1);
+		expect(world.queueLength()).toBeGreaterThanOrEqual(1);
+	});
+});
