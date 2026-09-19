@@ -37,6 +37,18 @@ const BUILDING_SHAPE: Record<BuildingType, () => THREE.BufferGeometry> = {
 	contre: () => new THREE.OctahedronGeometry(0.6),
 };
 
+/** Détail signature par type : petit volume posé sur le bâtiment (identité visuelle). */
+const DETAIL: Record<BuildingType, { shape: "box" | "cylinder" | "cone"; dx: number; dz: number; w: number; h: number; color: string }> = {
+	logement: { shape: "box", dx: 0.55, dz: -0.4, w: 0.14, h: 1.1, color: "#FFFFFF" },
+	labo: { shape: "cylinder", dx: -0.35, dz: 0.35, w: 0.42, h: 1.0, color: "#7FB98F" },
+	vente: { shape: "box", dx: 0, dz: 0.62, w: 1.1, h: 0.35, color: "#E8B45C" },
+	facade: { shape: "cylinder", dx: 0.5, dz: 0.5, w: 0.55, h: 0.9, color: "#E89AC0" },
+	planque: { shape: "cone", dx: -0.5, dz: -0.45, w: 0.6, h: 0.9, color: "#A99AD8" },
+	depot: { shape: "box", dx: 0.6, dz: 0.55, w: 0.7, h: 0.6, color: "#C2A87E" },
+	atelier: { shape: "box", dx: -0.55, dz: 0.45, w: 0.16, h: 1.6, color: "#6FA9CE" },
+	contre: { shape: "box", dx: 0.5, dz: -0.5, w: 0.1, h: 1.3, color: "#D98C86" },
+};
+
 const CONTROL_STEP = 5;
 /** Durée (ticks) des flashs d'animation. */
 const FLASH = 8;
@@ -54,11 +66,23 @@ export function TerritoryOverlay({
 }: TerritoryOverlayProps) {
 	const ref = useRef<THREE.InstancedMesh>(null);
 	const fillRef = useRef<THREE.InstancedMesh>(null);
+	const shockRef = useRef<THREE.InstancedMesh>(null);
 	const borderRef = useRef<THREE.InstancedMesh>(null);
 	const buildingRefs = useRef<Array<THREE.InstancedMesh | null>>([]);
+	const detailRefs = useRef<Array<THREE.InstancedMesh | null>>([]);
 	const count = city.modules.length;
 
 	const geometries = useMemo(() => BUILDING_TYPES_GEOMETRIES(), []);
+	const detailGeometries = useMemo(
+		() =>
+			BUILDING_TYPES.map((type) => {
+				const shape = DETAIL[type].shape;
+				if (shape === "cylinder") return new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
+				if (shape === "cone") return new THREE.ConeGeometry(0.5, 1, 10);
+				return new THREE.BoxGeometry(1, 1, 1);
+			}),
+		[],
+	);
 	const borderGeometry = useMemo(() => makeBorderGeometry(), []);
 
 	const colors = useMemo(
@@ -203,14 +227,36 @@ export function TerritoryOverlay({
 				if (underConstruction) color.setRGB(0.92, 0.68, 0.3);
 				else color.copy(buildingColors[type] ?? white);
 				buildingMesh.setColorAt(index, color);
+
+				// Détail signature du type (identité visuelle).
+				const detailMesh = detailRefs.current[effective];
+				const detail = DETAIL[type];
+				if (detailMesh) {
+					dummy.position.set(
+						centerX + detail.dx,
+						0.25 + height + detail.h / 2 - 0.05,
+						centerZ + detail.dz,
+					);
+					dummy.scale.set(detail.w, detail.h, detail.w);
+					dummy.updateMatrix();
+					detailMesh.setMatrixAt(index, dummy.matrix);
+					detailMesh.setColorAt(index, color.set(detail.color));
+				}
 				counters[effective] = index + 1;
 			}
 			BUILDING_TYPES.forEach((_, index) => {
 				const buildingMesh = buildingRefs.current[index];
-				if (!buildingMesh) return;
-				buildingMesh.count = counters[index]!;
-				buildingMesh.instanceMatrix.needsUpdate = true;
-				if (buildingMesh.instanceColor) buildingMesh.instanceColor.needsUpdate = true;
+				if (buildingMesh) {
+					buildingMesh.count = counters[index]!;
+					buildingMesh.instanceMatrix.needsUpdate = true;
+					if (buildingMesh.instanceColor) buildingMesh.instanceColor.needsUpdate = true;
+				}
+				const detailMesh = detailRefs.current[index];
+				if (detailMesh) {
+					detailMesh.count = counters[index]!;
+					detailMesh.instanceMatrix.needsUpdate = true;
+					if (detailMesh.instanceColor) detailMesh.instanceColor.needsUpdate = true;
+				}
 			});
 		}
 
@@ -241,7 +287,37 @@ export function TerritoryOverlay({
 			if (fillMesh.instanceColor) fillMesh.instanceColor.needsUpdate = true;
 		}
 
-		// 4) Frontières (propriétaires différents) + contours d'attaque (pulsés).
+		// 4) Onde de choc : anneau qui s'étend après une capture.
+		const shockMesh = shockRef.current;
+		if (shockMesh) {
+			let shockIndex = 0;
+			const bg = new THREE.Color("#0B0E12");
+			for (let module = 0; module < count; module += 1) {
+				const age = tick - territory.capturedAt[module]!;
+				if (age < 0 || age >= 14) continue;
+				const t = age / 14;
+				const owner = territory.owner[module]!;
+				const centerX = (module % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+				const centerZ = Math.floor(module / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+				dummy.position.set(centerX, 0.245, centerZ);
+				dummy.rotation.set(-Math.PI / 2, 0, 0);
+				const grow = 1 + 2.6 * t;
+				dummy.scale.set(grow, grow, 1);
+				dummy.updateMatrix();
+				shockMesh.setMatrixAt(shockIndex, dummy.matrix);
+				color
+					.copy(owner === NEUTRAL ? neutral : (colors[owner] ?? neutral))
+					.lerp(bg, t);
+				shockMesh.setColorAt(shockIndex, color);
+				shockIndex += 1;
+			}
+			dummy.rotation.set(0, 0, 0);
+			shockMesh.count = shockIndex;
+			shockMesh.instanceMatrix.needsUpdate = true;
+			if (shockMesh.instanceColor) shockMesh.instanceColor.needsUpdate = true;
+		}
+
+		// 5) Frontières (propriétaires différents) + contours d'attaque (pulsés).
 		const borderMesh = borderRef.current;
 		const pulse = 1 + 0.1 * Math.sin(tick * 0.9);
 		if (borderMesh) {
@@ -331,6 +407,29 @@ export function TerritoryOverlay({
 					<meshLambertMaterial flatShading />
 				</instancedMesh>
 			))}
+			{BUILDING_TYPES.map((type, index) => (
+				<instancedMesh
+					key={`detail-${type}`}
+					ref={(element) => {
+						detailRefs.current[index] = element;
+					}}
+					args={[undefined, undefined, count]}
+					frustumCulled={false}
+					renderOrder={7}
+				>
+					<primitive object={detailGeometries[index]} attach="geometry" />
+					<meshLambertMaterial flatShading />
+				</instancedMesh>
+			))}
+			<instancedMesh
+				ref={shockRef}
+				args={[undefined, undefined, count]}
+				frustumCulled={false}
+				renderOrder={9}
+			>
+				<ringGeometry args={[MODULE_SIZE / 2 - 0.5, MODULE_SIZE / 2 - 0.2, 24]} />
+				<meshBasicMaterial transparent opacity={0.9} depthWrite={false} side={THREE.DoubleSide} />
+			</instancedMesh>
 			<instancedMesh
 				ref={fillRef}
 				args={[undefined, undefined, count]}

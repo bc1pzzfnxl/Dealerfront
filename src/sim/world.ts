@@ -113,6 +113,14 @@ export interface Attack {
 
 export type Outcome = null | "victory" | "defeat";
 
+/** Texte flottant (juice) ancré à un quartier, éphémère. */
+export interface Floater {
+	module: number;
+	text: string;
+	kind: "gain" | "loss" | "info";
+	until: number;
+}
+
 /** Événements **du joueur** (retour audio/UX), drainés par l'IHM. */
 export type GameEvent =
 	| "attack"
@@ -150,6 +158,7 @@ export class World {
 	readonly embargoes: Embargo[] = [];
 	/** Événements joueur en attente d'être consommés par l'IHM. */
 	private readonly events: GameEvent[] = [];
+	private readonly floaters: Floater[] = [];
 	private outcomeRecorded = false;
 	/** Index du contact corrompu courant (change s'il est grillé). */
 	private contactIndex: number;
@@ -852,6 +861,7 @@ export class World {
 		this.cancelConstruction(module);
 		this.recount();
 		this.events.push("hitman");
+		this.float(module, `raid −${RAID.control}`, "loss");
 		this.pushLog(`Raid sur le module ${module}`);
 		return true;
 	}
@@ -863,6 +873,16 @@ export class World {
 
 	playerSetLaunderRatio(ratio: number): void {
 		this.player.launderRatio = Math.max(0, Math.min(1, ratio));
+	}
+
+	/** Textes flottants actifs (juice). */
+	activeFloaters(): readonly Floater[] {
+		return this.floaters;
+	}
+
+	private float(module: number, text: string, kind: Floater["kind"]): void {
+		this.floaters.push({ module, text, kind, until: this.tick + 14 });
+		if (this.floaters.length > 24) this.floaters.shift();
 	}
 
 	/** Consomme les événements joueur accumulés depuis le dernier rendu. */
@@ -994,6 +1014,9 @@ export class World {
 		this.resolveAttacks();
 		this.updateDiplomacyTimers();
 		this.think();
+		for (let i = this.floaters.length - 1; i >= 0; i -= 1) {
+			if (this.floaters[i]!.until <= this.tick) this.floaters.splice(i, 1);
+		}
 		this.updateTreasury();
 		this.updatePolice();
 		this.checkOutcome();
@@ -1104,8 +1127,13 @@ export class World {
 				const loser = previous === NEUTRAL ? "neutre" : this.factions[previous]!.name;
 				this.pushLog(`${taker} prend un quartier à ${loser}`);
 				this.police.crime += 1;
-				if (attack.factionId === this.player.id) this.events.push("capture");
-				else if (previous === this.player.id) this.events.push("lost");
+				if (attack.factionId === this.player.id) {
+					this.events.push("capture");
+					this.float(this.territory.count > 0 ? attack.target : attack.target, "+1 quartier", "gain");
+				} else if (previous === this.player.id) {
+					this.events.push("lost");
+					this.float(attack.target, "−1 quartier", "loss");
+				}
 			} else if (attack.troops <= 0) {
 				this.territory.control[attack.target] = control;
 				this.attacks.splice(index, 1);

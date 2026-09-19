@@ -116,6 +116,8 @@ function App() {
 	const world = useMemo(() => new World(seed), [seed]);
 	const [hovered, setHovered] = useState<number | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
+	const [shake, setShake] = useState(false);
+	const projectorRef = useRef<((module: number) => { x: number; y: number } | null) | null>(null);
 	const hoverRef = useRef<HTMLDivElement>(null);
 	const rafRef = useRef<number | null>(null);
 	const lastRef = useRef(0);
@@ -168,9 +170,14 @@ function App() {
 		}
 	}, [sound]);
 
-	// Sons des événements de jeu (file drainée à chaque rendu).
+	// Sons des événements de jeu + secousse d'écran quand on est frappé.
 	useEffect(() => {
 		const events = world.drainEvents();
+		if (events.includes("lost") || events.includes("raid")) {
+			setShake(true);
+			const timer = setTimeout(() => setShake(false), 420);
+			return () => clearTimeout(timer);
+		}
 		if (!sound) return;
 		for (const event of events) play(EVENT_SOUND[event]);
 	}, [version, world, sound]);
@@ -522,7 +529,7 @@ function App() {
 
 	return (
 		<div className="game">
-			<div className="viewport">
+			<div className={`viewport${shake ? " shake" : ""}`}>
 				<IsoCanvas
 					city={world.city}
 					territory={world.territory}
@@ -535,11 +542,29 @@ function App() {
 					version={version}
 					onModuleClick={(module) => setSelected(module)}
 					onModuleHover={setHovered}
+					onProjector={(project) => {
+						projectorRef.current = project;
+					}}
 				/>
 				<div
 					className={`vignette${alert ? " alert" : ""}`}
 					style={{ "--pressure": pressure / 100 } as React.CSSProperties}
 				/>
+				<div className="floaters">
+					{world.activeFloaters().map((floater, index) => {
+						const point = projectorRef.current?.(floater.module);
+						if (!point) return null;
+						return (
+							<span
+								key={`${floater.module}-${floater.until}-${index}`}
+								className={`floater ${floater.kind}`}
+								style={{ left: point.x, top: point.y }}
+							>
+								{floater.text}
+							</span>
+						);
+					})}
+				</div>
 				<Radar
 					city={world.city}
 					territory={world.territory}

@@ -2,6 +2,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { MODULES_W, MODULE_SIZE } from "../sim/constants";
 import type { Faction } from "../sim/factions";
 import type { Territory } from "../sim/territory";
 import type { CityGrid } from "../sim/types";
@@ -14,6 +15,8 @@ const DEFAULT_SPAN = 120;
 const MIN_SPAN = 55;
 const MAX_SPAN = 260;
 const SHADOW_RADIUS = 60;
+/** Durée d'un cycle jour/nuit (ticks) — ~15 min à 10 Hz. */
+const DAY_CYCLE = 9000;
 
 /** La ville est statique : on ne recalcule la shadow map qu'au changement de seed. */
 function StaticShadows({ seed }: { seed: number }) {
@@ -40,6 +43,7 @@ interface IsoCanvasProps {
 	version: number;
 	onModuleClick: (module: number) => void;
 	onModuleHover: (module: number | null) => void;
+	onProjector: (project: (module: number) => { x: number; y: number } | null) => void;
 }
 
 /** Caméra god-view libre : pan + zoom, iso fixe, sans suivi de personnage. */
@@ -99,6 +103,32 @@ function CameraRig({
 }
 
 /** Scène iso 2.5D — vue de gestion (god view), sans personnage. */
+/** Expose une projection module → écran (pour les textes flottants). */
+function Projector({
+	offset,
+	onReady,
+}: {
+	offset: [number, number, number];
+	onReady: (project: (module: number) => { x: number; y: number } | null) => void;
+}) {
+	const camera = useThree((state) => state.camera);
+	const size = useThree((state) => state.size);
+	useLayoutEffect(() => {
+		const vector = new THREE.Vector3();
+		onReady((module: number) => {
+			const cx = (module % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+			const cz = Math.floor(module / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+			vector.set(cx + offset[0], 2.4, cz + offset[2]).project(camera);
+			if (vector.z > 1) return null;
+			return {
+				x: (vector.x * 0.5 + 0.5) * size.width,
+				y: (-vector.y * 0.5 + 0.5) * size.height,
+			};
+		});
+	}, [camera, size, offset, onReady]);
+	return null;
+}
+
 export function IsoCanvas({
 	city,
 	territory,
@@ -111,6 +141,7 @@ export function IsoCanvas({
 	version,
 	onModuleClick,
 	onModuleHover,
+	onProjector,
 }: IsoCanvasProps) {
 	const offset = useMemo<[number, number, number]>(
 		() => [-city.width / 2, 0, -city.height / 2],
@@ -131,13 +162,20 @@ export function IsoCanvas({
 		[city.width],
 	);
 
+	// Cycle jour/nuit : 0 = plein jour, 1 = pleine nuit.
+	const night = 0.5 - 0.5 * Math.cos((tick / DAY_CYCLE) * Math.PI * 2);
+
 	return (
 		<Canvas orthographic flat shadows dpr={dpr} camera={cameraConfig}>
-			<color attach="background" args={["#0e1013"]} />
-			<ambientLight intensity={0.45} />
+			<color
+				attach="background"
+				args={[night > 0.5 ? "#090b12" : "#0e1013"]}
+			/>
+			<ambientLight intensity={0.45 - 0.24 * night} color={night > 0.5 ? "#8ea0c4" : "#ffffff"} />
 			<directionalLight
 				position={lightPosition}
-				intensity={1.5}
+				color={night > 0.5 ? "#9fb4d8" : "#fff4e0"}
+				intensity={1.5 - 0.85 * night}
 				castShadow
 				shadow-mapSize-width={2048}
 				shadow-mapSize-height={2048}
@@ -162,6 +200,7 @@ export function IsoCanvas({
 				/>
 			</group>
 			<CameraRig focus={focus} offset={offset} />
+			<Projector offset={offset} onReady={onProjector} />
 			<StaticShadows seed={city.seed} />
 		</Canvas>
 	);
