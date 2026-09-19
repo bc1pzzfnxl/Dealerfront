@@ -4,6 +4,7 @@ import { EvilComposedChart } from "@/components/evilcharts/charts/recharts-compo
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { GameMapPrototype } from "./GameMapPrototype";
 import { MapExample } from "./MapExample";
 import data from "./sim-data.json";
 
@@ -168,6 +169,19 @@ export function Dashboard() {
 						<EvilComposedChart.Bar dataKey="clean" />
 						<EvilComposedChart.Line dataKey="control" />
 					</EvilComposedChart>
+				</CardContent>
+			</Card>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>Prototype — le jeu sur une vraie carte (IRIS Paris)</CardTitle>
+					<CardDescription>
+						Zones réelles colorées par faction et Contrôle simulés · fond muet, la couleur est
+						l'information
+					</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<GameMapPrototype />
 				</CardContent>
 			</Card>
 
