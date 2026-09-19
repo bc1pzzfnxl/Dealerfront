@@ -270,7 +270,7 @@ function App() {
 	const build = useCallback(
 		(type: BuildingType) => {
 			if (selected === null) return;
-			if (world.playerBuild(selected, type)) setVersion((value) => value + 1);
+			if (world.playerQueueBuild(selected, type)) setVersion((value) => value + 1);
 		},
 		[selected, world],
 	);
@@ -283,10 +283,10 @@ function App() {
 				const type = chooseBuildType(
 					world.buildingCounts(world.player.id),
 					world.modulesOwned(world.player.id),
-					(candidate) => world.playerCanBuild(selected, candidate),
+					(candidate) => world.playerCanQueue(selected, candidate),
 					{ atelier: TECH.maxLevel },
 				);
-				if (type !== null && world.playerBuild(selected, type)) {
+				if (type !== null && world.playerQueueBuild(selected, type)) {
 					setVersion((value) => value + 1);
 				}
 			}
@@ -365,7 +365,7 @@ function App() {
 	const totalModules = world.city.modules.length;
 	const playerPct = Math.round(world.controlRatio(player.id) * 100);
 	const perSecond = Math.round(world.productionPerTick(player.id) * SIM_HZ * 10) / 10;
-	const afford = (type: BuildingType) => selected !== null && world.playerCanBuild(selected, type);
+	const afford = (type: BuildingType) => selected !== null && world.playerCanQueue(selected, type);
 	const costFactor = selected !== null ? world.buildCostFactor(selected) : 1;
 	const constructionLeft = selected !== null ? world.constructionLeft(selected) : 0;
 	const pendingType = selected !== null ? world.pendingBuilding(selected) : null;
@@ -398,7 +398,7 @@ function App() {
 				: chooseBuildType(
 						world.buildingCounts(player.id),
 						world.modulesOwned(player.id),
-						(candidate) => world.playerCanBuild(selected, candidate),
+						(candidate) => world.playerCanQueue(selected, candidate),
 						{ atelier: TECH.maxLevel },
 					)
 			: null;
@@ -480,18 +480,11 @@ function App() {
 	/** Raison d'indisponibilité d'un bâtiment sur le quartier sélectionné. */
 	const blockReason = (type: BuildingType): string | null => {
 		if (selected === null) return null;
-		if (world.activeConstructions(player.id) >= world.buildCrews()) return "équipes occupées";
+		if (world.buildingAt(selected) !== null) return "quartier occupé";
+		if (world.constructionLeft(selected) > 0) return "chantier en cours";
 		if (!world.canBuildInZone(selected, type)) return "zone incompatible";
-		const spec = BUILDINGS[type];
-		if (spec.costMembers && player.members < spec.costMembers) {
-			return `${spec.costMembers} membres requis`;
-		}
-		if (spec.costSale && player.cashSale < spec.costSale) {
-			return `${spec.costSale} Cash sale requis`;
-		}
-		if (spec.costClean && player.cashPropre < spec.costClean) {
-			return `${spec.costClean} Cash propre requis`;
-		}
+		if (world.playerBuildOrders().some((order) => order.module === selected)) return "déjà en file";
+		if (world.queueLength() >= world.queueCap()) return "file pleine";
 		return null;
 	};
 	const attackReason = !adjacentTarget
@@ -657,7 +650,8 @@ function App() {
 					<div className="line">
 						<span>Chantiers</span>
 						<code>
-							{world.activeConstructions(player.id)}/{world.buildCrews()}
+							{world.activeConstructions(player.id)}/{world.buildCrews()} ·{" "}
+							{world.queueLength()}/{world.queueCap()} en file
 						</code>
 					</div>
 					<div className="line">
@@ -1012,7 +1006,29 @@ function App() {
 							Baissez pour garder du Cash sale (achats), montez pour l'objectif de victoire.
 						</p>
 					</section>
-					<section className="card journal-card">
+					{world.playerBuildOrders().length > 0 ? (
+					<section className="card loop-card queue-card">
+						<h2>File d'ordres <em>{world.queueLength()}</em></h2>
+						{world.playerBuildOrders().map((order) => (
+							<div className="loop-row" key={order.module}>
+								<span>
+									{BUILDINGS[order.type].label} <em>mod. {order.module}</em>
+								</span>
+								<button
+									type="button"
+									className="tech-up"
+									onClick={() => {
+										world.playerCancelOrder(order.module);
+										setVersion((value) => value + 1);
+									}}
+								>
+									Annuler
+								</button>
+							</div>
+						))}
+					</section>
+				) : null}
+				<section className="card journal-card">
 						<h2>Journal</h2>
 						<ul className="journal">
 							{world.log.length === 0 ? (

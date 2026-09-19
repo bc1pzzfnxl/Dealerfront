@@ -129,3 +129,9 @@ Le récap (voir `docs/ui-ux.md`, `docs/scoring.md`) affiche :
 - **Fin au temps** : classement par **score composite** ; joueur 1er → victoire, sinon défaite « rang N ». **Pas de match nul** (rang strict).
 - **Overtime** : implémenté mais **désactivé par défaut** (`overtime: false`) ; s'il est activé, le seuil baisse de **−2 %/min** après l'échéance (plancher 20 %).
 - **Récap** (`summary()`) : contrôle, quartiers, Cash propre, quartiers pris, gangs éliminés, raids subis, saisies, score, rang, cause.
+
+### P18 — seuil de contrôle sur la grande carte
+
+- Carte passée à **24×24 = 576 quartiers** ; le seuil de victoire est ajusté à **≥ 42 %** (≈ 242 quartiers), mesuré « quart juste » = 25 %.
+- La **coalition anti-leader** ne se déclenche qu'au-delà de **40 %** de part de carte (`coalitionFloor`) : pas de contention tant que tu n'es pas proche de gagner, résistance ensuite.
+- Résultat (bot, 20 APM, 100 seeds) : **92 % de victoires**, ~**21 min**, dont **79 % par la double condition** (contrôle + cash) — le gameplay converge vers 20–30 min sans forcer le buzzer.

@@ -34,6 +34,8 @@ export const DIPLOMACY = {
 	 * vise en priorité un quartier du leader. Nulle à parité → pas de dogpile.
 	 */
 	leaderFocus: 0.25,
+	/** La coalition anti-leader ne se déclenche qu'au-delà de cette part de carte. */
+	coalitionFloor: 0.4,
 } as const;
 
 /** Embargo : blocus marché (malus de revenu sale de la cible). */

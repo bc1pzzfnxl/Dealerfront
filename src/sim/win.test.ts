@@ -77,10 +77,10 @@ describe("fin de partie", () => {
 
 	it("l'overtime abaisse le seuil de contrôle après l'échéance", () => {
 		const standard = new World(1, "nightlife", { timeLimitTicks: 10 });
-		expect(standard.victoryControlThreshold()).toBe(0.6);
+		expect(standard.victoryControlThreshold()).toBe(0.42);
 
 		const overtime = new World(1, "nightlife", { timeLimitTicks: 10, overtime: true });
 		overtime.tick = 10 + 600; // 1 min au-delà
-		expect(overtime.victoryControlThreshold()).toBeCloseTo(0.58);
+		expect(overtime.victoryControlThreshold()).toBeCloseTo(0.4);
 	});
 });

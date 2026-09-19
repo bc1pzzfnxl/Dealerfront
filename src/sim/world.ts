@@ -47,11 +47,13 @@ const MAX_DAMAGE_PER_TICK = 5;
 const ATTACK_LOSS = 8;
 const CONTROL_REGEN = 1.2;
 /** Assauts simultanés max par faction : pas de « clique-partout ». */
-const MAX_ASSAULTS = 3;
+const MAX_ASSAULTS = 4;
 /** Déplacement des troupes avant le siège (ticks). */
 export const TRAVEL_TICKS = 12;
 /** Équipes de construction simultanées par faction. */
 const BUILD_CREWS = 2;
+/** Longueur max de la file d'ordres par faction. */
+const QUEUE_MAX = 6;
 const AI_INTERVAL = 25;
 const MIN_COMMIT = 400;
 /** Raid : affaiblit un quartier adjacent sans le capturer. */
@@ -70,7 +72,7 @@ const ZONE_DEFENSE: Record<ZoneType, number> = {
 
 /** Fin de partie (docs/win-conditions.md). */
 const SESSION_TICKS = 15000; // 25 min à 10 Hz
-const VICTORY_CONTROL = 0.6;
+const VICTORY_CONTROL = 0.42;
 const CLEAN_GOAL = 500000;
 const BANKRUPT_TICKS = 300; // 30 s
 const OVERTIME_ENABLED = false;
@@ -107,6 +109,13 @@ function emptyCounts(): Record<BuildingType, number> {
 		atelier: 0,
 		contre: 0,
 	};
+}
+
+/** Ordre de construction en attente (traité dès qu'une équipe se libère). */
+export interface BuildOrder {
+	factionId: number;
+	module: number;
+	type: BuildingType;
 }
 
 export interface Attack {
@@ -167,6 +176,8 @@ export class World {
 	/** Événements joueur en attente d'être consommés par l'IHM. */
 	private readonly events: GameEvent[] = [];
 	private readonly floaters: Floater[] = [];
+	/** Ordres de construction en attente, par faction. */
+	readonly buildOrders: BuildOrder[] = [];
 	private outcomeRecorded = false;
 	/** Index du contact corrompu courant (change s'il est grillé). */
 	private contactIndex: number;
@@ -900,6 +911,74 @@ export class World {
 		return this.events.splice(0, this.events.length);
 	}
 
+	/** Ordres en file pour une faction. */
+	playerBuildOrders(): readonly BuildOrder[] {
+		return this.buildOrders.filter((order) => order.factionId === this.player.id);
+	}
+
+	queueCap(): number {
+		return QUEUE_MAX;
+	}
+
+	queueLength(factionId = this.player.id): number {
+		return this.buildOrders.filter((order) => order.factionId === factionId).length;
+	}
+
+	/** Peut-on mettre cet ordre en file ? (état, zone, file non pleine) */
+	playerCanQueue(module: number, type: BuildingType): boolean {
+		if (this.outcome !== null) return false;
+		if (this.ownerAt(module) !== this.player.id) return false;
+		if (this.territory.building[module] !== NO_BUILDING) return false;
+		if (this.territory.construction[module]! > 0) return false;
+		if (!canBuildInZone(this.city.modules[module]!, type)) return false;
+		if (this.buildOrders.some((order) => order.module === module)) return false;
+		return this.queueLength() < QUEUE_MAX;
+	}
+
+	/** Met un ordre en file ; démarre immédiatement si une équipe est libre. */
+	playerQueueBuild(module: number, type: BuildingType): boolean {
+		if (!this.playerCanQueue(module, type)) return false;
+		this.buildOrders.push({ factionId: this.player.id, module, type });
+		this.processBuildQueues();
+		return true;
+	}
+
+	/** Annule l'ordre en file visant ce quartier. */
+	playerCancelOrder(module: number): boolean {
+		const index = this.buildOrders.findIndex(
+			(order) => order.factionId === this.player.id && order.module === module,
+		);
+		if (index < 0) return false;
+		this.buildOrders.splice(index, 1);
+		return true;
+	}
+
+	/** Démarre les ordres en file tant qu'une équipe est disponible et abordable. */
+	private processBuildQueues(): void {
+		for (const faction of this.factions) {
+			let guard = QUEUE_MAX;
+			while (guard > 0) {
+				guard -= 1;
+				if (this.activeConstructions(faction.id) >= BUILD_CREWS) break;
+				const index = this.buildOrders.findIndex((order) => order.factionId === faction.id);
+				if (index < 0) break;
+				const order = this.buildOrders[index]!;
+				const valid =
+					this.ownerAt(order.module) === faction.id &&
+					this.territory.building[order.module] === NO_BUILDING &&
+					this.territory.construction[order.module] === 0 &&
+					canBuildInZone(this.city.modules[order.module]!, order.type);
+				if (!valid) {
+					this.buildOrders.splice(index, 1);
+					continue;
+				}
+				if (!this.canAfford(faction, order.type, this.buildCostFactor(order.module))) break;
+				this.buildOrders.splice(index, 1);
+				this.startBuild(faction.id, order.module, order.type);
+			}
+		}
+	}
+
 	/** Nombre de chantiers simultanés autorisés par faction. */
 	buildCrews(): number {
 		return BUILD_CREWS;
@@ -1052,6 +1131,7 @@ export class World {
 		this.launder();
 		this.regenerateControl();
 		this.advanceConstruction();
+		this.processBuildQueues();
 		this.resolveAttacks();
 		this.updateDiplomacyTimers();
 		this.think();
@@ -1290,7 +1370,7 @@ export class World {
 		// Anti-snowball : une fraction des décisions vise le leader, ∝ à sa domination.
 		const focusChance =
 			leader >= 0 && leader !== factionId
-				? Math.max(0, this.controlRatio(leader) - 1 / this.factions.length) *
+				? Math.max(0, this.controlRatio(leader) - DIPLOMACY.coalitionFloor) *
 					DIPLOMACY.leaderFocus
 				: 0;
 		const focusLeader = focusChance > 0 && this.rng() < focusChance;

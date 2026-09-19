@@ -682,7 +682,7 @@ describe("fin de partie", () => {
 
 	it("garde seuils, échéance et récap cohérents", () => {
 		const world = new World(1, "nightlife", { timeLimitTicks: 1000 });
-		expect(world.victoryControlThreshold()).toBe(0.6);
+		expect(world.victoryControlThreshold()).toBe(0.42);
 		expect(world.cleanGoal()).toBe(500000);
 		expect(world.ticksLeft()).toBe(1000);
 		world.tick = 1100;
@@ -839,20 +839,21 @@ describe("raid & assauts simultanés", () => {
 		const player = world.player;
 		player.members = 100_000;
 		// Possède une ligne et vise la ligne du dessous (indices relatifs à la largeur).
+		const max = world.maxAssaults();
 		const own0 = MODULES_W * 2;
 		const target0 = MODULES_W * 3;
-		for (let i = own0; i < own0 + 4; i += 1) {
+		for (let i = own0; i < own0 + max; i += 1) {
 			world.territory.owner[i] = player.id;
 			world.territory.control[i] = 100;
 		}
-		for (let i = target0; i < target0 + 4; i += 1) {
+		for (let i = target0; i < target0 + max + 1; i += 1) {
 			world.territory.owner[i] = NEUTRAL;
 			world.territory.control[i] = 100;
 		}
-		expect(world.playerAttack(target0)).toBe(true);
-		expect(world.playerAttack(target0 + 1)).toBe(true);
-		expect(world.playerAttack(target0 + 2)).toBe(true);
-		expect(world.playerAttack(target0 + 3)).toBe(false);
+		for (let i = 0; i < max; i += 1) {
+			expect(world.playerAttack(target0 + i)).toBe(true);
+		}
+		expect(world.playerAttack(target0 + max)).toBe(false);
 	});
 });
 
@@ -865,5 +866,45 @@ describe("ratio d'assaut", () => {
 		expect(world.playerAttackRatio()).toBe(0.05);
 		world.playerSetAttackRatio(0.3);
 		expect(world.commitRatio()).toBe(0.3);
+	});
+});
+
+describe("file de construction", () => {
+	it("met en file quand les équipes sont occupées puis démarre à leur libération", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.cashSale = 100_000;
+		player.cashPropre = 100_000;
+		const a = ownConversion(world, player.id, "labo");
+		const b = ownConversion(world, player.id, "labo");
+		const c = ownConversion(world, player.id, "labo");
+
+		expect(world.playerQueueBuild(a, "labo")).toBe(true);
+		expect(world.playerQueueBuild(b, "labo")).toBe(true);
+		expect(world.playerQueueBuild(c, "labo")).toBe(true);
+		expect(world.activeConstructions(player.id)).toBe(world.buildCrews());
+		expect(world.queueLength()).toBe(1);
+		expect(world.constructionLeft(c)).toBe(0);
+
+		finishBuild(world, a);
+		expect(world.queueLength()).toBe(0);
+		expect(world.constructionLeft(c)).toBeGreaterThan(0);
+	});
+
+	it("annule un ordre en file", () => {
+		const world = new World(1, "nightlife");
+		const player = world.player;
+		player.cashSale = 100_000;
+		player.cashPropre = 100_000;
+		const a = ownConversion(world, player.id, "labo");
+		const b = ownConversion(world, player.id, "labo");
+		const c = ownConversion(world, player.id, "labo");
+		world.playerQueueBuild(a, "labo");
+		world.playerQueueBuild(b, "labo");
+		world.playerQueueBuild(c, "labo");
+		expect(world.queueLength()).toBe(1);
+		expect(world.playerCancelOrder(c)).toBe(true);
+		expect(world.queueLength()).toBe(0);
+		expect(world.constructionLeft(c)).toBe(0);
 	});
 });
