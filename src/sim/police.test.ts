@@ -32,7 +32,7 @@ describe("police", () => {
 
 	it("la Pression monte quand un cartel domine et retombe sinon", () => {
 		const world = new World(1, "nightlife");
-		giveNeutral(world, 0, 80);
+		giveNeutral(world, 0, Math.ceil(world.territory.count * 0.35));
 		world.step();
 		const risen = world.police.pressure;
 		expect(risen).toBeGreaterThan(0);
@@ -48,7 +48,7 @@ describe("police", () => {
 		const world = new World(1, "nightlife");
 		const player = world.player;
 		player.cashPropre = 100000;
-		giveNeutral(world, player.id, 120);
+		giveNeutral(world, player.id, Math.ceil(world.territory.count * 0.45));
 		world.step();
 		world.police.pressure = 60;
 		expect(world.playerCorrupt()).toBe(true);

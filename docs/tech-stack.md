@@ -60,3 +60,10 @@ Fixer les choix techniques structurants du mode god-view : simulation de contrô
 | 3 | Architecture sim | **intents → executions**, core déterministe 10 Hz |
 | 4 | Rendu | Three.js ortho, god view large + overlays |
 | 5 | Worker/DO | prévu mais différé |
+
+
+### P18 — carte 24×24 et optimisations
+
+- Grille **144×144 tuiles → 24×24 = 576 quartiers** (était 16×16).
+- **Sol optimisé** : un plot par module (576) + **plateau de rues** (les interstices dessinent la voirie) au lieu d'une instance par tuile (20 736).
+- **Caméra** : zoom initial adapté à la carte (tout voir), **rotation** autorisée + damping ; ombres et `dpr` ajustés.

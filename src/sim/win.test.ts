@@ -21,7 +21,7 @@ function giveNeutral(world: World, factionId: number, count: number): void {
 describe("fin de partie", () => {
 	it("la victoire exige contrôle ET Cash propre", () => {
 		const world = new World(1, "nightlife");
-		giveNeutral(world, 0, 160); // ~62,5 % de la carte
+		giveNeutral(world, 0, Math.ceil(world.territory.count * 0.63));
 		world.step();
 		expect(world.controlRatio(0)).toBeGreaterThanOrEqual(0.6);
 		expect(world.player.cashPropre).toBe(0);

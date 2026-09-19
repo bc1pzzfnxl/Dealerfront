@@ -92,7 +92,7 @@ function disarmAi(world: World): void {
 
 /** Force une victoire (contrôle ≥ 60 % + Cash propre ≥ objectif). */
 function forceVictory(world: World): void {
-	giveNeutral(world, world.player.id, 160);
+	giveNeutral(world, world.player.id, Math.ceil(world.territory.count * 0.63));
 	world.step();
 	world.player.cashPropre = world.cleanGoal();
 	world.step();
@@ -838,19 +838,21 @@ describe("raid & assauts simultanés", () => {
 		const world = new World(1, "nightlife");
 		const player = world.player;
 		player.members = 100_000;
-		// Possède une ligne (indices 32..35) et vise la ligne du dessous (48..51).
-		for (let i = 32; i <= 35; i += 1) {
+		// Possède une ligne et vise la ligne du dessous (indices relatifs à la largeur).
+		const own0 = MODULES_W * 2;
+		const target0 = MODULES_W * 3;
+		for (let i = own0; i < own0 + 4; i += 1) {
 			world.territory.owner[i] = player.id;
 			world.territory.control[i] = 100;
 		}
-		for (const target of [48, 49, 50, 51]) {
-			world.territory.owner[target] = NEUTRAL;
-			world.territory.control[target] = 100;
+		for (let i = target0; i < target0 + 4; i += 1) {
+			world.territory.owner[i] = NEUTRAL;
+			world.territory.control[i] = 100;
 		}
-		expect(world.playerAttack(48)).toBe(true);
-		expect(world.playerAttack(49)).toBe(true);
-		expect(world.playerAttack(50)).toBe(true);
-		expect(world.playerAttack(51)).toBe(false);
+		expect(world.playerAttack(target0)).toBe(true);
+		expect(world.playerAttack(target0 + 1)).toBe(true);
+		expect(world.playerAttack(target0 + 2)).toBe(true);
+		expect(world.playerAttack(target0 + 3)).toBe(false);
 	});
 });
 

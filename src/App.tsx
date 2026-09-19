@@ -14,7 +14,7 @@ import {
 } from "./sim/buildings";
 import { archetypeOf } from "./sim/city";
 import { SimClock } from "./sim/clock";
-import { MODULES_W, MODULE_SIZE, SIM_HZ } from "./sim/constants";
+import { MODULES_H, MODULES_W, MODULE_SIZE, SIM_HZ } from "./sim/constants";
 import { HITMAN, TECH, TECH_BRANCHES, TECH_LABELS, techCost } from "./sim/tech";
 import { POLICE_TIER_LABELS } from "./sim/police";
 import { NEUTRAL } from "./sim/territory";
@@ -506,7 +506,7 @@ function App() {
 			<div className="select-screen">
 				<h1>DealerFront</h1>
 				<p>
-					256 quartiers · 4 cartels · objectif : ≥ {Math.round(threshold * 100)} % et{" "}
+					{MODULES_W * MODULES_H} quartiers · 4 cartels · objectif : ≥ {Math.round(threshold * 100)} % et{" "}
 					{cleanGoal.toLocaleString("fr-FR")} de Cash propre
 				</p>
 				<div className="city-choices">

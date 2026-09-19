@@ -1,4 +1,4 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -10,11 +10,8 @@ import type { Attack } from "../sim/world";
 import { MemoCityMeshes } from "./CityMeshes";
 import { TerritoryOverlay } from "./TerritoryOverlay";
 
-/** Vue aérienne : nombre de tuiles visibles. */
-const DEFAULT_SPAN = 120;
-const MIN_SPAN = 55;
-const MAX_SPAN = 260;
-const SHADOW_RADIUS = 60;
+/** Vue aérienne : nombre de tuiles visibles (adapté à la taille de la carte). */
+const spanFor = (width: number) => width * 1.15;
 /** Durée d'un cycle jour/nuit (ticks) — ~15 min à 10 Hz. */
 const DAY_CYCLE = 9000;
 
@@ -50,9 +47,11 @@ interface IsoCanvasProps {
 function CameraRig({
 	focus,
 	offset,
+	span,
 }: {
 	focus: { x: number; z: number };
 	offset: [number, number, number];
+	span: number;
 }) {
 	const camera = useThree((state) => state.camera);
 	const domElement = useThree((state) => state.gl.domElement);
@@ -62,9 +61,9 @@ function CameraRig({
 	const initialized = useRef(false);
 
 	const minSize = Math.min(width, height);
-	const minZoom = minSize / MAX_SPAN;
-	const maxZoom = minSize / MIN_SPAN;
-	const defaultZoom = minSize / DEFAULT_SPAN;
+	const minZoom = minSize / (span * 1.4);
+	const maxZoom = minSize / (span * 0.5);
+	const defaultZoom = minSize / span;
 
 	const initialTarget = useRef<[number, number, number]>([
 		focus.x + offset[0],
@@ -75,7 +74,11 @@ function CameraRig({
 	useLayoutEffect(() => {
 		const controls = new OrbitControls(camera, domElement);
 		controls.target.set(initialTarget[0], initialTarget[1], initialTarget[2]);
-		controls.enableRotate = false;
+		controls.enableRotate = true;
+		controls.enableDamping = true;
+		controls.dampingFactor = 0.08;
+		controls.maxPolarAngle = Math.PI / 2.6;
+		controls.minPolarAngle = Math.PI / 4;
 		controls.screenSpacePanning = false;
 		controls.zoomSpeed = 0.9;
 		controlsRef.current = controls;
@@ -84,6 +87,9 @@ function CameraRig({
 			controlsRef.current = null;
 		};
 	}, [camera, domElement, initialTarget]);
+
+	// Damping : mise à jour par frame.
+	useFrame(() => controlsRef.current?.update());
 
 	useLayoutEffect(() => {
 		const controls = controlsRef.current;
@@ -156,7 +162,9 @@ export function IsoCanvas({
 			far: 9000,
 		};
 	}, [city.width, city.height]);
-	const dpr = useMemo<[number, number]>(() => [1, 2], []);
+	const dpr = useMemo<[number, number]>(() => [1, 1.75], []);
+	const span = useMemo(() => spanFor(city.width), [city.width]);
+	const shadowRadius = useMemo(() => city.width * 0.8, [city.width]);
 	const lightPosition = useMemo<[number, number, number]>(
 		() => [city.width * 0.4, city.width * 0.8, city.width * 0.2],
 		[city.width],
@@ -179,10 +187,10 @@ export function IsoCanvas({
 				castShadow
 				shadow-mapSize-width={2048}
 				shadow-mapSize-height={2048}
-				shadow-camera-left={-SHADOW_RADIUS}
-				shadow-camera-right={SHADOW_RADIUS}
-				shadow-camera-top={SHADOW_RADIUS}
-				shadow-camera-bottom={-SHADOW_RADIUS}
+				shadow-camera-left={-shadowRadius}
+				shadow-camera-right={shadowRadius}
+				shadow-camera-top={shadowRadius}
+				shadow-camera-bottom={-shadowRadius}
 				shadow-camera-near={1}
 				shadow-camera-far={400}
 			/>
@@ -199,7 +207,7 @@ export function IsoCanvas({
 					version={version}
 				/>
 			</group>
-			<CameraRig focus={focus} offset={offset} />
+			<CameraRig focus={focus} offset={offset} span={span} />
 			<Projector offset={offset} onReady={onProjector} />
 			<StaticShadows seed={city.seed} />
 		</Canvas>

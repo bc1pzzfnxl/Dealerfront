@@ -9,7 +9,6 @@ import { ZONE_STYLE } from "./palette";
 
 const GROUND_THICKNESS = 0.1;
 const LOT_TOP = 0.1;
-const GROUND_ROAD = 0.14;
 const GROUND_LOT = 0.28;
 const GROUND_PARK = 0.36;
 const GROUND_PLAZA = 0.44;
@@ -22,21 +21,6 @@ function hash2(x: number, y: number, seed: number): number {
 	let h = (x * 374761393 + y * 668265263 + seed * 2246822519) | 0;
 	h = (h ^ (h >>> 13)) * 1274126177;
 	return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
-function moduleIndexAt(x: number, y: number): number {
-	return Math.floor(x / MODULE_SIZE) + Math.floor(y / MODULE_SIZE) * MODULES_W;
-}
-
-function isStreetTile(x: number, y: number): boolean {
-	const localX = x % MODULE_SIZE;
-	const localY = y % MODULE_SIZE;
-	return (
-		localX === 0 ||
-		localX === MODULE_SIZE - 1 ||
-		localY === 0 ||
-		localY === MODULE_SIZE - 1
-	);
 }
 
 function buildingHeight(city: CityGrid, module: number): number {
@@ -116,41 +100,55 @@ export function CityMeshes({
 
 function GroundTiles({ city }: { city: CityGrid }) {
 	const ref = useRef<THREE.InstancedMesh>(null);
-	const count = city.width * city.height;
+	const count = city.modules.length;
 
 	useLayoutEffect(() => {
 		const mesh = ref.current;
 		if (!mesh) return;
 		const dummy = new THREE.Object3D();
 		const color = new THREE.Color();
-		for (let y = 0; y < city.height; y += 1) {
-			for (let x = 0; x < city.width; x += 1) {
-				const index = y * city.width + x;
-				dummy.position.set(x + 0.5, GROUND_THICKNESS / 2, y + 0.5);
-				dummy.scale.set(1, GROUND_THICKNESS, 1);
-				dummy.updateMatrix();
-				mesh.setMatrixAt(index, dummy.matrix);
+		for (let module = 0; module < count; module += 1) {
+			const centerX = (module % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+			const centerZ = Math.floor(module / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
+			dummy.position.set(centerX, GROUND_THICKNESS / 2, centerZ);
+			dummy.scale.set(MODULE_SIZE - 0.6, GROUND_THICKNESS, MODULE_SIZE - 0.6);
+			dummy.updateMatrix();
+			mesh.setMatrixAt(module, dummy.matrix);
 
-				const moduleIndex = moduleIndexAt(x, y);
-				const zone = city.modules[moduleIndex]!;
-				let base: number;
-				if (zone === "vacant") base = GROUND_PLAZA;
-				else if (zone === "park") base = GROUND_PARK;
-				else if (isStreetTile(x, y)) base = GROUND_ROAD;
-				else base = GROUND_LOT;
-				const noise = (hash2(x, y, city.seed) - 0.5) * 0.02;
-				mesh.setColorAt(index, color.setScalar(Math.min(1, Math.max(0, base + noise))));
-			}
+			const zone = city.modules[module]!;
+			const base =
+				zone === "vacant"
+					? GROUND_PLAZA
+					: zone === "park"
+						? GROUND_PARK
+						: GROUND_LOT;
+			mesh.setColorAt(module, color.setScalar(base));
 		}
 		mesh.instanceMatrix.needsUpdate = true;
 		if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 	}, [city, count]);
 
 	return (
-		<instancedMesh ref={ref} args={[undefined, undefined, count]} receiveShadow frustumCulled={false}>
-			<boxGeometry args={[1, 1, 1]} />
-			<meshLambertMaterial />
-		</instancedMesh>
+		<>
+			{/* Plateau de rues : les interstices entre plots dessinent la voirie. */}
+			<mesh
+				rotation={[-Math.PI / 2, 0, 0]}
+				position={[city.width / 2, 0.02, city.height / 2]}
+				receiveShadow
+			>
+				<planeGeometry args={[city.width, city.height]} />
+				<meshLambertMaterial color="#262B33" />
+			</mesh>
+			<instancedMesh
+				ref={ref}
+				args={[undefined, undefined, count]}
+				receiveShadow
+				frustumCulled={false}
+			>
+				<boxGeometry args={[1, 1, 1]} />
+				<meshLambertMaterial />
+			</instancedMesh>
+		</>
 	);
 }
 
