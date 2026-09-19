@@ -21,6 +21,12 @@ interface TerritoryOverlayProps {
 }
 
 const CONTROL_STEP = 5;
+
+function hash2(x: number, y: number, seed: number): number {
+	let h = (x * 374761393 + y * 668265263 + seed * 2246822519) | 0;
+	h = (h ^ (h >>> 13)) * 1274126177;
+	return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 const FLASH = 8;
 const CONSTRUCTION_COLOR = new THREE.Color("#EBAD4C");
 
@@ -42,12 +48,10 @@ export function TerritoryOverlay({
 	colorblind,
 	version,
 }: TerritoryOverlayProps) {
-	const ref = useRef<THREE.InstancedMesh>(null);
 	const fillRef = useRef<THREE.InstancedMesh>(null);
 	const shockRef = useRef<THREE.InstancedMesh>(null);
 	const unitRef = useRef<THREE.InstancedMesh>(null);
 	const borderRef = useRef<THREE.InstancedMesh>(null);
-	const edgeRef = useRef<THREE.InstancedMesh>(null);
 	const partRefs = useRef<Array<THREE.InstancedMesh | null>>([]);
 	const count = city.modules.length;
 
@@ -64,13 +68,53 @@ export function TerritoryOverlay({
 		[parts],
 	);
 	const borderGeometry = useMemo(() => makeBorderGeometry(), []);
-	const cornerGeometries = useMemo(() => {
-		const r = MODULE_SIZE / 2 - 0.05;
-		return [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map(
-			(start) => new THREE.RingGeometry(r - 0.5, r, 12, 1, start, Math.PI / 2),
-		);
-	}, []);
-	const cornerRefs = useRef<Array<THREE.InstancedMesh | null>>([]);
+	const fieldRef = useRef<THREE.Mesh>(null);
+	const outlineRef = useRef<THREE.LineSegments>(null);
+
+	// Tuilage irrégulier : on décale les sommets de la grille (déterministe).
+	const jitter = useMemo(() => {
+		const n = MODULES_W + 1;
+		const arr = new Float32Array(n * (MODULES_H + 1) * 2);
+		for (let y = 0; y <= MODULES_H; y += 1) {
+			for (let x = 0; x <= MODULES_W; x += 1) {
+				const i = (y * n + x) * 2;
+				const border = x === 0 || y === 0 || x === MODULES_W || y === MODULES_H;
+				arr[i] = x * MODULE_SIZE + (border ? 0 : (hash2(x, y, city.seed + 101) - 0.5) * 0.8);
+				arr[i + 1] = y * MODULE_SIZE + (border ? 0 : (hash2(x, y, city.seed + 202) - 0.5) * 0.8);
+			}
+		}
+		return arr;
+	}, [city.seed]);
+
+	const fieldGeometry = useMemo(() => {
+		const geometry = new THREE.BufferGeometry();
+		const positions = new Float32Array(count * 6 * 3);
+		const colors = new Float32Array(count * 6 * 3);
+		const n = MODULES_W + 1;
+		const corner = (x: number, y: number, target: Float32Array, offset: number) => {
+			const i = (y * n + x) * 2;
+			target[offset] = jitter[i]!;
+			target[offset + 1] = 0.19;
+			target[offset + 2] = jitter[i + 1]!;
+		};
+		for (let module = 0; module < count; module += 1) {
+			const mx = module % MODULES_W;
+			const my = Math.floor(module / MODULES_W);
+			const base = module * 6 * 3;
+			const tri = [
+				[mx, my],
+				[mx + 1, my],
+				[mx + 1, my + 1],
+				[mx, my],
+				[mx + 1, my + 1],
+				[mx, my + 1],
+			] as const;
+			tri.forEach(([x, y], k) => corner(x!, y!, positions, base + k * 3));
+		}
+		geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+		geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+		return geometry;
+	}, [count, jitter]);
 
 	const colors = useMemo(
 		() =>
@@ -113,8 +157,7 @@ export function TerritoryOverlay({
 	}
 
 	useLayoutEffect(() => {
-		const mesh = ref.current;
-		if (!mesh) return;
+		if (!fieldRef.current) return;
 		const state = stateRef.current!;
 		const dummy = new THREE.Object3D();
 		const color = new THREE.Color();
@@ -143,15 +186,7 @@ export function TerritoryOverlay({
 			const captureAge = tick - territory.capturedAt[module]!;
 			const fx = captureAge >= 0 && captureAge < FLASH ? captureAge : 0;
 
-			if (buildMatrices) {
-				const centerX = (module % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
-				const centerZ = Math.floor(module / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2;
-				dummy.position.set(centerX, 0.19, centerZ);
-				dummy.rotation.set(0, 0, 0);
-				dummy.scale.set(MODULE_SIZE - 0.15, 0.05, MODULE_SIZE - 0.15);
-				dummy.updateMatrix();
-				mesh.setMatrixAt(module, dummy.matrix);
-			}
+			void buildMatrices;
 
 			if (owner !== state.owner[module] || controlQ !== state.control[module] || fx !== state.fx[module]) {
 				state.owner[module] = owner;
@@ -165,12 +200,14 @@ export function TerritoryOverlay({
 					color.copy(colors[owner] ?? neutral).multiplyScalar(0.5 + 0.35 * ratio);
 				}
 				if (fx > 0) color.lerp(white, 0.55 * (1 - fx / FLASH));
-				mesh.setColorAt(module, color);
+				const attr = fieldGeometry.getAttribute("color") as THREE.BufferAttribute;
+				for (let k = 0; k < 6; k += 1) attr.setXYZ(module * 6 + k, color.r, color.g, color.b);
 				colorDirty = true;
 			}
 		}
-		if (buildMatrices) mesh.instanceMatrix.needsUpdate = true;
-		if (colorDirty && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+		if (colorDirty) {
+			(fieldGeometry.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
+		}
 
 		// 2) Bâtiments composés (recettes de volumes) + chantier + pop de livraison.
 		let buildingsDirty = buildMatrices;
@@ -357,91 +394,40 @@ export function TerritoryOverlay({
 			if (borderMesh.instanceColor) borderMesh.instanceColor.needsUpdate = true;
 		}
 
-		// 6a) Coins arrondis : lisse les angles convexes d'un territoire (rendu « organique »).
-		for (let corner = 0; corner < 4; corner += 1) {
-			const cornerMesh = cornerRefs.current[corner];
-			if (!cornerMesh) continue;
-			let cornerIndex = 0;
+		// 5b) Contours de territoire : segments sur les arêtes où deux propriétaires diffèrent.
+		const outline = outlineRef.current;
+		if (outline) {
+			const n = MODULES_W + 1;
+			const px = (x: number, y: number) => jitter[(y * n + x) * 2]!;
+			const pz = (x: number, y: number) => jitter[(y * n + x) * 2 + 1]!;
+			const positions: number[] = [];
+			const cols: number[] = [];
+			const push = (ax: number, ay: number, bx: number, by: number, c: THREE.Color) => {
+				positions.push(px(ax, ay), 0.24, pz(ax, ay), px(bx, by), 0.24, pz(bx, by));
+				cols.push(c.r, c.g, c.b, c.r, c.g, c.b);
+			};
 			for (let module = 0; module < count; module += 1) {
 				const owner = territory.owner[module]!;
 				if (owner === NEUTRAL) continue;
 				const x = module % MODULES_W;
 				const y = Math.floor(module / MODULES_W);
-				// Voisins N/S/E/O + diagonale, avec bords de carte sûrs.
-				const n = y > 0 ? territory.owner[module - MODULES_W] : owner;
-				const south = y < MODULES_H - 1 ? territory.owner[module + MODULES_W] : owner;
-				const w = x > 0 ? territory.owner[module - 1] : owner;
-				const e = x < MODULES_W - 1 ? territory.owner[module + 1] : owner;
-				const nw = x > 0 && y > 0 ? territory.owner[module - MODULES_W - 1] : owner;
-				const ne = x < MODULES_W - 1 && y > 0 ? territory.owner[module - MODULES_W + 1] : owner;
-				const sw = x > 0 && y < MODULES_H - 1 ? territory.owner[module + MODULES_W - 1] : owner;
-				const se =
-					x < MODULES_W - 1 && y < MODULES_H - 1 ? territory.owner[module + MODULES_W + 1] : owner;
-				// Coin convexe : deux voisins orthogonaux possédés, diagonale non possédée.
-				const convex =
-					(corner === 0 && n === owner && e === owner && ne !== owner) ||
-					(corner === 1 && n === owner && w === owner && nw !== owner) ||
-					(corner === 2 && south === owner && w === owner && sw !== owner) ||
-					(corner === 3 && south === owner && e === owner && se !== owner);
-				if (!convex) continue;
-				const cx = x * MODULE_SIZE + (corner === 0 || corner === 3 ? MODULE_SIZE : 0);
-				const cz = y * MODULE_SIZE + (corner === 2 || corner === 3 ? MODULE_SIZE : 0);
-				dummy.position.set(cx, 0.24, cz);
-				dummy.rotation.set(-Math.PI / 2, 0, 0);
-				dummy.scale.set(1, 1, 1);
-				dummy.updateMatrix();
-				cornerMesh.setMatrixAt(cornerIndex, dummy.matrix);
-				cornerMesh.setColorAt(cornerIndex, color.copy(colors[owner] ?? neutral).multiplyScalar(1.35));
-				cornerIndex += 1;
+				const c = colors[owner] ?? neutral;
+				if (y === 0 || territory.owner[module - MODULES_W] !== owner) push(x, y, x + 1, y, c);
+				if (y === MODULES_H - 1 || territory.owner[module + MODULES_W] !== owner) {
+					push(x, y + 1, x + 1, y + 1, c);
+				}
+				if (x === 0 || territory.owner[module - 1] !== owner) push(x, y, x, y + 1, c);
+				if (x === MODULES_W - 1 || territory.owner[module + 1] !== owner) {
+					push(x + 1, y, x + 1, y + 1, c);
+				}
 			}
-			dummy.rotation.set(0, 0, 0);
-			cornerMesh.count = cornerIndex;
-			cornerMesh.instanceMatrix.needsUpdate = true;
-			if (cornerMesh.instanceColor) cornerMesh.instanceColor.needsUpdate = true;
+			const geometry = new THREE.BufferGeometry();
+			geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+			geometry.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+			outline.geometry.dispose();
+			outline.geometry = geometry;
 		}
 
-		// 6b) Arêtes de frontière : barres fines là où deux propriétaires se touchent
-		// (le territoire se lit comme une **région continue**, pas comme des carrés).
-		const edgeMesh = edgeRef.current;
-		if (edgeMesh) {
-			let edgeIndex = 0;
-			const thickness = 0.5;
-			for (let module = 0; module < count; module += 1) {
-				const owner = territory.owner[module]!;
-				if (owner === NEUTRAL) continue;
-				const x = module % MODULES_W;
-				const y = Math.floor(module / MODULES_W);
-				const centerX = x * MODULE_SIZE + MODULE_SIZE / 2;
-				const centerZ = y * MODULE_SIZE + MODULE_SIZE / 2;
-				const edges: [number, number, number, boolean][] = [];
-				if (y === 0 || territory.owner[module - MODULES_W] !== owner) {
-					edges.push([centerX, centerZ - MODULE_SIZE / 2, 0, true]);
-				}
-				if (y === MODULES_H - 1 || territory.owner[module + MODULES_W] !== owner) {
-					edges.push([centerX, centerZ + MODULE_SIZE / 2, 0, true]);
-				}
-				if (x === 0 || territory.owner[module - 1] !== owner) {
-					edges.push([centerX - MODULE_SIZE / 2, centerZ, Math.PI / 2, false]);
-				}
-				if (x === MODULES_W - 1 || territory.owner[module + 1] !== owner) {
-					edges.push([centerX + MODULE_SIZE / 2, centerZ, Math.PI / 2, false]);
-				}
-				for (const [ex, ez, rot, horizontal] of edges) {
-					dummy.position.set(ex, 0.235, ez);
-					dummy.rotation.set(-Math.PI / 2, rot, 0);
-					dummy.scale.set(MODULE_SIZE, thickness, 1);
-					dummy.updateMatrix();
-					edgeMesh.setMatrixAt(edgeIndex, dummy.matrix);
-					edgeMesh.setColorAt(edgeIndex, color.copy(colors[owner] ?? neutral).multiplyScalar(1.35));
-					edgeIndex += 1;
-					void horizontal;
-				}
-			}
-			dummy.rotation.set(0, 0, 0);
-			edgeMesh.count = edgeIndex;
-			edgeMesh.instanceMatrix.needsUpdate = true;
-			if (edgeMesh.instanceColor) edgeMesh.instanceColor.needsUpdate = true;
-		}
 	}, [territory, colors, partColors, partOffset, parts, count, version, attacks, city.seed, tick]);
 
 	const selectedCenter =
@@ -454,10 +440,13 @@ export function TerritoryOverlay({
 
 	return (
 		<>
-			<instancedMesh ref={ref} args={[undefined, undefined, count]} frustumCulled={false} renderOrder={5}>
-				<boxGeometry args={[1, 1, 1]} />
-				<meshBasicMaterial transparent opacity={0.62} depthWrite={false} />
-			</instancedMesh>
+			<mesh ref={fieldRef} geometry={fieldGeometry} renderOrder={5}>
+				<meshBasicMaterial vertexColors transparent opacity={0.66} depthWrite={false} />
+			</mesh>
+			<lineSegments ref={outlineRef} renderOrder={8}>
+				<bufferGeometry />
+				<lineBasicMaterial vertexColors transparent opacity={0.95} />
+			</lineSegments>
 			{parts.map(({ type }, index) => (
 				<instancedMesh
 					key={`${type}-${index}`}
@@ -495,24 +484,6 @@ export function TerritoryOverlay({
 			>
 				<boxGeometry args={[1, 1, 1]} />
 				<meshBasicMaterial transparent opacity={0.75} depthWrite={false} />
-			</instancedMesh>
-			{cornerGeometries.map((geometry, index) => (
-				<instancedMesh
-					key={`corner-${index}`}
-					ref={(element) => {
-						cornerRefs.current[index] = element;
-					}}
-					args={[undefined, undefined, count]}
-					frustumCulled={false}
-					renderOrder={8}
-				>
-					<primitive object={geometry} attach="geometry" />
-					<meshBasicMaterial transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} />
-				</instancedMesh>
-			))}
-			<instancedMesh ref={edgeRef} args={[undefined, undefined, count]} frustumCulled={false} renderOrder={8}>
-				<planeGeometry args={[1, 1]} />
-				<meshBasicMaterial transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} />
 			</instancedMesh>
 			<instancedMesh
 				ref={borderRef}

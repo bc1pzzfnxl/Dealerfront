@@ -869,36 +869,35 @@ function App() {
 							) : null}
 						</>
 					)}
+					{batch.count > 0 ? (
+						<section className="card">
+							<h2>
+								Aménagement par lot <em>{batch.count} quartier(s)</em>
+							</h2>
+							<div className="line">
+								<span>Coût total</span>
+								<code>
+									{batch.sale > 0 ? `${batch.sale.toLocaleString("fr-FR")} sale ` : ""}
+									{batch.members > 0 ? `${batch.members.toLocaleString("fr-FR")} membres ` : ""}
+									{batch.clean > 0 ? `${batch.clean.toLocaleString("fr-FR")} propre` : ""}
+								</code>
+							</div>
+							<button
+								type="button"
+								onClick={() => {
+									world.playerBatchBuild();
+									setVersion((value) => value + 1);
+								}}
+							>
+								Aménager le lot
+							</button>
+							<p className="hint-inline">
+								Applique la composition conseillée à tous tes quartiers vides (file limitée à{" "}
+								{world.queueCap()}).
+							</p>
+						</section>
+					) : null}
 				</section>
-
-				{batch.count > 0 ? (
-					<section className="card">
-						<h2>
-							Aménagement par lot <em>{batch.count} quartier(s)</em>
-						</h2>
-						<div className="line">
-							<span>Coût total</span>
-							<code>
-								{batch.sale > 0 ? `${batch.sale.toLocaleString("fr-FR")} sale ` : ""}
-								{batch.members > 0 ? `${batch.members.toLocaleString("fr-FR")} membres ` : ""}
-								{batch.clean > 0 ? `${batch.clean.toLocaleString("fr-FR")} propre` : ""}
-							</code>
-						</div>
-						<button
-							type="button"
-							onClick={() => {
-								world.playerBatchBuild();
-								setVersion((value) => value + 1);
-							}}
-						>
-							Aménager le lot
-						</button>
-						<p className="hint-inline">
-							Applique la composition conseillée à tous tes quartiers vides (file limitée à{" "}
-							{world.queueCap()}).
-						</p>
-					</section>
-				) : null}
 
 				<aside className="panel-right">
 					<section className={`card police${policeTargeted ? " targeted" : ""}`}>

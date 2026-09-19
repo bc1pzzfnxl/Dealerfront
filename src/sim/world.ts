@@ -1540,8 +1540,11 @@ export class World {
 			if (this.rng() < 0.3 && this.aiOperate(i)) continue;
 			// Tueur à gage occasionnel sur un quartier ennemi frontalier.
 			if (this.rng() < 0.25 && this.aiHitman(i)) continue;
-			const target = this.pickAiTarget(i);
-			if (target !== null) this.attackFrom(i, target);
+			// Concentration de force : on renforce l'assaut en cours avant d'ouvrir un front.
+			const active = this.attacks.find((attack) => attack.factionId === i);
+			const focus =
+				active && this.canAttack(i, active.target) ? active.target : this.pickAiTarget(i);
+			if (focus !== null) this.attackFrom(i, focus);
 		}
 	}
 
