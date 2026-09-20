@@ -71,6 +71,17 @@ export const BUILDING_EFFECTS = {
 /** Coût d'une **conversion** (bâti existant réutilisé) : 50 % du coût plein. */
 export const CONVERSION_COST = 0.5;
 
+/**
+ * Coût croissant : chaque bâtiment du même type renchérit le suivant.
+ * Crée un vrai arbitrage (diversifier plutôt que spammer un type).
+ */
+export const BUILDING_COST_GROWTH = 1.35;
+
+/** Facteur de coût du `count`-ième bâtiment d'un type (0 = premier). */
+export function buildingCostGrowth(count: number): number {
+	return BUILDING_COST_GROWTH ** count;
+}
+
 /** Durée d'une **construction neuve** (terrain vague), en ticks. La conversion est instantanée. */
 export const BUILD_TICKS: Record<BuildingType, number> = {
 	logement: 90,

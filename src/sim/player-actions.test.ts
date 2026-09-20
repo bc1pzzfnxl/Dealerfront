@@ -247,7 +247,14 @@ describe("construction — annulation du chantier", () => {
 		const module = ownVacant(world, world.player.id, "labo");
 		expect(world.playerBuild(module, "labo")).toBe(true);
 		world.territory.control[module] = 1;
-		world.attacks.push({ factionId: 1, source: -1, target: module, troops: 100000, arrivesAt: 0 });
+		world.attacks.push({
+			factionId: 1,
+			source: -1,
+			target: module,
+			troops: 100000,
+			arrivesAt: 0,
+			startControl: 1,
+		});
 		world.step();
 		expect(world.ownerAt(module)).toBe(1);
 		expect(world.constructionLeft(module)).toBe(0);
@@ -731,8 +738,8 @@ describe("zones", () => {
 		}
 		expect(built).toBeGreaterThanOrEqual(0);
 		expect(vacant).toBeGreaterThanOrEqual(0);
-		expect(world.buildCostFactor(built)).toBe(CONVERSION_COST);
-		expect(world.buildCostFactor(vacant)).toBe(1);
+		expect(world.buildCostFactor(world.player.id, built, "labo")).toBe(CONVERSION_COST);
+		expect(world.buildCostFactor(world.player.id, vacant, "labo")).toBe(1);
 		expect(world.isConversion(vacant)).toBe(false);
 		// Le contre-espionnage n'est pas constructible sur terrain vague.
 		expect(world.allowedBuildings(vacant)).not.toContain("contre");

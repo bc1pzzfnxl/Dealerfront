@@ -225,6 +225,7 @@ function EffectStates({
 	const { map, isLoaded } = useMap();
 	const prevOwner = useRef<Int16Array | null>(null);
 	const prevBuildings = useRef<string>("");
+	const prevAttacked = useRef<Set<number>>(new Set());
 	const prevControl = useRef<Uint8Array | null>(null);
 	const prevHeat = useRef<Uint8Array | null>(null);
 	const prevFlash = useRef<Uint8Array | null>(null);
@@ -239,6 +240,7 @@ function EffectStates({
 		prevFlash.current = null;
 		prevBuilding.current = null;
 		prevBuildings.current = "";
+		prevAttacked.current = new Set();
 		prevSiege.current = "";
 	}, [map, isLoaded]);
 
@@ -337,6 +339,50 @@ function EffectStates({
 				},
 			});
 		}
+		// Jauge de conquête : trait épais qui grossit *vers l'intérieur* du quartier
+		// (offset négatif) au fur et à mesure que le Contrôle baisse.
+		// `zoom` doit rester l'entrée de plus haut niveau de l'expression.
+		if (!map.getLayer("iris-conquest")) {
+			const progress = ["coalesce", ["feature-state", "conquest"], 0] as never;
+			const conquestWidth = [
+				"interpolate",
+				["linear"],
+				["zoom"],
+				11,
+				["*", progress, 12],
+				13,
+				["*", progress, 40],
+				15,
+				["*", progress, 130],
+				17,
+				["*", progress, 255],
+			] as never;
+			const conquestOffset = [
+				"interpolate",
+				["linear"],
+				["zoom"],
+				11,
+				["*", progress, 6],
+				13,
+				["*", progress, 20],
+				15,
+				["*", progress, 65],
+				17,
+				["*", progress, 127.5],
+			] as never;
+			map.addLayer({
+				id: "iris-conquest",
+				type: "line",
+				source: SOURCE_ID,
+				paint: {
+					"line-color": "#ffffff",
+					"line-width": conquestWidth,
+					"line-offset": conquestOffset,
+					"line-opacity": 0.6,
+					"line-blur": 2.5,
+				},
+			});
+		}
 		// Icônes de bâtiment : MapLibre n'autorise `feature-state` qu'en *paint*,
 		// pas en layout (icon-image) ni en filter. On passe donc par une source
 		// GeoJSON de points portant le type de bâtiment en propriété.
@@ -406,23 +452,44 @@ function EffectStates({
 		});
 	}, [map, isLoaded, territory, version]);
 
-	// Siège : uniquement quand le front change (pas à chaque tick).
+	// Siège (couleur) quand le front change ; conquête (remplissage bord→centre)
+	// recalculée à chaque tick pour les quartiers assiégés.
 	useEffect(() => {
 		if (!map || !isLoaded || !map.getSource(SOURCE_ID)) return;
 		const next = attacks
 			.map((attack) => `${attack.target}:${attack.factionId}`)
 			.sort()
 			.join(",");
-		if (prevSiege.current === next) return;
-		prevSiege.current = next;
-		for (let i = 0; i < territory.count; i += 1) {
-			const attack = attacks.find((candidate) => candidate.target === i);
+		if (prevSiege.current !== next) {
+			prevSiege.current = next;
+			for (let i = 0; i < territory.count; i += 1) {
+				const attack = attacks.find((candidate) => candidate.target === i);
+				map.setFeatureState(
+					{ source: SOURCE_ID, id: i },
+					{ siege: attack ? attack.factionId : -1 },
+				);
+			}
+		}
+		const besieged = new Set<number>();
+		for (const attack of attacks) {
+			besieged.add(attack.target);
+			const control = territory.control[attack.target] ?? 0;
+			const progress =
+				attack.startControl > 0
+					? Math.max(0, Math.min(1, 1 - control / attack.startControl))
+					: 0;
 			map.setFeatureState(
-				{ source: SOURCE_ID, id: i },
-				{ siege: attack ? attack.factionId : -1 },
+				{ source: SOURCE_ID, id: attack.target },
+				{ conquest: progress },
 			);
 		}
-	}, [map, isLoaded, attacks, territory.count, version]);
+		for (const id of prevAttacked.current) {
+			if (!besieged.has(id)) {
+				map.setFeatureState({ source: SOURCE_ID, id }, { conquest: 0 });
+			}
+		}
+		prevAttacked.current = besieged;
+	}, [map, isLoaded, attacks, territory, version, tick]);
 
 	// Possession + contrôle + heat + flash + bâtiment (incrémental).
 	useEffect(() => {

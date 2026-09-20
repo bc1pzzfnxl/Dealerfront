@@ -20,6 +20,7 @@ import {
 	type BuildingType,
 	NO_BUILDING,
 	ZONE_BUILDINGS,
+	buildingCostGrowth,
 } from "./buildings";
 import { PARIS_MAP } from "./maps/paris";
 import { createRng, type Rng } from "./rng";
@@ -202,6 +203,8 @@ export interface Attack {
 	troops: number;
 	/** Tick d'arrivée sur la cible (avant : troupes en route). */
 	arrivesAt: number;
+	/** Contrôle de la cible au début de l'assaut (pour la jauge de conquête). */
+	startControl: number;
 }
 
 export type Outcome = null | "victory" | "defeat";
@@ -996,7 +999,7 @@ export class World {
 		if (this.territory.construction[module]! > 0) return false;
 		if (this.activeConstructions(this.player.id) >= BUILD_CREWS) return false;
 		if (!canBuildInZone(this.city.modules[module]!, type)) return false;
-		return this.canAfford(this.player, type, this.buildCostFactor(module));
+		return this.canAfford(this.player, type, this.buildCostFactor(this.player.id, module, type));
 	}
 
 	/** Types de bâtiments convertibles sur ce quartier (selon sa zone). */
@@ -1431,7 +1434,7 @@ export class World {
 				chooseBuildType(scratch, owned, (t) => canBuildInZone(this.city.modules[i]!, t));
 			if (type === null) continue;
 			if (!canBuildInZone(this.city.modules[i]!, type)) continue;
-			const factor = this.buildCostFactor(i);
+			const factor = this.buildCostFactor(player.id, i, type, scratch[type]);
 			const spec = BUILDINGS[type];
 			if (spec.costMembers) members += Math.round(spec.costMembers * factor);
 			if (spec.costSale) sale += Math.round(spec.costSale * factor);
@@ -1507,7 +1510,7 @@ export class World {
 					this.buildOrders.splice(index, 1);
 					continue;
 				}
-				if (!this.canAfford(faction, order.type, this.buildCostFactor(order.module))) break;
+				if (!this.canAfford(faction, order.type, this.buildCostFactor(faction.id, order.module, order.type))) break;
 				this.buildOrders.splice(index, 1);
 				this.startBuild(faction.id, order.module, order.type);
 			}
@@ -1571,13 +1574,19 @@ export class World {
 	}
 
 	/** Facteur de coût : 0,5 en conversion, 1,0 en construction neuve. */
-	buildCostFactor(module: number): number {
-		return this.isConversion(module) ? CONVERSION_COST : 1;
+	/**
+	 * Facteur de coût : conversion (−50 %) × croissance par type déjà possédé.
+	 * `count` permet de tenir compte des bâtiments déjà prévus dans un même lot.
+	 */
+	buildCostFactor(factionId: number, module: number, type: BuildingType, count?: number): number {
+		const owned = count ?? this.counts[factionId]?.[type] ?? 0;
+		const base = this.isConversion(module) ? CONVERSION_COST : 1;
+		return base * buildingCostGrowth(owned);
 	}
 
 	/** Paie puis lance le chantier (conversion = moitié du temps, chantier malgré tout). */
 	private startBuild(factionId: number, module: number, type: BuildingType): void {
-		this.pay(this.factions[factionId]!, type, this.buildCostFactor(module));
+		this.pay(this.factions[factionId]!, type, this.buildCostFactor(factionId, module, type));
 		const ticks = Math.round(
 			BUILD_TICKS[type] * (this.isConversion(module) ? CONVERSION_TIME : 1),
 		);
@@ -1650,6 +1659,7 @@ export class World {
 			target: module,
 			troops,
 			arrivesAt: this.tick + TRAVEL_TICKS,
+			startControl: this.territory.control[module]!,
 		});
 		// Guetteur : un Contre-espionnage adjacent à la cible alerte le défenseur joueur.
 		const defender = this.territory.owner[module];
@@ -1978,12 +1988,11 @@ export class World {
 			if (this.territory.building[i] !== NO_BUILDING) continue;
 			if (this.territory.construction[i]! > 0) continue;
 			const zone = this.city.modules[i]!;
-			const factor = this.buildCostFactor(i);
 			const type = chooseBuildType(
 				counts,
 				owned,
 				(t) =>
-					this.canAfford(faction, t, factor) &&
+					this.canAfford(faction, t, this.buildCostFactor(factionId, i, t)) &&
 					canBuildInZone(zone, t) &&
 					(bootstrap === null || t === bootstrap),
 				{ atelier: TECH.maxLevel },
@@ -2012,7 +2021,7 @@ export class World {
 			if (this.territory.building[target] !== NO_BUILDING) continue;
 			if (this.territory.construction[target]! > 0) continue;
 			if (!canBuildInZone(this.city.modules[target]!, "planque")) continue;
-			if (!this.canAfford(faction, "planque", this.buildCostFactor(target))) return false;
+			if (!this.canAfford(faction, "planque", this.buildCostFactor(factionId, target, "planque"))) return false;
 			this.startBuild(factionId, target, "planque");
 			return true;
 		}

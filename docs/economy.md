@@ -85,7 +85,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
   `Membres_max = 2 × (quartiers_possédés^0.6 × 1 000 + 50 000) + dépôts × 250 000` (à équilibrer).
 - **Régénération de Membres/tick** (inspiré OpenFront) :
   `régén = (10 + Membres^0.73 / 4) × (1 − Membres / Membres_max) + dépôts × 5` (à équilibrer).
-- **Coût croissant** des bâtiments (inspiré OpenFront City/Factory/Port) : `cost(n) = min(1 000 000, 2^num × 12 500)` pour Labo/PdV/Façade ; Atelier, Contre-espionnage et Dépôt ont leurs propres paliers (à équilibrer).
+- **Coût croissant** des bâtiments (inspiré OpenFront City/Factory/Port) : `coût(n) = coût_base × 1,35^n` où `n` = nombre de bâtiments **du même type** déjà possédés (conversion = ×0,5). Le coût est calculé par faction et par type ; un lot tient compte des bâtiments déjà prévus. Force la **diversification** plutôt que le spam d'un seul type.
 
 ### 6. Objectif économique
 
@@ -149,7 +149,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 - [ ] La boucle Produit → Cash sale → Cash propre est **obligatoire** (aucun raccourci direct).
 - [ ] Les Membres ne peut **jamais** s'acheter avec du Cash sale/propre (séparation conquête/économie).
 - [ ] Les 7 bâtiments sont convertibles depuis au moins un type de bâtiment généré.
-- [ ] Le coût croissant des bâtiments empêche le spam d'un seul type.
+- [x] Le coût croissant des bâtiments empêche le spam d'un seul type.
 - [x] L'économie permet de soutenir une guerre de longue haleine (battle royale).
 
 ## Décisions tranchées (log)

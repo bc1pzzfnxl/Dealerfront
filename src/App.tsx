@@ -382,7 +382,8 @@ function App() {
 	const playerPct = Math.round(world.controlRatio(player.id) * 100);
 	const perSecond = Math.round(world.productionPerTick(player.id) * SIM_HZ * 10) / 10;
 	const afford = (type: BuildingType) => selected !== null && world.playerCanQueue(selected, type);
-	const costFactor = selected !== null ? world.buildCostFactor(selected) : 1;
+	const costFactor = (type: BuildingType) =>
+		selected !== null ? world.buildCostFactor(player.id, selected, type) : 1;
 	const constructionLeft = selected !== null ? world.constructionLeft(selected) : 0;
 	const pendingType = selected !== null ? world.pendingBuilding(selected) : null;
 	const isConversion = selected !== null && world.isConversion(selected);
@@ -730,8 +731,11 @@ function App() {
 						</span>
 					</div>
 
-					<label className="slider-row" title="Part des Membres engagée à chaque assaut">
-						<span>Troupes</span>
+					<label
+						className="slider-row"
+						title="Part de vos Membres engagée à chaque assaut. Le reste défend vos quartiers : engager trop vous affaiblit."
+					>
+						<span>Engagement</span>
 						<input
 							type="range"
 							min={5}
@@ -743,7 +747,10 @@ function App() {
 								setVersion((value) => value + 1);
 							}}
 						/>
-						<code>{Math.round(world.playerAttackRatio() * 100)}%</code>
+						<code>
+							{Math.round(world.playerAttackRatio() * 100)}% ·{" "}
+							{engaged.toLocaleString("fr-FR")}
+						</code>
 					</label>
 
 					{isOwned ? (
@@ -770,12 +777,12 @@ function App() {
 												type="button"
 												className={type === recommendedType ? "recommended" : undefined}
 												disabled={!afford(type)}
-												title={`${BUILDINGS[type].label} — ${BUILDING_EFFECT_LABELS[type]} · ${formatCost(type, costFactor)}${reason ? ` · ${reason}` : ""}`}
+												title={`${BUILDINGS[type].label} — ${BUILDING_EFFECT_LABELS[type]} · ${formatCost(type, costFactor(type))}${reason ? ` · ${reason}` : ""}`}
 												onClick={() => build(type)}
 											>
 												<Icon className="build-icon" aria-hidden="true" />
 												<em className={zoneBlocked ? "zone" : reason ? "lack" : undefined}>
-													{zoneBlocked ? "zone" : formatCost(type, costFactor)}
+													{zoneBlocked ? "zone" : formatCost(type, costFactor(type))}
 												</em>
 											</button>
 										);
@@ -1273,6 +1280,10 @@ function App() {
 							un seul bâtiment par quartier.
 						</p>
 						<p>
+							<strong>Coût croissant :</strong> chaque bâtiment du même type renchérit le suivant
+							(+35 %). Diversifier est plus rentable que spammer un seul type.
+						</p>
+						<p>
 							<strong>Zones :</strong> chaque quartier n'accepte que certains bâtiments (parc →
 							planque, police → contre-espionnage…). Le détail est affiché sous le menu de
 							construction.
@@ -1294,8 +1305,15 @@ function App() {
 						</ul>
 						<h3>Conquête</h3>
 						<p>
-							Sélectionnez un quartier <strong>adjacent</strong> puis <kbd>Q</kbd> pour l'attaquer
-							(20 % de vos Membres engagés).
+							Sélectionnez un quartier <strong>adjacent</strong> puis <kbd>Q</kbd> pour l'attaquer.
+							L'<strong>Engagement</strong> (curseur) = part de vos Membres envoyée à l'assaut :
+							plus il est haut, plus le siège est rapide, mais moins il reste de défenseurs chez
+							vous.
+						</p>
+						<p>
+							Le siège fait baisser le <strong>Contrôle</strong> de la cible (il régénère seul) ;
+							à zéro, le quartier est pris. Un <strong>remplissage coloré</strong> part des bords
+							vers le centre pour montrer l'avancée du siège.
 						</p>
 						<h3>Marché &amp; logistique</h3>
 						<p>
