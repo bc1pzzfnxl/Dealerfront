@@ -79,7 +79,7 @@ export function createFactions(count: number, startMembers: number): Faction[] {
 			members: startMembers,
 			produit: 0,
 			cashSale: 2000,
-			cashPropre: 0,
+			cashPropre: 1000,
 			housing: 0,
 			buildings: 0,
 			tech: { armement: 0, protection: 0, logistique: 0 },

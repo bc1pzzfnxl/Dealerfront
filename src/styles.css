@@ -399,8 +399,54 @@ kbd {
 	font-size: 0.76rem;
 }
 
-.line span {
+/* Bloc quartier compact : en-tête + grille de stats + pied. */
+.quarter-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 0.5rem;
+}
+
+.quarter-head h2 {
+	margin: 0;
+}
+
+.quarter-owner {
+	font-size: 0.7rem;
+}
+
+.quarter-stats {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0.3rem;
+	margin: 0.4rem 0 0.2rem;
+}
+
+.quarter-stats span {
+	display: flex;
+	flex-direction: column;
+	gap: 0.05rem;
+	padding: 0.3rem 0.35rem;
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	font-size: 0.54rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
 	color: var(--muted);
+}
+
+.quarter-stats strong {
+	font-size: 0.78rem;
+	color: var(--text);
+	font-variant-numeric: tabular-nums;
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+.quarter-foot {
+	font-size: 0.62rem;
+	color: var(--muted);
+	padding-top: 0.15rem;
 }
 
 code {

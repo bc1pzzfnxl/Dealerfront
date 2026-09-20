@@ -946,8 +946,8 @@ describe("butin (bâtiments objectifs)", () => {
 		for (let i = 0; i < 40 && world.ownerAt(target) !== player.id; i += 1) world.step();
 
 		expect(world.ownerAt(target)).toBe(player.id);
-		expect(player.cashSale).toBeCloseTo(1000 * 0.4);
-		expect(victim.cashSale).toBeCloseTo(10_000 - 1000 * 0.4);
+		expect(player.cashSale).toBeCloseTo(BUILDINGS.vente.costSale! * 0.4);
+		expect(victim.cashSale).toBeCloseTo(10_000 - BUILDINGS.vente.costSale! * 0.4);
 	});
 });
 
@@ -969,7 +969,9 @@ describe("descente & sabotage (armement)", () => {
 		expect(world.playerDescent(target)).toBe(true);
 		expect(world.ownerAt(target)).toBe(1);
 		expect(world.buildingAt(target)).toBe("vente");
-		expect(player.cashSale).toBeCloseTo(before - world.descentCost().sale + 400);
+		expect(player.cashSale).toBeCloseTo(
+			before - world.descentCost().sale + BUILDINGS.vente.costSale! * 0.4,
+		);
 	});
 
 	it("sans Armement suffisant, pas d'opération", () => {

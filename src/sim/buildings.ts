@@ -37,13 +37,13 @@ export interface BuildingSpec {
 
 export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
 	logement: { type: "logement", label: "Recrutement", costMembers: 800, width: 1.6, height: 1.2 },
-	labo: { type: "labo", label: "Labo", costSale: 1000, width: 1.4, height: 1.6 },
-	vente: { type: "vente", label: "Point de vente", costSale: 1000, width: 1.8, height: 0.8 },
-	facade: { type: "facade", label: "Façade", costSale: 1500, width: 2.0, height: 1.0 },
-	planque: { type: "planque", label: "Planque", costSale: 1200, width: 1.6, height: 0.7 },
-	depot: { type: "depot", label: "Dépôt", costSale: 1200, width: 2.2, height: 1.4 },
-	atelier: { type: "atelier", label: "Atelier", costClean: 2500, width: 1.6, height: 1.1 },
-	contre: { type: "contre", label: "Guetteur", costClean: 2000, width: 1.2, height: 1.3 },
+	labo: { type: "labo", label: "Labo", costSale: 1500, width: 1.4, height: 1.6 },
+	vente: { type: "vente", label: "Point de vente", costSale: 1500, width: 1.8, height: 0.8 },
+	facade: { type: "facade", label: "Façade", costSale: 2200, width: 2.0, height: 1.0 },
+	planque: { type: "planque", label: "Planque", costSale: 1800, width: 1.6, height: 0.7 },
+	depot: { type: "depot", label: "Dépôt", costSale: 1800, width: 2.2, height: 1.4 },
+	atelier: { type: "atelier", label: "Atelier", costClean: 3500, width: 1.6, height: 1.1 },
+	contre: { type: "contre", label: "Guetteur", costClean: 3000, width: 1.2, height: 1.3 },
 };
 
 /** Effets chiffrés (par tick sauf mention). */
@@ -61,7 +61,7 @@ export const BUILDING_EFFECTS = {
 	/** Cash sale blanchi par façade et par tick. */
 	cashPerFacade: 60,
 	/** Commission de blanchiment. */
-	commission: 0.2,
+	commission: 0.25,
 	/** Membres max ajoutés par dépôt. */
 	maxMembersPerDepot: 2000,
 	/** Multiplicateur de défense local d'une planque. */
@@ -90,7 +90,7 @@ export const CONVERSION_TIME = 0.5;
 export const BUILDING_EFFECT_LABELS: Record<BuildingType, string> = {
 	logement: "recrute +25 membres/tick (immeuble récupéré)",
 	labo: "+1,5 produit/tick",
-	vente: "transforme le produit en cash sale",
+	vente: "vend le produit (≈60 sale/unité)",
 	facade: "blanchit 60 cash sale/tick",
 	planque: "défense ×1,5",
 	depot: "+2000 membres max",

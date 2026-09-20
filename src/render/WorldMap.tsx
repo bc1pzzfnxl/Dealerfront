@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FeatureCollection, Geometry } from "geojson";
 import type { GeoJSONSource } from "maplibre-gl";
+import { renderToStaticMarkup } from "react-dom/server";
 import {
 	Map,
 	MapArc,
@@ -9,11 +10,13 @@ import {
 	useMap,
 	type MapGeoJSONEvent,
 } from "@/components/ui/map";
+import { BUILDING_TYPES, type BuildingType } from "../sim/buildings";
 import { FACTION_COLORS } from "../sim/factions";
 import { PARIS_CENTROIDS } from "../sim/maps/paris";
 import parisGeoUrl from "../sim/maps/paris-iris.geojson?url";
 import type { Territory } from "../sim/territory";
 import type { Attack, ConvoyRoute } from "../sim/world";
+import { BUILDING_ICONS, buildingIconImage } from "./icons";
 import { factionDisplayColor } from "./palette";
 import { useReducedMotion } from "./useReducedMotion";
 
@@ -53,6 +56,9 @@ interface WorldMapProps {
 	onModuleHover: (module: number | null) => void;
 	onProjector: (project: (module: number) => { x: number; y: number } | null) => void;
 }
+
+/** Icône de bâtiment : id d'image MapLibre par type (0 = aucun bâtiment). */
+const BUILDING_ICON_ID = (type: BuildingType) => `bld-${type}`;
 
 /** Couleur de remplissage pilotée par `feature-state` (faction + contrôle). */
 function factionMatch(colorblind: boolean): unknown[] {
@@ -219,6 +225,7 @@ function EffectStates({
 	const prevControl = useRef<Uint8Array | null>(null);
 	const prevHeat = useRef<Uint8Array | null>(null);
 	const prevFlash = useRef<Uint8Array | null>(null);
+	const prevBuilding = useRef<Int8Array | null>(null);
 	const prevSiege = useRef<string>("");
 
 	// La source est recréée quand la carte/le style change : on repart du cache.
@@ -227,6 +234,7 @@ function EffectStates({
 		prevControl.current = null;
 		prevHeat.current = null;
 		prevFlash.current = null;
+		prevBuilding.current = null;
 		prevSiege.current = "";
 	}, [map, isLoaded]);
 
@@ -268,6 +276,25 @@ function EffectStates({
 		if (!map.getLayer("iris-capture")) {
 			map.addLayer({
 				id: "iris-capture",
+				type: "fill",
+				source: SOURCE_ID,
+				paint: {
+					"fill-color": "#ffffff",
+					"fill-opacity": [
+						"interpolate",
+						["linear"],
+						["coalesce", ["feature-state", "flash"], 0],
+						0,
+						0,
+						1,
+						0.6,
+					] as never,
+				},
+			});
+		}
+		if (!map.getLayer("iris-capture-line")) {
+			map.addLayer({
+				id: "iris-capture-line",
 				type: "line",
 				source: SOURCE_ID,
 				paint: {
@@ -306,6 +333,49 @@ function EffectStates({
 				},
 			});
 		}
+		// Icônes de bâtiment : 8 images (badge + glyphe) + une couche symbole.
+		if (!map.hasImage(BUILDING_ICON_ID("labo"))) {
+			BUILDING_TYPES.forEach((type) => {
+				const color = factionDisplayColor(0, "#e8eaee", false);
+				const image = buildingIconImage(
+					BUILDING_ICONS[type],
+					(icon) => renderToStaticMarkup(icon({ strokeWidth: 2.4 })),
+					color,
+				);
+				if (image && !map.hasImage(BUILDING_ICON_ID(type))) {
+					map.addImage(BUILDING_ICON_ID(type), image as never, { sdf: false });
+				}
+			});
+		}
+		if (!map.getLayer("iris-buildings")) {
+			map.addLayer({
+				id: "iris-buildings",
+				type: "symbol",
+				source: SOURCE_ID,
+				minzoom: 12,
+				layout: {
+					"icon-image": [
+						"match",
+						["coalesce", ["feature-state", "building"], ""],
+						"logement",
+						BUILDING_ICON_ID("logement"),
+						...BUILDING_TYPES.slice(1).flatMap((type) => [type, BUILDING_ICON_ID(type)]),
+						"",
+					] as never,
+					"icon-size": [
+						"interpolate",
+						["linear"],
+						["zoom"],
+						12,
+						0.5,
+						16,
+						0.9,
+					] as never,
+					"icon-allow-overlap": true,
+					"icon-ignore-placement": true,
+				},
+			});
+		}
 	}, [map, isLoaded]);
 
 	// Siège : uniquement quand le front change (pas à chaque tick).
@@ -326,7 +396,7 @@ function EffectStates({
 		}
 	}, [map, isLoaded, attacks, territory.count, version]);
 
-	// Possession + contrôle + heat + flash (incrémental).
+	// Possession + contrôle + heat + flash + bâtiment (incrémental).
 	useEffect(() => {
 		if (!map || !isLoaded || !map.getSource(SOURCE_ID)) return;
 		const count = territory.count;
@@ -334,27 +404,32 @@ function EffectStates({
 		const control = prevControl.current ?? (prevControl.current = new Uint8Array(count));
 		const heatCache = prevHeat.current ?? (prevHeat.current = new Uint8Array(count));
 		const flash = prevFlash.current ?? (prevFlash.current = new Uint8Array(count));
+		const building = prevBuilding.current ?? (prevBuilding.current = new Int8Array(count).fill(-2));
 		for (let i = 0; i < count; i += 1) {
 			const nextOwner = territory.owner[i]!;
 			const nextControl = Math.round(territory.control[i]!);
 			const nextHeat = Math.round(heat[i] ?? 0);
 			const age = tick - territory.capturedAt[i]!;
 			const nextFlash = age >= 0 && age < CAPTURE_FLASH_TICKS ? 1 : 0;
+			const nextBuilding = territory.building[i]!;
 			if (
 				owner[i] !== nextOwner ||
 				control[i] !== nextControl ||
 				heatCache[i] !== nextHeat ||
-				flash[i] !== nextFlash
+				flash[i] !== nextFlash ||
+				building[i] !== nextBuilding
 			) {
 				owner[i] = nextOwner;
 				control[i] = nextControl;
 				heatCache[i] = nextHeat;
 				flash[i] = nextFlash;
+				building[i] = nextBuilding;
 				map.setFeatureState({ source: SOURCE_ID, id: i }, {
 					faction: nextOwner,
 					control: nextControl,
 					heat: nextHeat,
 					flash: nextFlash,
+					building: BUILDING_TYPES[nextBuilding] ?? "",
 				});
 			}
 		}

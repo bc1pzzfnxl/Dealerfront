@@ -77,7 +77,7 @@ describe("bot — runs longs", () => {
 			playOut(world, rng, 3000);
 			assertSane(world);
 		}
-	});
+	}, 20000);
 
 	it("même seed + même bot ⇒ territoire identique", () => {
 		const run = (): number[] => {

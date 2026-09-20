@@ -677,19 +677,12 @@ function App() {
 				<section className="card panel-left">
 					<p className="advisor">{advisor}</p>
 					{notice ? <p className="notice">{notice}</p> : null}
-					<h2>
-						Quartier <em>{selected !== null ? `module ${selected}` : "—"}</em>
-					</h2>
-					<div className="line">
-						<span>Chantiers</span>
-						<code>
-							{world.activeConstructions(player.id)}/{world.buildCrews()} ·{" "}
-							{world.queueLength()}/{world.queueCap()} en file
-						</code>
-					</div>
-					<div className="line">
-						<span>Propriétaire</span>
+					<div className="quarter-head">
+						<h2>
+							Quartier <em>{selected !== null ? `#${selected}` : "—"}</em>
+						</h2>
 						<code
+							className="quarter-owner"
 							style={{
 								color:
 									selectedOwner === NEUTRAL ? undefined : world.factions[selectedOwner]?.color,
@@ -698,35 +691,43 @@ function App() {
 							{selectedOwnerName}
 						</code>
 					</div>
-					<div className="line">
-						<span>Contrôle</span>
-						<code>{selected !== null ? Math.round(world.controlAt(selected)) : "—"}</code>
+					<div className="quarter-stats">
+						<span title="Contrôle du quartier (0–100)">
+							<strong>{selected !== null ? Math.round(world.controlAt(selected)) : "—"}</strong>
+							Contrôle
+						</span>
+						<span title="Clientele locale (vente, recrutement)">
+							<strong>
+								×{selected !== null ? world.demandAt(selected).toFixed(1) : "—"}
+							</strong>
+							Demande
+						</span>
+						<span title="Prix et blanchiment locaux">
+							<strong>
+								×{selected !== null ? world.wealthAt(selected).toFixed(1) : "—"}
+							</strong>
+							Richesse
+						</span>
+						<span title="Pression policière locale">
+							<strong>{selected !== null ? Math.round(world.heatAt(selected)) : "—"}</strong>
+							Heat
+						</span>
+						<span title="Part de la vente reliée à un labo">
+							<strong>{Math.round(world.retailSupplyRatio(player.id) * 100)}%</strong>
+							Logistique
+						</span>
+						<span
+							title={`Zone : ${selectedZoneLabel}${selectedBuilding ? ` · ${BUILDINGS[selectedBuilding].label}` : ""}`}
+						>
+							<strong>{selectedBuilding ? BUILDINGS[selectedBuilding].label : selectedZoneLabel}</strong>
+							Bâti
+						</span>
 					</div>
-					<div className="line">
-						<span>Logistique</span>
-						<code>{Math.round(world.retailSupplyRatio(player.id) * 100)}% approvisionné</code>
-					</div>
-					<div className="line">
-						<span>Heat</span>
-						<code>{selected !== null ? Math.round(world.heatAt(selected)) : "—"}</code>
-					</div>
-					<div className="line">
-						<span>Bâtiment</span>
-						<code>{selectedBuilding ? BUILDINGS[selectedBuilding].label : "—"}</code>
-					</div>
-					<div className="line">
-						<span>Zone</span>
-						<code>{selectedZoneLabel}</code>
-					</div>
-					<div className="line">
-						<span>Profil</span>
-						<code>
-							{selected !== null
-								? `demande ×${world.demandAt(selected).toFixed(1)} · richesse ×${world
-										.wealthAt(selected)
-										.toFixed(1)}`
-								: "—"}
-						</code>
+					<div className="quarter-foot">
+						<span>
+							Chantiers {world.activeConstructions(player.id)}/{world.buildCrews()} · file{" "}
+							{world.queueLength()}/{world.queueCap()}
+						</span>
 					</div>
 
 					<label className="slider-row" title="Part des Membres engagée à chaque assaut">
@@ -755,7 +756,6 @@ function App() {
 							<p className="hint-inline">
 								<strong>Occupé :</strong> {BUILDINGS[selectedBuilding].label} —{" "}
 								{BUILDING_EFFECT_LABELS[selectedBuilding]}.
-								<br />1 bâtiment par quartier — capturez un autre quartier pour en bâtir un autre.
 							</p>
 						) : (
 							<>
