@@ -929,31 +929,26 @@ function App() {
 						</div>
 					)}
 					{batch.count > 0 ? (
-						<section className="card">
+						<section className="card batch-card">
 							<h2>
-								Aménagement par lot <em>{batch.count} quartier(s)</em>
+								Lot <em>{batch.count} quartier(s)</em>
 							</h2>
-							<div className="line">
-								<span>Coût total</span>
+							<div className="batch-row">
 								<code>
 									{batch.sale > 0 ? `${batch.sale.toLocaleString("fr-FR")} sale ` : ""}
 									{batch.members > 0 ? `${batch.members.toLocaleString("fr-FR")} membres ` : ""}
 									{batch.clean > 0 ? `${batch.clean.toLocaleString("fr-FR")} propre` : ""}
 								</code>
+								<button
+									type="button"
+									onClick={() => {
+										world.playerBatchBuild();
+										setVersion((value) => value + 1);
+									}}
+								>
+									Aménager
+								</button>
 							</div>
-							<button
-								type="button"
-								onClick={() => {
-									world.playerBatchBuild();
-									setVersion((value) => value + 1);
-								}}
-							>
-								Aménager le lot
-							</button>
-							<p className="hint-inline">
-								Applique la composition conseillée à tous tes quartiers vides (file limitée à{" "}
-								{world.queueCap()}).
-							</p>
 						</section>
 					) : null}
 				</section>
@@ -1165,8 +1160,7 @@ function App() {
 						<p className="hint-inline">
 							Baissez pour garder du Cash sale (achats), montez pour l'objectif de victoire.
 						</p>
-					</section>
-					{world.playerBuildOrders().length > 0 ? (
+					</section>					{world.playerBuildOrders().length > 0 ? (
 					<section className="card loop-card queue-card">
 						<h2>File d'ordres <em>{world.queueLength()}</em></h2>
 						{world.playerBuildOrders().map((order) => (

@@ -449,6 +449,27 @@ kbd {
 	padding-top: 0.15rem;
 }
 
+/* Lot : ligne unique coût + action (pas de bloc verbeux). */
+.batch-card {
+	padding-top: 0.4rem;
+	padding-bottom: 0.45rem;
+}
+
+.batch-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.batch-row code {
+	font-size: 0.72rem;
+}
+
+.batch-row button {
+	flex: 0 0 auto;
+}
+
 code {
 	color: var(--accent);
 	font-variant-numeric: tabular-nums;

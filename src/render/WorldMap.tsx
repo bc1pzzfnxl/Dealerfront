@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { FeatureCollection, Geometry } from "geojson";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import type { Feature, FeatureCollection, Geometry, Point } from "geojson";
 import type { GeoJSONSource } from "maplibre-gl";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -23,12 +23,14 @@ import { useReducedMotion } from "./useReducedMotion";
 const SOURCE = "iris";
 /** mapcn préfixe l'id source/layer par `geojson-source-` / `geojson-fill-`. */
 const SOURCE_ID = `geojson-source-${SOURCE}`;
+const BUILDING_SOURCE = "buildings";
+const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
 const NEUTRAL_COLOR = "#2A3140";
 const PARIS_CENTER: [number, number] = [2.3522, 48.8566];
 const CONVOY_SOURCE = "convoys";
 const CONVOY_SPEED = 0.045;
 /** Durée du flash de capture (ticks, 10 Hz). */
-const CAPTURE_FLASH_TICKS = 7;
+const CAPTURE_FLASH_TICKS = 16;
 
 interface IrisProps {
 	i: number;
@@ -222,6 +224,7 @@ function EffectStates({
 }) {
 	const { map, isLoaded } = useMap();
 	const prevOwner = useRef<Int16Array | null>(null);
+	const prevBuildings = useRef<string>("");
 	const prevControl = useRef<Uint8Array | null>(null);
 	const prevHeat = useRef<Uint8Array | null>(null);
 	const prevFlash = useRef<Uint8Array | null>(null);
@@ -235,6 +238,7 @@ function EffectStates({
 		prevHeat.current = null;
 		prevFlash.current = null;
 		prevBuilding.current = null;
+		prevBuildings.current = "";
 		prevSiege.current = "";
 	}, [map, isLoaded]);
 
@@ -287,7 +291,7 @@ function EffectStates({
 						0,
 						0,
 						1,
-						0.6,
+						0.75,
 					] as never,
 				},
 			});
@@ -333,50 +337,74 @@ function EffectStates({
 				},
 			});
 		}
-		// Icônes de bâtiment : 8 images (badge + glyphe) + une couche symbole.
-		if (!map.hasImage(BUILDING_ICON_ID("labo"))) {
-			BUILDING_TYPES.forEach((type) => {
-				const color = factionDisplayColor(0, "#e8eaee", false);
-				const image = buildingIconImage(
-					BUILDING_ICONS[type],
-					(icon) => renderToStaticMarkup(icon({ strokeWidth: 2.4 })),
-					color,
-				);
-				if (image && !map.hasImage(BUILDING_ICON_ID(type))) {
-					map.addImage(BUILDING_ICON_ID(type), image as never, { sdf: false });
-				}
-			});
+		// Icônes de bâtiment : MapLibre n'autorise `feature-state` qu'en *paint*,
+		// pas en layout (icon-image) ni en filter. On passe donc par une source
+		// GeoJSON de points portant le type de bâtiment en propriété.
+		const color = "#e8eaee";
+		if (!map.getSource(BUILDING_SOURCE)) {
+			map.addSource(BUILDING_SOURCE, { type: "geojson", data: EMPTY_FC });
 		}
-		if (!map.getLayer("iris-buildings")) {
+		Promise.all(
+			BUILDING_TYPES.map((type) =>
+				buildingIconImage(
+					renderToStaticMarkup(createElement(BUILDING_ICONS[type], { strokeWidth: 2.4 })),
+					color,
+				).then((image) => {
+					if (image && !map.hasImage(BUILDING_ICON_ID(type))) {
+						map.addImage(BUILDING_ICON_ID(type), image, { sdf: false });
+					}
+				}),
+			),
+		).then(() => {
+			if (map.getLayer("iris-buildings")) return;
 			map.addLayer({
 				id: "iris-buildings",
 				type: "symbol",
-				source: SOURCE_ID,
-				minzoom: 12,
+				source: BUILDING_SOURCE,
+				minzoom: 10,
 				layout: {
-					"icon-image": [
-						"match",
-						["coalesce", ["feature-state", "building"], ""],
-						"logement",
-						BUILDING_ICON_ID("logement"),
-						...BUILDING_TYPES.slice(1).flatMap((type) => [type, BUILDING_ICON_ID(type)]),
-						"",
-					] as never,
+					"icon-image": ["concat", "bld-", ["get", "type"]],
 					"icon-size": [
 						"interpolate",
 						["linear"],
 						["zoom"],
-						12,
-						0.5,
-						16,
+						10,
+						0.55,
+						14,
 						0.9,
+						17,
+						1.15,
 					] as never,
 					"icon-allow-overlap": true,
 					"icon-ignore-placement": true,
 				},
 			});
-		}
+		});
 	}, [map, isLoaded]);
+
+	// Points des bâtiments : recalculés seulement quand un bâtiment change.
+	useEffect(() => {
+		if (!map || !isLoaded || !map.getSource(BUILDING_SOURCE)) return;
+		const features: Feature<Point, { type: string }>[] = [];
+		for (let i = 0; i < territory.count; i += 1) {
+			const building = territory.building[i]!;
+			const center = PARIS_CENTROIDS[i];
+			if (building < 0 || !center) continue;
+			features.push({
+				type: "Feature",
+				id: i,
+				geometry: { type: "Point", coordinates: [center[0], center[1]] },
+				properties: { type: BUILDING_TYPES[building]! },
+			});
+		}
+		const signature = features.map((feature) => `${feature.id}:${feature.properties.type}`).join(",");
+		if (prevBuildings.current === signature) return;
+		prevBuildings.current = signature;
+		(map.getSource(BUILDING_SOURCE) as GeoJSONSource).setData({
+			type: "FeatureCollection",
+			features,
+		});
+	}, [map, isLoaded, territory, version]);
 
 	// Siège : uniquement quand le front change (pas à chaque tick).
 	useEffect(() => {

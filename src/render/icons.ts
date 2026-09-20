@@ -33,32 +33,40 @@ export const BUILDING_ICONS: Record<BuildingType, typeof FlaskConical> = {
 	contre: Eye,
 };
 
-type IconComponent = (typeof BUILDING_ICONS)[BuildingType];
-
 /**
- * Image MapLibre d'une icône de bâtiment : badge circulaire coloré + glyphe.
- * Le glyphe Lucide est injecté en SVG (blanc), le badge en couleur de faction.
- * Rendu une seule fois au chargement de la carte.
+ * Image MapLibre (pixels RGBA) d'une icône de bâtiment : badge circulaire coloré
+ * + glyphe blanc. `glyphMarkup` = SVG Lucide déjà rendu (async : rasterisation canvas).
  */
-export function buildingIconImage(
-	Icon: IconComponent,
-	render: (icon: IconComponent) => string,
+export async function buildingIconImage(
+	glyphMarkup: string,
 	color: string,
-): { width: number; height: number; data: Uint8Array } | null {
-	if (typeof TextEncoder === "undefined") return null;
+): Promise<ImageData | null> {
+	if (typeof document === "undefined") return null;
 	const size = 40;
-	const glyph = render(Icon)
+	const glyph = glyphMarkup
+		.replace(/\swidth="[^"]*"/, "")
+		.replace(/\sheight="[^"]*"/, "")
 		.replace("<svg", `<svg x="9" y="9" width="22" height="22"`)
-		.replace(/currentColor/g, "#ffffff");
+		.replace(/currentColor/g, "#12161d");
 	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
 <circle cx="20" cy="20" r="18" fill="${color}" stroke="#0b0e12" stroke-width="2"/>
 ${glyph}
 </svg>`;
-	return {
-		width: size,
-		height: size,
-		data: new TextEncoder().encode(svg),
-	};
+	const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+	const image = new Image();
+	image.src = url;
+	try {
+		await image.decode();
+	} catch {
+		return null;
+	}
+	const canvas = document.createElement("canvas");
+	canvas.width = size;
+	canvas.height = size;
+	const ctx = canvas.getContext("2d");
+	if (!ctx) return null;
+	ctx.drawImage(image, 0, 0, size, size);
+	return ctx.getImageData(0, 0, size, size);
 }
 
 /** Icônes des ressources du cartel (barre haute). */
