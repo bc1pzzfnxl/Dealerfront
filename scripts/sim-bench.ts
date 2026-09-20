@@ -8,7 +8,6 @@ import { Database } from "bun:sqlite";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { playOut } from "../src/sim/bot";
 import { createRng } from "../src/sim/rng";
-import { ARCHETYPES, type Archetype } from "../src/sim/types";
 import { World } from "../src/sim/world";
 
 const SEEDS = Number(process.env.SEEDS ?? 100);
@@ -19,7 +18,6 @@ const JSON_PATH = "src/dashboard/sim-data.json";
 
 interface Run {
 	seed: number;
-	archetype: string;
 	outcome: string;
 	reason: string;
 	ticks: number;
@@ -36,15 +34,13 @@ interface Run {
 }
 
 function runSeed(seed: number): Run {
-	const archetype = ARCHETYPES[seed % ARCHETYPES.length] as Archetype;
-	const world = new World(seed, archetype);
+	const world = new World(seed);
 	const rng = createRng((seed * 7919 + 13) >>> 0);
 	const ticks = playOut(world, rng, MAX_TICKS, CADENCE);
 	let totalClean = 0;
 	for (const faction of world.factions) totalClean += faction.cashPropre;
 	return {
 		seed,
-		archetype: world.city.archetype,
 		outcome: world.outcome ?? "none",
 		reason: world.endReason,
 		ticks,
@@ -71,22 +67,21 @@ mkdirSync("data", { recursive: true });
 const db = new Database(DB_PATH);
 db.run(`CREATE TABLE IF NOT EXISTS runs (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	seed INTEGER, archetype TEXT, cadence INTEGER, outcome TEXT, reason TEXT,
+	seed INTEGER, cadence INTEGER, outcome TEXT, reason TEXT,
 	ticks INTEGER, duration_s REAL, control REAL, clean INTEGER, total_clean INTEGER,
 	buildings INTEGER, pressure REAL, raids INTEGER, pacts INTEGER,
 	captures INTEGER, eliminations INTEGER, created_at TEXT
 )`);
 db.run("DELETE FROM runs");
 const insert = db.prepare(
-	`INSERT INTO runs (seed, archetype, cadence, outcome, reason, ticks, duration_s, control,
+	`INSERT INTO runs (seed, cadence, outcome, reason, ticks, duration_s, control,
 	 clean, total_clean, buildings, pressure, raids, pacts, captures, eliminations, created_at)
-	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 );
 db.transaction(() => {
 	for (const run of runs) {
 		insert.run(
 			run.seed,
-			run.archetype,
 			CADENCE,
 			run.outcome,
 			run.reason,

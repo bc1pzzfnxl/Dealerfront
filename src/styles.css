@@ -43,6 +43,44 @@ body {
 	inset: 0;
 }
 
+/* Carte réelle (mapcn/MapLibre) : occupe le viewport, contrôles style jeu. */
+.world-map {
+	position: absolute;
+	inset: 0;
+}
+
+.map-controls {
+	position: absolute;
+	right: 0.7rem;
+	bottom: 0.7rem;
+	z-index: 5;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.map-controls button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 6px;
+	background: rgba(14, 16, 19, 0.85);
+	color: #e8eaf0;
+	cursor: pointer;
+}
+
+.map-controls button:hover {
+	background: rgba(40, 46, 56, 0.95);
+}
+
+.map-controls svg {
+	width: 1rem;
+	height: 1rem;
+}
+
 /* ---------- HUD ---------- */
 
 .hud {
@@ -102,8 +140,26 @@ body {
 
 .top-stats .stat {
 	flex-direction: row;
-	align-items: baseline;
+	align-items: center;
 	gap: 0.35rem;
+}
+
+.stat-icon {
+	width: 0.95rem;
+	height: 0.95rem;
+	color: var(--muted);
+	flex: none;
+}
+
+.stat-icon.clean {
+	color: #8fd8a5;
+}
+
+.stat-label {
+	font-size: 0.57rem;
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
 }
 
 .top-stats .stat span {
@@ -118,20 +174,75 @@ body {
 	display: flex;
 	flex-direction: column;
 	align-items: flex-end;
-	gap: 0.1rem;
+	gap: 0.2rem;
 	text-align: right;
+	min-width: 11rem;
 }
 
 .objective {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
 	font-size: 0.64rem;
 	color: var(--muted);
 	white-space: nowrap;
+}
+
+.objective-bar {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.58rem;
+}
+
+.objective-bar progress {
+	width: 5.5rem;
+	height: 0.35rem;
+	appearance: none;
+	border: none;
+	border-radius: 2px;
+	background: rgba(255, 255, 255, 0.09);
+	overflow: hidden;
+}
+
+.objective-bar progress::-webkit-progress-bar {
+	background: rgba(255, 255, 255, 0.09);
+}
+
+.objective-bar progress::-webkit-progress-value {
+	background: var(--accent);
+	transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.objective-bar progress::-moz-progress-bar {
+	background: var(--accent);
+}
+
+.objective-bar[data-done="true"] progress::-webkit-progress-value {
+	background: #8fd8a5;
+}
+
+.objective-bar[data-done="true"] progress::-moz-progress-bar {
+	background: #8fd8a5;
+}
+
+.objective-bar em {
+	font-style: normal;
+	color: var(--text);
+	font-variant-numeric: tabular-nums;
 }
 
 .timer {
 	font-size: 0.72rem;
 	color: var(--warn);
 	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.timer[data-urgent="true"] {
+	color: var(--danger);
+	font-weight: 700;
 }
 
 .panel-left {
@@ -372,18 +483,67 @@ code {
 
 .build-menu button {
 	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 0.1rem;
-	padding: 0.35rem 0.45rem;
+	flex-direction: row;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.4rem 0.5rem;
 	font-size: 0.68rem;
 	text-align: left;
+}
+
+.build-icon {
+	width: 1rem;
+	height: 1rem;
+	flex: none;
+	color: var(--text);
+}
+
+.build-menu button.recommended .build-icon {
+	color: var(--accent);
 }
 
 .build-menu button em {
 	font-style: normal;
 	font-size: 0.56rem;
 	color: var(--muted);
+	margin-left: auto;
+}
+
+/* Barre de commandement (quartier ennemi/neutre) : icônes + raccourci. */
+.command-bar {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0.3rem;
+	margin-top: 0.5rem;
+}
+
+.command {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.12rem;
+	padding: 0.45rem 0.3rem;
+	position: relative;
+}
+
+.command-icon {
+	width: 1.15rem;
+	height: 1.15rem;
+	color: var(--text);
+}
+
+.command-label {
+	font-size: 0.58rem;
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.command kbd {
+	position: absolute;
+	top: 0.2rem;
+	right: 0.28rem;
+	font-size: 0.5rem;
 }
 
 code.clean {
@@ -422,12 +582,48 @@ button {
 	font: inherit;
 	font-size: 0.72rem;
 	cursor: pointer;
-	transition: border-color 120ms ease, color 120ms ease;
+	transition: border-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+		color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+		background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+		transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 button:hover {
 	border-color: var(--accent);
 	color: var(--accent);
+}
+
+button:not(:disabled):active {
+	transform: scale(0.97);
+}
+
+.journal li.log-gain {
+	border-left-color: var(--ok);
+	color: #cdd6cf;
+}
+
+.journal li.log-loss {
+	border-left-color: var(--danger);
+	color: #e6cecb;
+}
+
+.journal li.log-info {
+	border-left-color: var(--accent);
+}
+
+.journal li {
+	animation: log-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes log-in {
+	from {
+		opacity: 0;
+		transform: translateX(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
 }
 
 .hud-foot {
@@ -473,33 +669,6 @@ button:hover {
 	}
 }
 
-.radar {
-	position: absolute;
-	bottom: 1rem;
-	right: 0.85rem;
-	border: 1px solid var(--border);
-	background-color: var(--panel);
-	backdrop-filter: blur(8px);
-	border-radius: 8px;
-	padding: 0.45rem;
-}
-
-.radar-canvas {
-	display: block;
-	width: 200px;
-	height: 200px;
-	image-rendering: pixelated;
-	border-radius: 4px;
-	cursor: crosshair;
-}
-
-.radar-hint {
-	margin: 0.35rem 0 0;
-	text-align: center;
-	color: var(--muted);
-	font-size: 0.62rem;
-}
-
 /* ---------- Fin de run ---------- */
 
 .end-banner {
@@ -513,6 +682,58 @@ button:hover {
 	padding: 1.4rem 1.8rem;
 	text-align: center;
 	max-width: 24rem;
+}
+
+.end-banner.win {
+	border-color: var(--ok);
+}
+
+.end-banner.win h2 {
+	color: var(--ok);
+}
+
+/* ---------- Sélection : pitch et boucle ---------- */
+.select-pitch {
+	max-width: 26rem;
+	text-align: center;
+	line-height: 1.5;
+}
+
+.select-loop {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.select-loop span {
+	position: relative;
+	padding: 0.35rem 0.9rem 0.35rem 1.2rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 999px;
+	font-size: 0.68rem;
+	color: var(--text);
+	letter-spacing: 0.04em;
+}
+
+.select-loop span::before {
+	content: "";
+	position: absolute;
+	left: 0.5rem;
+	top: 50%;
+	width: 0.45rem;
+	height: 0.45rem;
+	border-radius: 50%;
+	transform: translateY(-50%);
+	background: var(--accent);
+}
+
+.select-loop span + span::after {
+	content: "→";
+	position: absolute;
+	left: -0.55rem;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--muted);
+	font-size: 0.7rem;
 }
 
 .end-banner h2 {
@@ -954,7 +1175,8 @@ button:not(:disabled):active {
 
 @media (prefers-reduced-motion: reduce) {
 	.card,
-	.end-banner {
+	.end-banner,
+	.journal li {
 		animation: none;
 	}
 	button {
@@ -1101,6 +1323,87 @@ code.unknown {
 @media (prefers-reduced-motion: reduce) {
 	.floater,
 	.viewport.shake {
+		animation: none;
+	}
+}
+
+/* ---------- Événement à choix ---------- */
+.event-card {
+	position: absolute;
+	top: 4.6rem;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 12;
+	width: min(26rem, 80vw);
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 0.8rem 0.95rem;
+	border: 1px solid var(--warn);
+	border-radius: 8px;
+	background-color: rgba(14, 16, 19, 0.96);
+	animation: event-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.event-card.gain {
+	border-color: var(--ok);
+}
+
+.event-card.loss {
+	border-color: var(--danger);
+}
+
+.event-card h3 {
+	margin: 0;
+	font-size: 0.82rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.event-card p {
+	margin: 0;
+	font-size: 0.72rem;
+	color: var(--muted);
+	line-height: 1.45;
+}
+
+.event-choices {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.4rem;
+}
+
+.event-choices button {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.1rem;
+	padding: 0.5rem 0.6rem;
+}
+
+.event-choices button strong {
+	font-size: 0.74rem;
+}
+
+.event-choices button em {
+	font-style: normal;
+	font-size: 0.6rem;
+	color: var(--muted);
+}
+
+@keyframes event-in {
+	from {
+		opacity: 0;
+		transform: translate(-50%, -8px);
+	}
+	to {
+		opacity: 1;
+		transform: translate(-50%, 0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.event-card {
 		animation: none;
 	}
 }

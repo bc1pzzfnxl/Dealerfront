@@ -1,11 +1,18 @@
-import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
-import { EvilBarChart } from "@/components/evilcharts/charts/recharts-bar-chart";
-import { EvilComposedChart } from "@/components/evilcharts/charts/recharts-composed-chart";
+import {
+	Bar,
+	BarChart,
+	CartesianGrid,
+	ComposedChart,
+	Legend,
+	Line,
+	ResponsiveContainer,
+	Tooltip,
+	XAxis,
+	YAxis,
+} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { GameMapPrototype } from "./GameMapPrototype";
-import { MapExample } from "./MapExample";
 import data from "./sim-data.json";
 
 interface Run {
@@ -74,21 +81,13 @@ const archetypeRows = (() => {
 	return [...map.values()].sort((a, b) => b.victory + b.defeat - (a.victory + a.defeat));
 })();
 
-const outcomeConfig = {
-	victory: { label: "Victoires", colors: { light: ["var(--chart-2)"], dark: ["var(--chart-2)"] } },
-	defeat: { label: "Défaites", colors: { light: ["var(--chart-5)"], dark: ["var(--chart-5)"] } },
-} satisfies ChartConfig;
-
 const curveRows = runs.map((run) => ({
 	seed: run.seed,
 	control: Math.round(run.control * 1000) / 10,
 	clean: Math.round((run.clean / 1_000_000) * 100) / 100,
 }));
 
-const curveConfig = {
-	control: { label: "Contrôle (%)", colors: { light: ["var(--chart-1)"], dark: ["var(--chart-1)"] } },
-	clean: { label: "Cash propre (M)", colors: { light: ["var(--chart-3)"], dark: ["var(--chart-3)"] } },
-} satisfies ChartConfig;
+const AXIS = { fontSize: 11, fill: "var(--muted-foreground)" } as const;
 
 export function Dashboard() {
 	return (
@@ -129,21 +128,17 @@ export function Dashboard() {
 					<CardDescription>Victoires et défaites selon le profil de ville</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<EvilBarChart
-						config={outcomeConfig}
-						data={archetypeRows}
-						xDataKey="archetype"
-						stackType="stacked"
-						className="h-[320px] w-full"
-					>
-						<EvilBarChart.Grid />
-						<EvilBarChart.XAxis dataKey="archetype" />
-						<EvilBarChart.YAxis />
-						<EvilBarChart.Tooltip />
-						<EvilBarChart.Legend />
-						<EvilBarChart.Bar dataKey="victory" />
-						<EvilBarChart.Bar dataKey="defeat" />
-					</EvilBarChart>
+					<ResponsiveContainer width="100%" height={320}>
+						<BarChart data={archetypeRows}>
+							<CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+							<XAxis dataKey="archetype" tick={AXIS} />
+							<YAxis tick={AXIS} allowDecimals={false} />
+							<Tooltip />
+							<Legend />
+							<Bar dataKey="victory" stackId="a" fill="var(--chart-2)" />
+							<Bar dataKey="defeat" stackId="a" fill="var(--chart-5)" />
+						</BarChart>
+					</ResponsiveContainer>
 				</CardContent>
 			</Card>
 
@@ -155,43 +150,18 @@ export function Dashboard() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<EvilComposedChart
-						config={curveConfig}
-						data={curveRows}
-						xDataKey="seed"
-						className="h-[340px] w-full"
-					>
-						<EvilComposedChart.Grid />
-						<EvilComposedChart.XAxis dataKey="seed" />
-						<EvilComposedChart.YAxis />
-						<EvilComposedChart.Tooltip />
-						<EvilComposedChart.Legend />
-						<EvilComposedChart.Bar dataKey="clean" />
-						<EvilComposedChart.Line dataKey="control" />
-					</EvilComposedChart>
-				</CardContent>
-			</Card>
-
-			<Card>
-				<CardHeader>
-					<CardTitle>Prototype — le jeu sur une vraie carte (IRIS Paris)</CardTitle>
-					<CardDescription>
-						Zones réelles colorées par faction et Contrôle simulés · fond muet, la couleur est
-						l'information
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<GameMapPrototype />
-				</CardContent>
-			</Card>
-
-			<Card>
-				<CardHeader>
-					<CardTitle>Mapcn — exemple de carte</CardTitle>
-					<CardDescription>Fond de carte CARTO par défaut (rues, labels)</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<MapExample />
+					<ResponsiveContainer width="100%" height={340}>
+						<ComposedChart data={curveRows}>
+							<CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+							<XAxis dataKey="seed" tick={AXIS} />
+							<YAxis yAxisId="left" tick={AXIS} />
+							<YAxis yAxisId="right" orientation="right" tick={AXIS} />
+							<Tooltip />
+							<Legend />
+							<Bar yAxisId="left" dataKey="clean" fill="var(--chart-3)" />
+							<Line yAxisId="right" dataKey="control" stroke="var(--chart-1)" dot={false} />
+						</ComposedChart>
+					</ResponsiveContainer>
 				</CardContent>
 			</Card>
 
@@ -199,7 +169,8 @@ export function Dashboard() {
 			<p className="text-muted-foreground text-xs">
 				Données : <code>data/sim.sqlite</code> → export <code>src/dashboard/sim-data.json</code>.
 				Généré le {new Date(meta.generatedAt).toLocaleString("fr-FR")}. Relancer avec{" "}
-				<code>bun run sim:bench</code>.
+				<code>bun run sim:bench</code>. La carte jouable (Paris IRIS) est dans le jeu :{" "}
+				<code>?map=paris</code>.
 			</p>
 		</main>
 	);

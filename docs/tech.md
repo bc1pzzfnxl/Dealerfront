@@ -1,7 +1,7 @@
 # Tech — Évolution du matos
 
 > Statut : **v1 (DealerFront)** — arbre de tech du cartel, 3 branches × 5 paliers.
-> S'inscrit dans le mode god view (4–6 factions, 256 quartiers, session 20–30 min).
+> S'inscrit dans le mode god view (6 factions, 992 quartiers, battle royale).
 
 ## Objectif
 

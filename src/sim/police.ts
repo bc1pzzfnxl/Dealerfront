@@ -15,11 +15,16 @@ export const POLICE = {
 	/** Décroissance passive de la Pression (par tick). */
 	baseDecay: 0.002,
 	/**
-	 * Plancher de domination : la Pression ne peut pas descendre sous
-	 * `excès × dominationFloor` (part de carte du leader au-delà d'une part juste).
-	 * La corruption achète un répit, **jamais l'immunité**.
+	 * Plancher de domination. En battle royale, le leader détient par nature une
+	 * part importante : on ne mesure plus l'excès contre `1/nb factions` mais
+	 * contre un **seuil de domination écrasante** (~80 % de la carte). En dessous,
+	 * aucune pression plancher ; au-dessus, la police s'acharne. Comme dominer
+	 * est nécessaire pour conclure, le seuil est haut : la police punit la
+	 * domination *totale*, pas l'avance.
 	 */
-	dominationFloor: 200,
+	dominationFloor: 250,
+	/** Part de carte au-delà de laquelle un leader est « écrasant ». */
+	dominationShare: 0.8,
 	/** Paliers. */
 	raidThreshold: 40,
 	multiThreshold: 70,

@@ -21,10 +21,9 @@ import {
 	NO_BUILDING,
 	ZONE_BUILDINGS,
 } from "./buildings";
-import { generateCity } from "./city";
-import { MODULES_H, MODULES_W, MODULE_SIZE, SIM_HZ } from "./constants";
-import { createFactions, FACTION_COUNT, type Faction } from "./factions";
+import { PARIS_MAP } from "./maps/paris";
 import { createRng, type Rng } from "./rng";
+import { createFactions, FACTION_COUNT, type Faction } from "./factions";
 import { HITMAN, TECH, TECH_BRANCHES, type TechBranch, techCost } from "./tech";
 import { CONTACT_NAMES, POLICE, policeTier, type PoliceState, type PoliceTier } from "./police";
 import {
@@ -34,8 +33,10 @@ import {
 	type Pact,
 	type PactOffer,
 } from "./diplomacy";
-import { createTerritory, NEUTRAL, neighborsOf, type Territory } from "./territory";
-import type { Archetype, CityGrid, ZoneType } from "./types";
+import { createTerritory, NEUTRAL, type Territory } from "./territory";
+import type { CityGrid, ZoneType } from "./types";
+
+const EMPTY_NEIGHBORS: readonly number[] = [];
 
 const NEUTRAL_GARRISON = 60;
 const CAPTURE_CONTROL = 30;
@@ -70,6 +71,62 @@ const AI_INTERVAL = 25;
 const MIN_COMMIT = 400;
 /** Raid : affaiblit un quartier adjacent sans le capturer. */
 const RAID = { costSale: 2500, costMembers: 800, control: 35, cooldownTicks: 300 } as const;
+/**
+ * Logistique : une vente doit être reliée à un labo (et une façade à une vente)
+ * par un chemin de quartiers possédés. Hors ligne, la capacité tombe au plancher.
+ */
+const SUPPLY_FLOOR = 0.35;
+/** Routes de convoi affichées par faction (logistique visible). */
+const MAX_CONVOY_ROUTES = 4;
+/** Interception : détourne la cargaison d'un convoi ennemi et coupe la ligne. */
+const INTERCEPT = {
+	costMembers: 500,
+	requiredArmement: 1,
+	stealRatio: 0.25,
+	disruptTicks: 250,
+	cooldownTicks: 300,
+} as const;
+/**
+ * Police locale : le « heat » d'un quartier monte avec le crime local et
+ * retombe ; les commissariats (zones police) patrouillent et le font baisser
+ * plus vite. Les raids visent les quartiers les plus chauds.
+ */
+const HEAT = {
+	capture: 30,
+	hitman: 20,
+	operation: 15,
+	vente: 0.15,
+	facade: 0.08,
+	decay: 0.08,
+	policeSuppress: 3,
+	max: 100,
+} as const;
+
+/** Convoi visible : trajet d'approvisionnement d'une faction. */
+export interface ConvoyRoute {
+	factionId: number;
+	from: number;
+	to: number;
+	kind: "produit" | "cash";
+}
+
+/** Choix offert par un événement (effet traçable appliqué immédiatement). */
+export interface EventChoice {
+	/** Libellé court affiché sur le bouton. */
+	label: string;
+	/** Description chiffrée de l'effet (infobulle). */
+	detail: string;
+}
+
+/** Événement à choix en attente (un seul à la fois, déterministe). */
+export interface PendingEvent {
+	id: string;
+	title: string;
+	body: string;
+	/** Couleur suggérée (info / gain / perte). */
+	kind: "info" | "gain" | "loss";
+	choices: [EventChoice, EventChoice];
+}
 
 const ZONE_DEFENSE: Record<ZoneType, number> = {
 	residential: 1.0,
@@ -82,19 +139,16 @@ const ZONE_DEFENSE: Record<ZoneType, number> = {
 	vacant: 0.5,
 };
 
-/** Fin de partie (docs/win-conditions.md). */
-const SESSION_TICKS = 15000; // 25 min à 10 Hz
-const VICTORY_CONTROL = 0.42;
-const CLEAN_GOAL = 500000;
-const BANKRUPT_TICKS = 300; // 30 s
-const OVERTIME_ENABLED = false;
-const OVERTIME_DROP_PER_MIN = 0.02;
+/** Battle royale : aucune limite de temps — on joue jusqu'à l'élimination. */
+const BANKRUPT_TICKS = 300; // 30 s sans trésorerie → défaite
+/** Encirclement : taille minimale d'un cluster pour capituler (évite la perte pingre). */
+const ENCIRCLE_MIN_SIZE = 8;
+/** Encirclement : le cluster doit peser au moins cette part de la faction pour capituler. */
+const ENCIRCLE_SHARE = 0.35;
 
 export interface WorldOptions {
-	/** Durée de session en ticks (défaut 25 min). */
-	timeLimitTicks?: number;
-	/** Overtime : le seuil de contrôle baisse après l'échéance. */
-	overtime?: boolean;
+	/** Carte jouée (défaut : Paris). */
+	map?: CityGrid;
 }
 
 export interface FactionSummary {
@@ -108,6 +162,16 @@ export interface FactionSummary {
 	eliminated: boolean;
 	score: number;
 	rank: number;
+}
+
+/** Briefing sérialisable (objectif + progression), réutilisable hors UI. */
+export interface Briefing {
+	map: string;
+	alive: number;
+	control: number;
+	clean: number;
+	rank: number;
+	done: boolean;
 }
 
 function emptyCounts(): Record<BuildingType, number> {
@@ -165,6 +229,8 @@ export type GameEvent =
 	| "build"
 	| "descent"
 	| "sabotage"
+	| "intercept"
+	| "event"
 	| "alert"
 	| "victory"
 	| "defeat";
@@ -199,11 +265,8 @@ export class World {
 	tick = 0;
 	outcome: Outcome = null;
 	endReason = "";
-	/** Durée de session en ticks (échéance). */
-	readonly timeLimitTicks: number;
 
 	private readonly rng: Rng;
-	private readonly overtime: boolean;
 	private brokeTicks = 0;
 	private readonly aiCooldowns: number[] = [];
 	/** Relations symétriques par paire (0–100). */
@@ -218,18 +281,37 @@ export class World {
 	private owned: number[] = [];
 	/** Bâtiments sabotés par faction (recalculé une fois par tick). */
 	private sabotaged: Array<Record<BuildingType, number>> = [];
+	/** Sommes locales pondérées par le profil du quartier (recalculées par tick). */
+	private recruitDemand: number[] = [];
+	private housingDemand: number[] = [];
+	private retailDemand: number[] = [];
+	private retailWeighted: number[] = [];
+	private launderWealth: number[] = [];
+	/** Part de la capacité reliée à une source (labo/vente) — logistique. */
+	private retailSupply: number[] = [];
+	private launderSupply: number[] = [];
+	/** Routes de convoi courantes (rendu). */
+	private convoys: ConvoyRoute[] = [];
+	/** Événement à choix en attente (un seul à la fois). */
+	private pending: PendingEvent | null = null;
+	/** Empreinte propriété+bâtiments : évite un BFS de logistique inutile. */
+	private supplySignature = -1;
+	/** Heat policier par quartier (0–100) : monte au crime, retombe. */
+	readonly heat: Float32Array;
+	/** Quartier sous surveillance (zone police ou voisine d'une zone police). */
+	private readonly policeZone: Uint8Array;
 
-	constructor(seed: number, archetype?: Archetype, options?: WorldOptions) {
-		this.city = generateCity(seed, archetype);
+	constructor(seed: number, options?: WorldOptions) {
+		this.city = options?.map ?? PARIS_MAP;
 		this.territory = createTerritory(this.city.modules.length);
+		this.heat = new Float32Array(this.city.modules.length);
+		this.policeZone = this.buildPoliceZone();
 		this.factions = createFactions(FACTION_COUNT, START_MEMBERS);
 		this.rng = createRng((seed ^ 0x9e3779b9) >>> 0);
-		this.timeLimitTicks = options?.timeLimitTicks ?? SESSION_TICKS;
-		this.overtime = options?.overtime ?? OVERTIME_ENABLED;
 		this.contactIndex = seed % CONTACT_NAMES.length;
 
 		this.territory.control.fill(NEUTRAL_GARRISON);
-		const spawns = this.spawnModules(this.factions.length);
+		const spawns = this.city.spawns.slice(0, this.factions.length);
 		// Spawn toujours constructible : on force une zone « bâtie » sur chaque spawn.
 		const modules = this.city.modules as ZoneType[];
 		spawns.forEach((module, index) => {
@@ -250,11 +332,46 @@ export class World {
 		this.counts = this.factions.map(() => emptyCounts());
 		this.sabotaged = this.factions.map(() => emptyCounts());
 		this.owned = this.factions.map(() => 0);
+		this.recruitDemand = this.factions.map(() => 0);
+		this.housingDemand = this.factions.map(() => 0);
+		this.retailDemand = this.factions.map(() => 0);
+		this.retailWeighted = this.factions.map(() => 0);
+		this.launderWealth = this.factions.map(() => 0);
+		this.retailSupply = this.factions.map(() => 1);
+		this.launderSupply = this.factions.map(() => 1);
 		this.recount();
 	}
 
 	get player(): Faction {
 		return this.factions[0]!;
+	}
+
+	/** Zones sous surveillance policière (poste ou quartier voisin d'un poste). */
+	private buildPoliceZone(): Uint8Array {
+		const count = this.city.zones.length;
+		const mask = new Uint8Array(count);
+		for (let i = 0; i < count; i += 1) {
+			if (this.city.zones[i] === "police") mask[i] = 1;
+		}
+		for (let i = 0; i < count; i += 1) {
+			if (mask[i]) continue;
+			for (const neighbor of this.neighbors(i)) {
+				if (this.city.zones[neighbor] === "police") {
+					mask[i] = 1;
+					break;
+				}
+			}
+		}
+		return mask;
+	}
+
+	/** Ajoute du heat policier local (plafonné). */
+	private addHeat(module: number, amount: number): void {
+		this.heat[module] = Math.min(HEAT.max, (this.heat[module] ?? 0) + amount);
+	}
+
+	heatAt(module: number): number {
+		return this.heat[module] ?? 0;
 	}
 
 	get contactName(): string {
@@ -305,18 +422,28 @@ export class World {
 
 	productionPerTick(factionId: number): number {
 		const faction = this.factions[factionId]!;
-		const owned = this.modulesOwned(factionId);
-		const housing =
-			this.buildingCount(factionId, "logement") * this.sabotageFactor(factionId, "logement");
+		const ownedDemand = this.recruitDemand[factionId] ?? 0;
+		const housingDemand =
+			(this.housingDemand[factionId] ?? 0) * this.sabotageFactor(factionId, "logement");
 		const max = this.maxMembers(factionId);
 		if (faction.members >= max) return 0;
 		const logistique = 1 + TECH.logistiqueProduction * faction.tech.logistique;
 		return (
-			(BUILDING_EFFECTS.baseMembersPerQuarter * owned +
-				BUILDING_EFFECTS.membersPerLogement * housing) *
+			(BUILDING_EFFECTS.baseMembersPerQuarter * ownedDemand +
+				BUILDING_EFFECTS.membersPerLogement * housingDemand) *
 			(1 - faction.members / max) *
 			logistique
 		);
+	}
+
+	/** Demande locale d'un quartier (clientele) — voir docs/economy.md §marché local. */
+	demandAt(module: number): number {
+		return this.city.demand[module] ?? 1;
+	}
+
+	/** Richesse locale d'un quartier (prix, blanchiment). */
+	wealthAt(module: number): number {
+		return this.city.wealth[module] ?? 1;
 	}
 
 	attackBonus(factionId: number): number {
@@ -346,9 +473,21 @@ export class World {
 		const level = faction.tech[branch];
 		faction.cashPropre -= techCost(level + 1);
 		faction.tech[branch] = level + 1;
+		if (factionId === this.player.id) {
+			const anchor = this.playerAnchor();
+			if (anchor >= 0) this.float(anchor, `🔧 ${branch} ${level + 1}`, "gain");
+		}
 		this.pushLog(`Tech ${branch} → ${level + 1}`);
 		if (factionId === this.player.id) this.events.push("tech");
 		return true;
+	}
+
+	/** Quartier du joueur servant d'ancre aux retours (tech, corruption). */
+	private playerAnchor(): number {
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (this.territory.owner[i] === this.player.id) return i;
+		}
+		return -1;
 	}
 
 	playerUpgradeTech(branch: TechBranch): boolean {
@@ -388,7 +527,7 @@ export class World {
 	}
 
 	private applyHitman(factionId: number, module: number): void {
-		const targets = [module, ...neighborsOf(module)];
+		const targets = [module, ...this.neighbors(module)];
 		for (const target of targets) {
 			const owner = this.territory.owner[target];
 			if (owner === factionId || owner === NEUTRAL) continue;
@@ -406,6 +545,7 @@ export class World {
 				this.recount();
 			}
 			this.cancelConstruction(target);
+			this.addHeat(target, HEAT.hitman);
 		}
 	}
 
@@ -454,6 +594,7 @@ export class World {
 		const faction = this.factions[factionId]!;
 		faction.cashPropre -= this.corruptionCost(factionId);
 		faction.corruptionUses += 1;
+		this.coolFaction(factionId);
 		if (this.rng() < POLICE.corruptionBurnChance) {
 			this.police.pressure = Math.min(
 				POLICE.max,
@@ -466,6 +607,10 @@ export class World {
 		}
 		this.police.pressure = Math.max(0, this.police.pressure - POLICE.corruptionReduction);
 		this.police.window = POLICE.corruptionWindow;
+		if (faction.isPlayer) {
+			const anchor = this.playerAnchor();
+			if (anchor >= 0) this.float(anchor, "🤝 −Pression", "gain");
+		}
 		this.pushLog(`${this.contactName} fait baisser la Pression (${faction.name})`);
 		if (faction.isPlayer) this.events.push("corrupt");
 		return true;
@@ -473,6 +618,13 @@ export class World {
 
 	playerCorrupt(): boolean {
 		return this.corruptPolice(this.player.id);
+	}
+
+	/** Un contact corrompu refroidit les quartiers d'une faction (heat ÷2). */
+	private coolFaction(factionId: number): void {
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (this.territory.owner[i] === factionId) this.heat[i] = (this.heat[i] ?? 0) * 0.5;
+		}
 	}
 
 	relationBetween(a: number, b: number): number {
@@ -710,6 +862,19 @@ export class World {
 		}
 	}
 
+	/** Police locale : le crime chauffe les quartiers, la patrouille les refroidit. */
+	private updateHeat(): void {
+		const count = this.territory.count;
+		for (let i = 0; i < count; i += 1) {
+			let value = this.heat[i]!;
+			const building = this.territory.building[i]!;
+			if (building === BUILDING_INDEX.vente) value += HEAT.vente * (this.city.demand[i] ?? 1);
+			else if (building === BUILDING_INDEX.facade) value += HEAT.facade * (this.city.wealth[i] ?? 1);
+			const decay = HEAT.decay * (this.policeZone[i] ? HEAT.policeSuppress : 1);
+			this.heat[i] = Math.max(0, Math.min(HEAT.max, value - decay));
+		}
+	}
+
 	private updatePolice(): void {
 		const state = this.police;
 		if (state.cooldown > 0) state.cooldown -= 1;
@@ -719,8 +884,8 @@ export class World {
 		state.target = leader;
 		const modules = this.city.modules.length;
 		const leaderShare = leader >= 0 ? (this.owned[leader] ?? 0) / modules : 0;
-		const fair = 1 / this.factions.length;
-		const excess = Math.max(0, leaderShare - fair);
+		// Battle royale : on ne punit pas la simple avance, seulement la domination écrasante.
+		const excess = Math.max(0, leaderShare - POLICE.dominationShare);
 
 		let delta =
 			POLICE.excessWeight * excess + POLICE.crimeWeight * state.crime - POLICE.baseDecay;
@@ -739,13 +904,13 @@ export class World {
 		}
 	}
 
-	private highestControlModules(factionId: number, count: number): number[] {
+	private highestHeatModules(factionId: number, count: number): number[] {
 		const owned: number[] = [];
 		for (let i = 0; i < this.territory.count; i += 1) {
 			if (this.territory.owner[i] === factionId) owned.push(i);
 		}
 		owned.sort((a, b) => {
-			const diff = this.territory.control[b]! - this.territory.control[a]!;
+			const diff = this.heat[b]! - this.heat[a]!;
 			return diff !== 0 ? diff : a - b;
 		});
 		return owned.slice(0, count);
@@ -755,7 +920,7 @@ export class World {
 	private policeRaid(leader: number): void {
 		const state = this.police;
 		const multiple = state.pressure >= POLICE.multiThreshold;
-		const targets = this.highestControlModules(
+		const targets = this.highestHeatModules(
 			leader,
 			multiple ? POLICE.raidsMulti : POLICE.raidsSingle,
 		);
@@ -806,7 +971,7 @@ export class World {
 
 	canAttack(factionId: number, module: number): boolean {
 		if (this.territory.owner[module] === factionId) return false;
-		return neighborsOf(module).some((neighbor) => this.territory.owner[neighbor] === factionId);
+		return this.neighbors(module).some((neighbor) => this.territory.owner[neighbor] === factionId);
 	}
 
 	playerAttack(module: number): boolean {
@@ -853,6 +1018,7 @@ export class World {
 		if (!this.playerCanBuild(module, type)) return false;
 		const conversion = this.isConversion(module);
 		this.startBuild(this.player.id, module, type);
+		this.float(module, `🏗 ${BUILDINGS[type].label}`, "info");
 		this.pushLog(
 			conversion
 				? `${BUILDINGS[type].label} aménagé (module ${module})`
@@ -898,6 +1064,7 @@ export class World {
 		);
 		this.territory.building[module] = NO_BUILDING;
 		this.cancelConstruction(module);
+		this.addHeat(module, HEAT.operation);
 		this.recount();
 		this.events.push("hitman");
 		this.float(module, `raid −${RAID.control}`, "loss");
@@ -933,7 +1100,7 @@ export class World {
 		) {
 			guards += 1;
 		}
-		for (const neighbor of neighborsOf(module)) {
+		for (const neighbor of this.neighbors(module)) {
 			if (
 				this.territory.owner[neighbor] === owner &&
 				this.territory.building[neighbor] === BUILDING_INDEX.contre
@@ -977,6 +1144,7 @@ export class World {
 			return true;
 		}
 		const gained = this.loot(this.player.id, owner, type, guards >= 1 ? LOOT_RATIO * 0.5 : LOOT_RATIO);
+		this.addHeat(module, HEAT.operation);
 		this.events.push("descent");
 		this.float(
 			module,
@@ -1019,10 +1187,163 @@ export class World {
 			return true;
 		}
 		this.territory.sabotageUntil[module] = this.tick + SABOTAGE.duration;
+		this.addHeat(module, HEAT.operation);
 		this.events.push("sabotage");
 		this.float(module, "saboté −50 %", "loss");
 		this.pushLog(`Sabotage (module ${module})`);
 		return true;
+	}
+
+	/** Convoi visant ce quartier (cible d'une interception), s'il existe. */
+	private convoyTo(module: number): ConvoyRoute | undefined {
+		return this.convoys.find((route) => route.to === module);
+	}
+
+	interceptCost(): number {
+		return INTERCEPT.costMembers;
+	}
+
+	playerCanIntercept(module: number): boolean {
+		if (this.outcome !== null) return false;
+		const owner = this.ownerAt(module);
+		if (owner === NEUTRAL || owner === this.player.id) return false;
+		if (!this.canAttack(this.player.id, module)) return false;
+		if (!this.convoyTo(module)) return false;
+		if (this.player.tech.armement < INTERCEPT.requiredArmement) return false;
+		if (this.player.hitmanCooldown > 0) return false;
+		return this.player.members >= INTERCEPT.costMembers;
+	}
+
+	/** Interception : détourne la cargaison d'un convoi et coupe la ligne. */
+	playerIntercept(module: number): boolean {
+		if (!this.playerCanIntercept(module)) return false;
+		const route = this.convoyTo(module)!;
+		const victim = this.factions[route.factionId]!;
+		this.player.members -= INTERCEPT.costMembers;
+		this.player.hitmanCooldown = INTERCEPT.cooldownTicks;
+		const gained = this.stealCargo(this.player, victim, route.kind);
+		this.territory.sabotageUntil[module] = this.tick + INTERCEPT.disruptTicks;
+		this.addHeat(module, HEAT.operation);
+		this.events.push("intercept");
+		this.float(module, `interception +${Math.round(gained)}`, "gain");
+		this.pushLog(`Convoi intercepté (module ${module})`);
+		return true;
+	}
+
+	/** Détourne une part de la cargaison du convoi (produit ou cash sale). */
+	private stealCargo(thief: Faction, victim: Faction, kind: ConvoyRoute["kind"]): number {
+		if (kind === "produit") {
+			const amount = victim.produit * INTERCEPT.stealRatio;
+			victim.produit -= amount;
+			thief.produit += amount;
+			return amount;
+		}
+		const amount = victim.cashSale * INTERCEPT.stealRatio;
+		victim.cashSale -= amount;
+		thief.cashSale += amount;
+		return amount;
+	}
+
+	/** Événement à choix en attente pour le joueur (un seul à la fois). */
+	pendingEvent(): PendingEvent | null {
+		return this.pending;
+	}
+
+	/** Force un événement (tests / scénarios) — n'affecte pas la simulation normale. */
+	debugSetEvent(event: PendingEvent | null): void {
+		this.pending = event;
+	}
+
+	/**
+	 * Résout l'événement courant. Les deux choix ont un coût et un bénéfice réels,
+	 * **aucun n'est scripté bon/mauvais** (docs/npc-events.md).
+	 */
+	playerChoose(choice: 0 | 1): boolean {
+		const event = this.pending;
+		if (!event || this.outcome !== null) return false;
+		const player = this.player;
+		const anchor = this.playerAnchor();
+		if (event.id === "livraison") {
+			if (choice === 0) {
+				player.cashSale += 8000;
+				if (anchor >= 0) {
+					this.addHeat(anchor, HEAT.operation * 3);
+					this.float(anchor, "+8 000 sale", "gain");
+				}
+				this.pushLog("Livraison acceptée : +8 000 sale, heat en hausse");
+			} else {
+				player.cashPropre += 4000;
+				this.pushLog("Livraison refusée : +4 000 propre");
+			}
+		} else if (event.id === "indicateur") {
+			if (choice === 0) {
+				player.cashSale = Math.max(0, player.cashSale - 6000);
+				this.police.pressure = Math.max(0, this.police.pressure - 12);
+				this.pushLog("Indicateur acheté : −12 Pression (−6 000 sale)");
+			} else {
+				player.cashSale += 3000;
+				player.cashPropre += 3000;
+				this.police.pressure = Math.min(POLICE.max, this.police.pressure + 8);
+				if (anchor >= 0) this.addHeat(anchor, HEAT.operation * 4);
+				this.pushLog("Indicateur réduit au silence : +6 000, Pression +8");
+			}
+		} else if (event.id === "facade") {
+			if (choice === 0) {
+				if (anchor >= 0 && this.territory.building[anchor] === NO_BUILDING) {
+					this.territory.building[anchor] = BUILDING_INDEX.facade;
+					this.territory.builtAt[anchor] = this.tick;
+					this.recount();
+					this.float(anchor, "🏛 Façade offerte", "gain");
+				}
+				this.pushLog("Façade concurrente rachetée");
+			} else {
+				player.cashSale += 5000;
+				this.pushLog("Façade revendue : +5 000 sale");
+			}
+		}
+		this.events.push("event");
+		this.pending = null;
+		return true;
+	}
+
+	/** Tire un événement à choix (déterministe, un seul à la fois, ~toutes les 2 min). */
+	private maybeTriggerEvent(): void {
+		if (this.pending || this.outcome !== null) return;
+		if (this.tick < 600 || this.tick % 1200 !== 0) return;
+		if (this.rng() >= 0.5) return;
+		const pool: PendingEvent[] = [
+			{
+				id: "livraison",
+				title: "Livraison risquée",
+				body: "Un fournisseur propose une cargaison hors circuit : paiement immédiat, mais la police rôde.",
+				kind: "info",
+				choices: [
+					{ label: "Accepter", detail: "+8 000 sale · heat en hausse" },
+					{ label: "Refuser", detail: "+4 000 propre" },
+				],
+			},
+			{
+				id: "indicateur",
+				title: "Un indicateur parle",
+				body: "Quelqu'un vous a dénoncé. Il peut être acheté… ou réduit au silence.",
+				kind: "loss",
+				choices: [
+					{ label: "Acheter", detail: "−6 000 sale · −12 Pression" },
+					{ label: "Faire taire", detail: "+6 000 · Pression +8" },
+				],
+			},
+			{
+				id: "facade",
+				title: "Façade concurrente",
+				body: "Une façade bien placée se libère dans un de vos quartiers.",
+				kind: "gain",
+				choices: [
+					{ label: "Racheter", detail: "Façade aménagée gratuitement" },
+					{ label: "Revendre", detail: "+5 000 sale" },
+				],
+			},
+		];
+		this.pending = pool[Math.floor(this.rng() * pool.length)]!;
 	}
 
 	/** Facteur de production d'une faction (bâtiments sabotés = moitié). */
@@ -1312,7 +1633,7 @@ export class World {
 		// Origine = quartier possédé adjacent au contrôle le plus élevé.
 		let source = -1;
 		let best = -1;
-		for (const neighbor of neighborsOf(module)) {
+		for (const neighbor of this.neighbors(module)) {
 			if (this.territory.owner[neighbor] !== factionId) continue;
 			const control = this.territory.control[neighbor]!;
 			if (control > best) {
@@ -1333,7 +1654,7 @@ export class World {
 		// Guetteur : un Contre-espionnage adjacent à la cible alerte le défenseur joueur.
 		const defender = this.territory.owner[module];
 		if (defender === this.player.id && factionId !== this.player.id) {
-			const lookout = neighborsOf(module).some(
+			const lookout = this.neighbors(module).some(
 				(neighbor) =>
 					this.territory.owner[neighbor] === defender &&
 					this.territory.building[neighbor] === BUILDING_INDEX.contre,
@@ -1361,13 +1682,16 @@ export class World {
 		this.advanceConstruction();
 		this.processBuildQueues();
 		this.resolveAttacks();
+		this.resolveEncirclements();
 		this.updateDiplomacyTimers();
 		this.think();
 		for (let i = this.floaters.length - 1; i >= 0; i -= 1) {
 			if (this.floaters[i]!.until <= this.tick) this.floaters.splice(i, 1);
 		}
 		this.updateTreasury();
+		this.updateHeat();
 		this.updatePolice();
+		this.maybeTriggerEvent();
 		this.checkOutcome();
 		if (this.outcome !== null && !this.outcomeRecorded) {
 			this.outcomeRecorded = true;
@@ -1389,25 +1713,29 @@ export class World {
 		}
 	}
 
-	/** Points de vente : Produit → Cash sale. */
+	/** Points de vente : Produit → Cash sale, au prix du quartier (richesse locale). */
 	private sell(): void {
 		for (const faction of this.factions) {
-			const ventes =
-				this.buildingCount(faction.id, "vente") * this.sabotageFactor(faction.id, "vente");
+			const demand = this.retailDemand[faction.id] ?? 0;
+			const supply = SUPPLY_FLOOR + (1 - SUPPLY_FLOOR) * (this.retailSupply[faction.id] ?? 1);
+			const ventes = demand * supply * this.sabotageFactor(faction.id, "vente");
 			if (ventes === 0 || faction.produit <= 0) continue;
 			const capacity = ventes * BUILDING_EFFECTS.produitPerVente;
 			const sold = Math.min(faction.produit, capacity);
 			faction.produit -= sold;
+			const avgWealth = demand > 0 ? (this.retailWeighted[faction.id] ?? 0) / demand : 1;
 			const embargo = this.isEmbargoed(faction.id) ? 1 - EMBARGO.salePenalty : 1;
-			faction.cashSale += sold * BUILDING_EFFECTS.pricePerProduit * embargo;
+			faction.cashSale += sold * BUILDING_EFFECTS.pricePerProduit * avgWealth * embargo;
 		}
 	}
 
-	/** Façades : Cash sale → Cash propre (commission). */
+	/** Façades : Cash sale → Cash propre (capacité ∝ richesse locale). */
 	private launder(): void {
 		for (const faction of this.factions) {
 			const facades =
-				this.buildingCount(faction.id, "facade") * this.sabotageFactor(faction.id, "facade");
+				(this.launderWealth[faction.id] ?? 0) *
+				(SUPPLY_FLOOR + (1 - SUPPLY_FLOOR) * (this.launderSupply[faction.id] ?? 1)) *
+				this.sabotageFactor(faction.id, "facade");
 			if (facades === 0 || faction.cashSale <= 0 || faction.launderRatio <= 0) continue;
 			const capacity = facades * BUILDING_EFFECTS.cashPerFacade * faction.launderRatio;
 			const laundered = Math.min(faction.cashSale, capacity);
@@ -1430,6 +1758,79 @@ export class World {
 				this.territory.control[i]! + CONTROL_REGEN * logistique,
 			);
 		}
+	}
+
+	/**
+	 * Encirclement (idée OpenFront) : un ensemble connexe de quartiers d'une même
+	 * faction sans aucune frontière avec du neutre ou une autre faction est
+	 * **capitulé** d'un coup au profit de son encercleur. Récompense la manœuvre
+	 * et évite les fins de partie interminables. Déterministe, seuil de taille.
+	 */
+	private resolveEncirclements(): void {
+		if (this.tick % 5 !== 0) return;
+		const count = this.territory.count;
+		const assigned = new Uint8Array(count);
+		let changed = false;
+		for (let start = 0; start < count; start += 1) {
+			const owner = this.territory.owner[start]!;
+			if (owner === NEUTRAL || assigned[start]) continue;
+			// Composante connexe de même propriétaire.
+			const cluster: number[] = [start];
+			assigned[start] = 1;
+			let encircler = -1;
+			let closed = true;
+			for (let head = 0; head < cluster.length; head += 1) {
+				const module = cluster[head]!;
+				for (const neighbor of this.neighbors(module)) {
+					const other = this.territory.owner[neighbor]!;
+					if (other === owner) {
+						if (!assigned[neighbor]) {
+							assigned[neighbor] = 1;
+							cluster.push(neighbor);
+						}
+						continue;
+					}
+					if (other === NEUTRAL) {
+						closed = false;
+					} else if (encircler === -1) {
+						encircler = other;
+					} else if (encircler !== other) {
+						closed = false;
+					}
+				}
+			}
+			if (!closed || encircler < 0 || encircler === owner) continue;
+			// Seuls les clusters significatifs capitulent : évite le grignotage gratuit
+			// et laisse une faction réduite se battre (sa perte serait sinon arbitraire).
+			const factionOwned = this.owned[owner] ?? 0;
+			if (cluster.length < ENCIRCLE_MIN_SIZE) continue;
+			if (factionOwned > 0 && cluster.length < factionOwned * ENCIRCLE_SHARE) continue;
+			// L'encercleur doit être le plus gros : un empire quasi complet ne tombe
+			// pas au contact d'une poche minuscule.
+			if (cluster.length >= (this.owned[encircler] ?? 0)) continue;
+			const victim = this.factions[owner]!;
+			const taker = this.factions[encircler]!;
+			for (const module of cluster) {
+				this.territory.owner[module] = encircler;
+				this.territory.control[module] = CAPTURE_CONTROL;
+				this.territory.building[module] = NO_BUILDING;
+				this.territory.capturedAt[module] = this.tick;
+				this.cancelConstruction(module);
+			}
+			victim.quartersLost += cluster.length;
+			taker.captures += cluster.length;
+			this.addHeat(cluster[0]!, HEAT.capture);
+			if (owner === this.player.id) {
+				this.events.push("lost");
+				this.float(cluster[0]!, `encerclé −${cluster.length}`, "loss");
+			} else if (encircler === this.player.id) {
+				this.events.push("capture");
+				this.float(cluster[0]!, `encerclement +${cluster.length}`, "gain");
+			}
+			this.pushLog(`${taker.name} encercle ${victim.name} (${cluster.length})`);
+			changed = true;
+		}
+		if (changed) this.recount();
 	}
 
 	private resolveAttacks(): void {
@@ -1467,6 +1868,7 @@ export class World {
 				this.territory.building[attack.target] = NO_BUILDING;
 				this.territory.capturedAt[attack.target] = this.tick;
 				this.cancelConstruction(attack.target);
+				this.addHeat(attack.target, HEAT.capture);
 				this.attacks.splice(index, 1);
 				this.recount();
 				const attacker = this.factions[attack.factionId]!;
@@ -1538,6 +1940,8 @@ export class World {
 			}
 			// Opérations (descente/sabotage) : armement requis, donc investissement tech.
 			if (this.rng() < 0.3 && this.aiOperate(i)) continue;
+			// Interception d'un convoi adverse frontalier.
+			if (this.rng() < 0.2 && this.aiIntercept(i)) continue;
 			// Tueur à gage occasionnel sur un quartier ennemi frontalier.
 			if (this.rng() < 0.25 && this.aiHitman(i)) continue;
 			// Concentration de force : on renforce l'assaut en cours avant d'ouvrir un front.
@@ -1639,6 +2043,7 @@ export class World {
 				faction.cashSale -= SABOTAGE.costSale;
 				faction.hitmanCooldown = SABOTAGE.cooldownTicks;
 				this.territory.sabotageUntil[i] = this.tick + SABOTAGE.duration;
+				this.addHeat(i, HEAT.operation);
 				if (owner === this.player.id) {
 					this.events.push("sabotage");
 					this.float(i, "saboté −50 %", "loss");
@@ -1655,6 +2060,7 @@ export class World {
 				faction.members -= DESCENT.costMembers;
 				faction.hitmanCooldown = DESCENT.cooldownTicks;
 				this.loot(factionId, owner, type);
+				this.addHeat(i, HEAT.operation);
 				if (owner === this.player.id) {
 					this.events.push("descent");
 					this.float(i, "descente ennemie", "loss");
@@ -1662,6 +2068,34 @@ export class World {
 				}
 				return true;
 			}
+		}
+		return false;
+	}
+
+	/** Interception IA : détourne un convoi adverse frontalier. */
+	private aiIntercept(factionId: number): boolean {
+		const faction = this.factions[factionId]!;
+		if (faction.hitmanCooldown > 0) return false;
+		if (faction.tech.armement < INTERCEPT.requiredArmement) return false;
+		if (faction.members < INTERCEPT.costMembers) return false;
+		for (let i = 0; i < this.territory.count; i += 1) {
+			const owner = this.territory.owner[i]!;
+			if (owner === NEUTRAL || owner === factionId) continue;
+			if (!this.canAttack(factionId, i)) continue;
+			const route = this.convoyTo(i);
+			if (!route) continue;
+			const victim = this.factions[route.factionId]!;
+			faction.members -= INTERCEPT.costMembers;
+			faction.hitmanCooldown = INTERCEPT.cooldownTicks;
+			this.stealCargo(faction, victim, route.kind);
+			this.territory.sabotageUntil[i] = this.tick + INTERCEPT.disruptTicks;
+			this.addHeat(i, HEAT.operation);
+			if (owner === this.player.id) {
+				this.events.push("intercept");
+				this.float(i, "convoi intercepté", "loss");
+				this.pushLog(`Convoi intercepté (module ${i})`);
+			}
+			return true;
 		}
 		return false;
 	}
@@ -1676,10 +2110,24 @@ export class World {
 				: 0;
 		const focusLeader = focusChance > 0 && this.rng() < focusChance;
 
+		// Battle royale : on achève les faibles pour qu'une partie se conclue.
+		let weakest = -1;
+		let weakestOwned = Number.POSITIVE_INFINITY;
+		for (const faction of this.factions) {
+			if (faction.id === factionId || faction.id === leader) continue;
+			const owned = this.modulesOwned(faction.id);
+			if (owned > 0 && owned < weakestOwned) {
+				weakestOwned = owned;
+				weakest = faction.id;
+			}
+		}
+
 		let best: number | null = null;
 		let bestScore = Number.POSITIVE_INFINITY;
 		let bestLeader: number | null = null;
 		let bestLeaderScore = Number.POSITIVE_INFINITY;
+		let bestWeak: number | null = null;
+		let bestWeakScore = Number.POSITIVE_INFINITY;
 		for (let i = 0; i < this.territory.count; i += 1) {
 			if (!this.canAttack(factionId, i)) continue;
 			const owner = this.territory.owner[i]!;
@@ -1693,8 +2141,14 @@ export class World {
 				bestLeaderScore = score;
 				bestLeader = i;
 			}
+			if (owner === weakest && score < bestWeakScore) {
+				bestWeakScore = score;
+				bestWeak = i;
+			}
 		}
 		if (focusLeader && bestLeader !== null) return bestLeader;
+		// Priorité à l'élimination : on achève le rival le plus faible s'il est à portée.
+		if (bestWeak !== null && this.rng() < 0.6) return bestWeak;
 		return best;
 	}
 
@@ -1719,16 +2173,31 @@ export class World {
 			c.atelier = 0;
 			c.contre = 0;
 			this.owned[f] = 0;
+			this.recruitDemand[f] = 0;
+			this.housingDemand[f] = 0;
+			this.retailDemand[f] = 0;
+			this.retailWeighted[f] = 0;
+			this.launderWealth[f] = 0;
 		}
 		for (let i = 0; i < this.territory.count; i += 1) {
 			const owner = this.territory.owner[i]!;
 			if (owner === NEUTRAL) continue;
 			this.owned[owner] = (this.owned[owner] ?? 0) + 1;
+			// Marché local : demande (clientele) et richesse (prix) du quartier.
+			const demand = this.city.demand[i] ?? 1;
+			const wealth = this.city.wealth[i] ?? 1;
+			this.recruitDemand[owner] = (this.recruitDemand[owner] ?? 0) + demand;
 			const buildIndex = this.territory.building[i]!;
 			if (buildIndex === NO_BUILDING) continue;
 			const type = BUILDING_TYPES[buildIndex];
 			if (!type) continue;
 			this.counts[owner]![type] += 1;
+			if (type === "logement") this.housingDemand[owner] = (this.housingDemand[owner] ?? 0) + demand;
+			if (type === "vente") {
+				this.retailDemand[owner] = (this.retailDemand[owner] ?? 0) + demand;
+				this.retailWeighted[owner] = (this.retailWeighted[owner] ?? 0) + demand * wealth;
+			}
+			if (type === "facade") this.launderWealth[owner] = (this.launderWealth[owner] ?? 0) + wealth;
 			if (this.territory.sabotageUntil[i]! > this.tick) this.sabotaged[owner]![type] += 1;
 		}
 		for (const faction of this.factions) {
@@ -1744,58 +2213,129 @@ export class World {
 				c.atelier +
 				c.contre;
 		}
+		this.updateSupply();
 	}
 
-	/** Seuil de contrôle requis (baisse en overtime après l'échéance). */
-	victoryControlThreshold(): number {
-		if (!this.overtime || this.tick <= this.timeLimitTicks) return VICTORY_CONTROL;
-		const minutes = Math.floor((this.tick - this.timeLimitTicks) / (SIM_HZ * 60));
-		return Math.max(0.2, VICTORY_CONTROL - OVERTIME_DROP_PER_MIN * minutes);
+	/** Parcours en largeur des quartiers possédés depuis les bâtiments `sourceType`. */
+	private reachableFrom(
+		factionId: number,
+		sourceType: number,
+	): { reached: Uint8Array; origin: Int32Array } {
+		const count = this.territory.count;
+		const reached = new Uint8Array(count);
+		const origin = new Int32Array(count).fill(-1);
+		const queue: number[] = [];
+		for (let i = 0; i < count; i += 1) {
+			if (this.territory.owner[i] === factionId && this.territory.building[i] === sourceType) {
+				reached[i] = 1;
+				origin[i] = i;
+				queue.push(i);
+			}
+		}
+		for (let head = 0; head < queue.length; head += 1) {
+			const module = queue[head]!;
+			for (const neighbor of this.neighbors(module)) {
+				if (this.territory.owner[neighbor] !== factionId || reached[neighbor]) continue;
+				reached[neighbor] = 1;
+				origin[neighbor] = origin[module]!;
+				queue.push(neighbor);
+			}
+		}
+		return { reached, origin };
 	}
 
-	cleanGoal(): number {
-		return CLEAN_GOAL;
+	/** Lignes d'approvisionnement : labo → vente → façade, par quartiers possédés. */
+	private updateSupply(): void {
+		const count = this.territory.count;
+		// La topologie ne change qu'aux captures/aménagements : on saute le BFS sinon.
+		let signature = 2166136261;
+		for (let i = 0; i < count; i += 1) {
+			signature = Math.imul(signature ^ (this.territory.owner[i]! + 7), 16777619);
+			signature = Math.imul(signature ^ (this.territory.building[i]! + 13), 16777619);
+		}
+		signature >>>= 0;
+		if (signature === this.supplySignature) return;
+		this.supplySignature = signature;
+
+		this.convoys = [];
+		for (const faction of this.factions) {
+			const id = faction.id;
+			const labo = this.reachableFrom(id, BUILDING_INDEX.labo);
+			const vente = this.reachableFrom(id, BUILDING_INDEX.vente);
+			let totalDemand = 0;
+			let suppliedDemand = 0;
+			let totalWealth = 0;
+			let suppliedWealth = 0;
+			let routes = 0;
+			for (let i = 0; i < count; i += 1) {
+				if (this.territory.owner[i] !== id) continue;
+				const building = this.territory.building[i]!;
+				const demand = this.city.demand[i] ?? 1;
+				const wealth = this.city.wealth[i] ?? 1;
+				if (building === BUILDING_INDEX.vente) {
+					totalDemand += demand;
+					if (labo.reached[i]) suppliedDemand += demand;
+				} else if (building === BUILDING_INDEX.facade) {
+					totalWealth += wealth;
+					if (vente.reached[i]) suppliedWealth += wealth;
+				}
+				if (routes >= MAX_CONVOY_ROUTES) continue;
+				if (building === BUILDING_INDEX.vente && labo.origin[i]! >= 0 && labo.origin[i] !== i) {
+					this.convoys.push({ factionId: id, from: labo.origin[i]!, to: i, kind: "produit" });
+					routes += 1;
+				} else if (
+					building === BUILDING_INDEX.facade &&
+					vente.origin[i]! >= 0 &&
+					vente.origin[i] !== i
+				) {
+					this.convoys.push({ factionId: id, from: vente.origin[i]!, to: i, kind: "cash" });
+					routes += 1;
+				}
+			}
+			this.retailSupply[id] = totalDemand > 0 ? suppliedDemand / totalDemand : 1;
+			this.launderSupply[id] = totalWealth > 0 ? suppliedWealth / totalWealth : 1;
+		}
 	}
 
-	/** Ticks restants avant l'échéance (peut être négatif en overtime). */
-	ticksLeft(): number {
-		return this.timeLimitTicks - this.tick;
+	/** Convois en cours (logistique visible). */
+	convoyRoutes(): readonly ConvoyRoute[] {
+		return this.convoys;
+	}
+
+	/** Part de la vente reliée à un labo (0–1). */
+	retailSupplyRatio(factionId: number): number {
+		return this.retailSupply[factionId] ?? 1;
+	}
+
+	/** Nombre de factions encore en jeu (≥ 1 quartier). */
+	aliveCount(): number {
+		let alive = 0;
+		for (const faction of this.factions) {
+			if ((this.owned[faction.id] ?? 0) > 0) alive += 1;
+		}
+		return alive;
 	}
 
 	/**
-	 * Score composite (docs/scoring.md) : base = Cash propre, bonus contrôle /
-	 * diversité / discrétion, malus saisies, quartiers perdus et éliminations.
+	 * Puissance d'une faction (classement du battle royale) :
+	 * quartiers d'abord, puis Membres, puis Cash propre — départage déterministe.
 	 */
 	score(factionId: number): number {
-		if (this.modulesOwned(factionId) === 0) return 0;
 		const faction = this.factions[factionId]!;
-		const control = this.controlRatio(factionId);
-		const bControle = 0.3 * Math.min(1, control / VICTORY_CONTROL);
-		let types = 0;
-		for (const type of BUILDING_TYPES) {
-			if (this.buildingCount(factionId, type) > 0) types += 1;
-		}
-		const bDiversite = 0.1 * (types / BUILDING_TYPES.length);
-		const bDiscretion = 0.2 * (1 - this.police.pressure / 100);
-		const violence = 1 - Math.min(0.5, 0.15 * faction.eliminations);
-		const penalties = faction.seizures * 50000 + faction.quartersLost * 5000;
-		return Math.max(
-			0,
-			faction.cashPropre * (1 + bControle + bDiversite + bDiscretion) * violence - penalties,
-		);
+		return this.modulesOwned(factionId) * 1e6 + faction.members + faction.cashPropre * 1e-3;
 	}
 
-	/** Classement déterministe par score (départages : cash, contrôle, id). */
-	private rankings(): number[] {
+	/** Classement déterministe par puissance (quartiers, membres, cash, id). */
+	rankings(): number[] {
 		return this.factions
 			.map((faction) => faction.id)
 			.sort((a, b) => {
-				const byScore = this.score(b) - this.score(a);
-				if (byScore !== 0) return byScore;
+				const byQuarters = this.modulesOwned(b) - this.modulesOwned(a);
+				if (byQuarters !== 0) return byQuarters;
+				const byMembers = this.factions[b]!.members - this.factions[a]!.members;
+				if (byMembers !== 0) return byMembers;
 				const byCash = this.factions[b]!.cashPropre - this.factions[a]!.cashPropre;
 				if (byCash !== 0) return byCash;
-				const byControl = this.controlRatio(b) - this.controlRatio(a);
-				if (byControl !== 0) return byControl;
 				return a - b;
 			});
 	}
@@ -1817,6 +2357,22 @@ export class World {
 		};
 	}
 
+	/**
+	 * Briefing sérialisable d'une partie (graine de multi/replay) : objectif,
+	 * progression et rang. Aucune dépendance UI, transportable en JSON.
+	 */
+	briefing(factionId = this.player.id): Briefing {
+		const summary = this.summary(factionId);
+		return {
+			map: "paris",
+			alive: this.aliveCount(),
+			control: summary.control,
+			clean: summary.cashPropre,
+			rank: summary.rank,
+			done: this.outcome === "victory",
+		};
+	}
+
 	private updateTreasury(): void {
 		const player = this.player;
 		if (player.cashPropre <= 0 && player.cashSale <= 0) {
@@ -1826,48 +2382,22 @@ export class World {
 		}
 	}
 
+	/** Battle royale : victoire au dernier survivant, défaites causales. */
 	private checkOutcome(): void {
 		const playerModules = this.modulesOwned(this.player.id);
-		const threshold = this.victoryControlThreshold();
-		if (this.controlRatio(this.player.id) >= threshold && this.player.cashPropre >= CLEAN_GOAL) {
-			this.outcome = "victory";
-			this.endReason = `Contrôle ≥ ${Math.round(threshold * 100)} % et ${CLEAN_GOAL} de Cash propre.`;
-			return;
-		}
-		let aliveCount = 0;
-		let lastAlive = -1;
-		for (const faction of this.factions) {
-			if (this.modulesOwned(faction.id) > 0) {
-				aliveCount += 1;
-				lastAlive = faction.id;
-			}
-		}
-		if (aliveCount === 1 && lastAlive === this.player.id) {
-			this.outcome = "victory";
-			this.endReason = "Dernier cartel en jeu.";
-			return;
-		}
 		if (playerModules === 0) {
 			this.outcome = "defeat";
 			this.endReason = "Votre cartel a été éliminé.";
 			return;
 		}
+		if (this.aliveCount() === 1) {
+			this.outcome = "victory";
+			this.endReason = "Dernier cartel en jeu — la ville est à vous.";
+			return;
+		}
 		if (this.brokeTicks >= BANKRUPT_TICKS) {
 			this.outcome = "defeat";
 			this.endReason = "Faillite : trésorerie à zéro trop longtemps.";
-			return;
-		}
-		// Une défaite posée par la police (liquidation) est conservée.
-		if (this.outcome !== null) return;
-		if (this.tick >= this.timeLimitTicks) {
-			const rank = this.rankings().indexOf(this.player.id) + 1;
-			if (rank === 1) {
-				this.outcome = "victory";
-				this.endReason = "Temps écoulé — 1er au score.";
-			} else {
-				this.outcome = "defeat";
-				this.endReason = `Temps écoulé — rang ${rank} au score.`;
-			}
 		}
 	}
 
@@ -1876,17 +2406,8 @@ export class World {
 		if (this.log.length > 8) this.log.shift();
 	}
 
-	private spawnModules(count: number): number[] {
-		const positions: [number, number][] = [
-			[1, 1],
-			[MODULES_W - 2, 1],
-			[1, MODULES_H - 2],
-			[MODULES_W - 2, MODULES_H - 2],
-			[Math.floor(MODULES_W / 2), 1],
-			[1, Math.floor(MODULES_H / 2)],
-		];
-		return positions.slice(0, count).map(([x, y]) => y * MODULES_W + x);
+	/** Voisins d'un quartier (adjacence fournie par la carte). */
+	private neighbors(module: number): readonly number[] {
+		return this.city.neighbors[module] ?? EMPTY_NEIGHBORS;
 	}
 }
-
-export { MODULE_SIZE, SIM_HZ };

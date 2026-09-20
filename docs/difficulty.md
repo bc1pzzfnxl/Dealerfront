@@ -1,6 +1,6 @@
 # Difficulty — Philosophie, formules O/D et budget de difficulté
 
-> Statut : **affiné (v2)** — formules O/D, détection par action, délais 3 paliers, variance et budgets par archétype tranchés.
+> Statut : **obsolète (v2, ancien mode)** — l'équilibrage se fait désormais par simulation massive (`sim:mass`) sur la carte Paris.
 
 ## Objectif
 
@@ -77,9 +77,9 @@ Tirage à l'intérieur de la fourchette selon l'action :
 | P2 — duo motorisé | 30–54 | 60–90 s |
 | P3 / P4 — renforcé / descente | 55–100 | 15–30 s |
 
-### Budgets cibles par archétype
+### Budgets cibles par profil de quartier
 
-Chaque archétype a un **ratio O/D cible propre**, toujours **dans la fourchette globale** 0,90–1,10 (valeurs à équilibrer) :
+Chaque profil de quartier (Paris : arrondissement, type IRIS) module l'opportunité et le danger autour de la fourchette globale 0,90–1,10 :
 
 | Archétype | Cible O/D | Intention |
 |---|---|---|
@@ -94,7 +94,7 @@ Chaque archétype a un **ratio O/D cible propre**, toujours **dans la fourchette
 | Paramètre | Valeur / fourchette | Statut |
 |---|---|---|
 | Fourchette O/D globale | 0,90–1,10 | fixé |
-| Cible O/D par archétype | 0,95–1,05 selon archétype | à équilibrer |
+| Cible O/D | 0,95–1,05 (profils de quartier) | à équilibrer |
 | Composantes de O | profit, densité clients, accessibilité, façades, distance labo→vente | fixé |
 | Composantes de D | patrouilles, postes, témoins, `H_base` | fixé |
 | Poids `α`, `β`, `γ` | **TBD** | TBD |
@@ -108,7 +108,7 @@ Chaque archétype a un **ratio O/D cible propre**, toujours **dans la fourchette
 ## Cas limites
 
 - **Compression temporelle** : les valeurs réelles sont ramenées à l'échelle de la session (30 min) ; la proportionnalité doit rester cohérente.
-- **Correction impossible** : si N itérations ne ramènent pas le ratio dans la fourchette, régénérer la seed (jamais d'acceptation hors fourchette).
+- **Correction impossible** : désormais la carte est **fixe** (Paris) → on ajuste les **profils de marché** plutôt que de régénérer une carte.
 - **Perception de l'aléa** : la difficulté de base doit être *lisible* avant le run (choix parmi 3 villes, `ui-ux.md`), sinon elle est injuste (R4).
 - **Rubber-banding déguisé** : toute mécanique qui « compense » la performance est interdite, même présentée comme du confort.
 - **Score indépendant de la difficulté** : le score final ne contient **aucun** bonus/malus de difficulté (sinon inéquitable entre runs, `scoring.md`).
@@ -140,4 +140,4 @@ Chaque archétype a un **ratio O/D cible propre**, toujours **dans la fourchette
 | 3 | Détection | Fourchettes par action (transport/vente/blanchiment) |
 | 4 | Délais de réaction | 3 paliers : 90–150 / 60–90 / 15–30 s |
 | 5 | Contrôle de variance | Correction auto puis régénération après N itérations |
-| 6 | Budgets archétype | Cible propre par archétype, dans la fourchette globale |
+| 6 | Budgets | Cible O/D par profil de quartier, dans la fourchette globale |

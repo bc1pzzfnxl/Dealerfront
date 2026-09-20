@@ -8,7 +8,7 @@ Fixer l'identité du jeu et les invariants qui s'appliquent à **tous** les syst
 
 ## Vision / Pitch
 
-Jeu de **stratégie/gestion solo**, vue **isométrique 2.5D** dans une **ville procédurale** vivante, jouable en navigateur. Tu incarnes **le cartel** (God view) : tu ne contrôles plus un personnage, tu **commandes de loin**. Objectif : **contrôler la ville** (≥ ~60 % des quartiers) **et blanchir assez d'argent** avant la clôture, face à **3–5 gangs IA** et à la **police**.
+Jeu de **stratégie/gestion solo**, vue **carte réelle** (Paris, quartiers IRIS) jouable en navigateur. Tu incarnes **le cartel** (God view) : tu ne contrôles plus un personnage, tu **commandes de loin**. Objectif : **rester le dernier cartel en jeu** (battle royale), face à **5 gangs IA** et à la **police**.
 
 **Inspirations** : OpenFront (contrôle territorial temps réel, alliances, traîtres), gestion sous pression (Heat, police), Frostpunk (diegetic UI).
 

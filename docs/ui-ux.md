@@ -11,7 +11,7 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 ### Caméra
 
 - **God view large** : caméra libre (pan + zoom), **iso fixe**, dézoom important (on voit la ville). Plus de caméra suiveuse serrée.
-- Navigation : glisser (pan), molette (zoom), bord d'écran/clavier (optionnel), **minimap cliquable** pour se téléporter.
+- Navigation : glisser (**pan**), molette (**zoom**) — assurée par MapLibre.
 
 ### Lecture de la carte
 
@@ -38,13 +38,13 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 - **Liste des factions** : contrôle %, statut (pacte/embargo/traître), leader.
 - **Milestones** : seuil de contrôle %, seuil de Cash propre.
 - **Journal** : événements récents (captures, raids, trahisons).
-- **Minimap** colorée (factions + police) cliquable.
+- **Carte** : fond muet, aplats de faction, contours de sélection/heat, convois.
 
 ### Écrans (MVP = 3)
 
 | Écran | Contenu |
 |---|---|
-| **Sélection de ville** | 3 propositions (profils, postes, factions) |
+| **Sélection de ville** | Paris (992 quartiers IRIS) |
 | **Vue de jeu** | Carte god-view + overlays + HUD + commandement |
 | **Récap de fin** | Score, contrôle final, cause, chaîne causale |
 
@@ -53,7 +53,6 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 | Paramètre | Valeur | Statut |
 |---|---|---|
 | Zoom (tuiles visibles) | large : ~90–200 | à équilibrer |
-| Taille minimap | ~220 px | fixé |
 | Couleur par faction | 6 couleurs (voir `art-direction.md`) | fixé |
 | Prévisualisation | obligatoire avant attaque | fixé |
 | Durée du récap | **TBD** | TBD |
@@ -87,27 +86,27 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 | 1 | Caméra | god view large (pan/zoom, iso fixe) |
 | 2 | Possession | aplat coloré + contour (couleur = info) |
 | 3 | Commandement | sélection + ordres contextuels + prévisualisation |
-| 4 | HUD | ressources, pression, factions, journal, minimap |
+| 4 | HUD | ressources, pression, factions, journal |
 | 5 | Écrans | 3 (sélection, jeu, récap) |
 
 ---
 
 ## Implémentation (P7) — état en vigueur
 
-> Section **faisant foi** pour `src/App.tsx`, `src/render/*`. Le rendu 3D est en `@react-three/fiber`.
+> Section **faisant foi** pour `src/App.tsx`, `src/render/*`. Le rendu carte est **mapcn / MapLibre** (`src/render/WorldMap.tsx`).
 
 ### Écrans (3)
 
-- **Sélection de ville** : 3 propositions (3 seeds → 3 profils), titre + objectif rappelé, clic = lancer.
+- **Sélection de ville** : carte **Paris** (992 quartiers IRIS) + rappel de l'objectif, clic = lancer.
 - **Vue de jeu** : carte god-view + overlays + HUD.
 - **Récap de fin** : cause, Cash propre, contrôle, **score + rang**, quartiers pris, gangs éliminés, raids/saisies, durée.
 
 ### Lecture de la carte
 
-- **Possession** : aplat translucide (opacité 0.5) **dont la teinte s'assombrit avec le Contrôle**.
-- **Quartier attaqué** : **contour** à la **couleur de l'attaquant** (le plus fort), dessiné sur la carte et en **rouge** sur la minimap.
-- **Bâtiments** : **icône par type** (8 géométries distinctes — boîte, cylindre, cône, octaèdre… + valeur de gris propre).
-- **Sélection** : anneau blanc.
+- **Possession** : aplat **par faction** (`fill-color` par `feature-state`), **opacité ∝ Contrôle**.
+- **Quartier attaqué** : **contour** à la **couleur de l'attaquant** (le plus fort), dessiné sur la carte.
+- **Bâtiments** : affichés dans le panneau Quartier (label + effet) ; le quartier construit porte la couleur de sa faction.
+- **Sélection** : contour **blanc** épais. **Heat local** : contour **orange** ∝ heat. **Convois** : points animés colorés par faction.
 - **Police** : **vignette d'ambiance** dont l'intensité suit la Pression ; passe en **rouge pulsant** quand le joueur est visé et en alerte (raid récent ou `P ≥ 70`).
 
 ### HUD
@@ -116,7 +115,6 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 - **Police** : jauge de Pression, palier, cible, raids, bouton **Corrompre**.
 - **Factions** : symbole + couleur, tag **leader**, contrôle %, Cash propre.
 - **Journal**, **temps restant**, boutons Pause / Nouvelle seed / **Daltonien**.
-- **Minimap** cliquable (sélection), raids en rouge.
 
 ### Mode daltonien
 
@@ -126,7 +124,7 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 
 - **Sélection multiple** (glisser-rectangle) et **prévisualisation chiffrée** avant attaque : non implémentées (sélection au clic).
 - **Alertes sonores** et **marqueurs de pacte/embargo** : non implémentés (pas de diplomatie).
-- Le zoom est borné (span 55–260) mais la taille de sélection multiple reste à définir.
+- Le zoom/pan est géré par MapLibre (glisser = caméra).
 
 ---
 
@@ -138,17 +136,16 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 
 | Zone | Contenu | Rôle |
 |---|---|---|
-| **Barre haute** (`topbar`) | Marque + seed, **ressources** (Membres, Produit, Cash sale, Cash propre), **Contrôle**, Quartiers, Production, **objectif** (seuil + Cash propre) et **temps restant** | Toujours visible, lecture d'un coup d'œil |
-| **Colonne gauche** (`panel-left`) | **Quartier** sélectionné + **ordres** (bâtir / attaquer / tueur) | Panneau d'**action** contextuel |
+| **Barre haute** (`topbar`) | Marque + carte, **ressources** (Membres, Produit, Cash sale, Cash propre), **Contrôle**, Quartiers, Production, **objectif** (seuil + Cash propre) et **temps restant** | Toujours visible, lecture d'un coup d'œil |
+| **Colonne gauche** (`panel-left`) | **Quartier** sélectionné (profil, logistique, heat) + **ordres** (bâtir / attaquer / raid / descente / sabotage / interception / tueur) | Panneau d'**action** contextuel |
 | **Colonne droite** (`panel-right`) | **Police** (Pression, cible, raids, corruption), **Tech** (3 branches), **Diplomatie** (relations, pactes, factions fusionnées) | Panneau de **pilotage** |
-| **Barre basse** (`panel-bottom`) | **Journal** (3 dernières entrées) + rappel des touches + boutons (Pause / Nouvelle seed / Daltonien) + tick | Ambiance / contrôle, laisse la place à la minimap |
-| **Minimap** | Coin bas-droit (hors grille HUD) | Navigation |
+| **Barre basse** (`panel-bottom`) | **Journal** + rappel des touches + boutons (Pause / Nouvelle seed / Daltonien) + tick | Ambiance / contrôle |
 
 ### Règles
 
 - La **légende de faction a fusionné** avec la Diplomatie (symbole + couleur + contrôle % + relation + action Pacte/Trahir) pour supprimer un panneau.
 - Les **statistiques du cartel** (ex-carte « Cartel ») sont passées dans la **barre haute**.
-- La barre basse réserve **~16,5 rem à droite** pour la minimap.
+- Les contrôles de carte (zoom) sont en bas-droite.
 - Vérifié **sans scroll** en 1600×900 et 1366×768 ; `overflow-y: auto` reste en secours sur les colonnes si l'écran est très petit.
 
 ---
@@ -186,7 +183,6 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 - **Renseignement** :
   - **Reconnaître** (bouton sur un quartier inconnu) : coûte **1 500 Cash sale**, révèle un carré de rayon 2 pendant **60 s**, cooldown **30 s**.
   - **Contre-espionnage** : révèle en permanence un rayon de 2 autour de lui (en plus de son effet anti-tueur).
-- La **minimap** applique la même règle (inconnu = sombre, notre base = nette, adverses connus = atténués).
 
 ### Diplomatie et information (P15)
 
@@ -195,3 +191,36 @@ Définir une interface **de commandement à distance** : lire la situation d'un 
 ### P16 — retour à l'information complète
 
 - Le **fog / renseignement** (P14) est **abandonné** : possession, contrôle et bâtiments sont **visibles pour tous** (lisibilité type OpenFront). Les mécaniques de vision/reconnaissance ont été retirées.
+
+---
+
+## Implémentation (P25) — Game feel & UI iconique
+
+> Décision : **une action = un retour visuel**. Aucune action du joueur ne doit rester muette.
+> Références : OpenFront / Territorial.io (commandes contextuelles, raccourcis, feedback), théorie du game feel (juice), motion design (Emil/Jakub).
+
+### Juice du monde (carte)
+
+- **Flash de capture** : contour blanc flouté sur les quartiers pris (`feature-state.flash`, ~0,7 s), tiré de `capturedAt`.
+- **Siège** : contour **pointillé animé** à la couleur de l'attaquant sur les cibles d'assaut (`feature-state.siege`).
+- **Convois** : la route (ligne à 35 %) et le point mobile sont visibles ; en `prefers-reduced-motion`, le point avance par pas.
+- **Heat local** : contour orange (inchangé).
+
+### UI
+
+- **Icônes (lucide, `currentColor`)** : bâtiments (Logement=Users, Labo=FlaskConical, Vente=Store, Façade=Landmark, Planque=Shield, Dépôt=Warehouse, Atelier=Factory, Guetteur=Eye), ressources, opérations. Plus de libellés longs.
+- **Barre de commandement** (panneau gauche, quartier non possédé) : grille d'icônes Assaut/Raid/Descente/Sabotage/Interception/Tueur, **coût + raccourci** affichés dans le bouton, raison d'indisponibilité en infobulle.
+- **Barre haute compacte** : icônes de ressource + deux **barres d'objectif** (Contrôle, Cash propre) ; minuteur en **urgence** sous 3 min.
+- **Journal-feed** : 3 entrées colorées (gain / perte / info) avec animation d'entrée courte.
+- **Sélection de ville** : pitch + rappel visuel de la boucle (Produire → Vendre → Blanchir) + CTA unique.
+- **Récap** : victoire (accent vert) distinguée de la défaite (rouge).
+
+### Micro-interactions (frequency gate)
+
+- Boutons : `scale(0.97)` au `:active`, transitions 160 ms. **Rien** sur les raccourcis clavier (jamais animés).
+- `prefers-reduced-motion` coupe flash/siège/journal/transitions (accessibilité, non optionnel).
+
+### Graines de multi (sans réseau)
+
+- `World.briefing()` : structure **sérialisable** JSON (objectif, progression, rang) — réutilisable par un futur lobby/partage.
+- `GameEvent` et `Floater` sont purs et sérialisables (replay/partage différés).

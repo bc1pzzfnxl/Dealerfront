@@ -13,17 +13,16 @@ import {
 	CONVERSION_COST,
 	type BuildingType,
 } from "./buildings";
-import { MODULES_W } from "./constants";
 import { DIPLOMACY, EMBARGO } from "./diplomacy";
 import { CONTACT_NAMES, POLICE } from "./police";
 import { HITMAN, TECH, techCost } from "./tech";
 import { NEUTRAL } from "./territory";
 import { World } from "./world";
 
-/** Spawn du joueur (coin haut-gauche, module (1,1)). */
-const SPAWN = 1 * MODULES_W + 1;
-/** Voisin immédiat à droite du spawn. */
-const ADJACENT = SPAWN + 1;
+/** Spawn du joueur (premier quartier de départ de la carte). */
+const SPAWN = 0;
+/** Voisin immédiat du spawn (adjacence de la carte). */
+const ADJACENT = 6;
 
 /** Premier module neutre de la carte. */
 function firstNeutral(world: World): number {
@@ -90,17 +89,20 @@ function disarmAi(world: World): void {
 	for (let f = 1; f < world.factions.length; f += 1) world.factions[f]!.members = 0;
 }
 
-/** Force une victoire (contrôle ≥ 60 % + Cash propre ≥ objectif). */
+/** Force une victoire (dernier survivant : tous les rivaux éliminés). */
 function forceVictory(world: World): void {
-	giveNeutral(world, world.player.id, Math.ceil(world.territory.count * 0.63));
-	world.step();
-	world.player.cashPropre = world.cleanGoal();
+	for (let i = 0; i < world.territory.count; i += 1) {
+		if (world.territory.owner[i]! > 0) {
+			world.territory.owner[i] = NEUTRAL;
+			world.territory.control[i] = 60;
+		}
+	}
 	world.step();
 }
 
 /** Baisse de Contrôle au centre d'un tueur, selon le nombre de Contre-espionnage de la cible. */
 function hitmanCenterDrop(contre: number): number {
-	const world = new World(1, "nightlife");
+	const world = new World(1);
 	const player = world.player;
 	player.cashPropre = 100000;
 	player.members = 100000;
@@ -124,14 +126,14 @@ function hitmanCenterDrop(contre: number): number {
 
 describe("construction — refus", () => {
 	it("refuse un quartier non possédé", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const neutral = firstNeutral(world);
 		expect(world.playerCanBuild(neutral, "logement")).toBe(false);
 		expect(world.playerBuild(neutral, "logement")).toBe(false);
 	});
 
 	it("refuse un quartier déjà bâti", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashSale = 100000;
 		const module = ownConversion(world, world.player.id, "logement");
 		expect(world.playerBuild(module, "logement")).toBe(true);
@@ -140,7 +142,7 @@ describe("construction — refus", () => {
 	});
 
 	it("refuse un quartier avec un chantier en cours", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashSale = 100000;
 		const module = ownVacant(world, world.player.id, "labo");
 		expect(world.playerBuild(module, "labo")).toBe(true);
@@ -150,7 +152,7 @@ describe("construction — refus", () => {
 	});
 
 	it("refuse une zone incompatible", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		let module = -1;
 		for (let i = 0; i < world.territory.count; i += 1) {
 			if (!world.allowedBuildings(i).includes("atelier")) {
@@ -168,7 +170,7 @@ describe("construction — refus", () => {
 	});
 
 	it("refuse des ressources insuffisantes", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.members = 100000;
 		world.player.cashSale = 0;
 		const module = ownConversion(world, world.player.id, "labo");
@@ -177,7 +179,7 @@ describe("construction — refus", () => {
 	});
 
 	it("playerCanAfford est optimiste (coût de conversion)", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashSale = BUILDINGS.labo.costSale! * CONVERSION_COST;
 		expect(world.playerCanAfford("labo")).toBe(true);
 		// Mais un terrain vague (coût plein) reste inabordable.
@@ -188,7 +190,7 @@ describe("construction — refus", () => {
 
 describe("construction — conversion vs chantier", () => {
 	it("la conversion coûte −50 % et prend la moitié du temps", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashSale = 10000;
 		const module = ownConversion(world, world.player.id, "facade");
 		expect(module).toBeGreaterThanOrEqual(0);
@@ -202,7 +204,7 @@ describe("construction — conversion vs chantier", () => {
 	});
 
 	it("la construction neuve sur terrain vague suit BUILD_TICKS", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		disarmAi(world);
 		world.player.cashSale = 10000;
 		const module = ownVacant(world, world.player.id, "labo");
@@ -225,7 +227,7 @@ describe("construction — conversion vs chantier", () => {
 	});
 
 	it("un chantier ne produit rien tant qu'il n'est pas livré", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		disarmAi(world);
 		const player = world.player;
 		player.cashSale = 10000;
@@ -240,7 +242,7 @@ describe("construction — conversion vs chantier", () => {
 
 describe("construction — annulation du chantier", () => {
 	it("une capture annule le chantier", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashSale = 10000;
 		const module = ownVacant(world, world.player.id, "labo");
 		expect(world.playerBuild(module, "labo")).toBe(true);
@@ -253,7 +255,7 @@ describe("construction — annulation du chantier", () => {
 	});
 
 	it("un raid policier annule le chantier", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		giveNeutral(world, world.player.id, 40);
 		const module = SPAWN;
 		for (let i = 0; i < world.territory.count; i += 1) {
@@ -262,6 +264,8 @@ describe("construction — annulation du chantier", () => {
 		world.territory.control[module] = 100;
 		world.territory.pending[module] = BUILDING_INDEX.labo;
 		world.territory.construction[module] = BUILD_TICKS.labo;
+		// Le raid vise désormais les quartiers les plus chauds.
+		world.heat[module] = 100;
 		world.police.pressure = POLICE.raidThreshold + 5;
 		world.police.cooldown = 0;
 		world.step();
@@ -271,7 +275,7 @@ describe("construction — annulation du chantier", () => {
 	});
 
 	it("un tueur à gage annule le chantier visé", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashPropre = 100000;
 		player.members = 100000;
@@ -290,20 +294,20 @@ describe("construction — annulation du chantier", () => {
 
 describe("attaque", () => {
 	it("refuse un quartier non adjacent", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const far = world.city.modules.length - 1;
 		expect(world.playerCanAttack(far)).toBe(false);
 		expect(world.playerAttack(far)).toBe(false);
 	});
 
 	it("refuse son propre quartier", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		expect(world.playerCanAttack(SPAWN)).toBe(false);
 		expect(world.playerAttack(SPAWN)).toBe(false);
 	});
 
 	it("refuse tant que l'engagement minimum n'est pas atteint", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const needed = world.minCommit() / world.commitRatio();
 		world.player.members = needed - 1;
 		expect(world.playerCanAttack(ADJACENT)).toBe(false);
@@ -313,7 +317,7 @@ describe("attaque", () => {
 	});
 
 	it("capture un quartier adjacent après résolution", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		expect(world.playerAttack(ADJACENT)).toBe(true);
 		for (let i = 0; i < 400 && world.ownerAt(ADJACENT) !== player.id; i += 1) {
@@ -326,7 +330,7 @@ describe("attaque", () => {
 
 describe("tueur à gage", () => {
 	it("exige Armement ≥ 2", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashPropre = 100000;
 		player.members = 100000;
@@ -341,7 +345,7 @@ describe("tueur à gage", () => {
 	});
 
 	it("refuse sa propre cible et les quartiers neutres", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashPropre = 100000;
 		player.members = 100000;
@@ -351,7 +355,7 @@ describe("tueur à gage", () => {
 	});
 
 	it("respecte le coût et le cooldown", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashPropre = 100000;
 		player.members = 100000;
@@ -372,7 +376,7 @@ describe("tueur à gage", () => {
 	});
 
 	it("refuse sans Cash propre ni Membres suffisants", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.members = 100000;
 		player.tech.armement = HITMAN.requiredArmement;
@@ -394,7 +398,7 @@ describe("tueur à gage", () => {
 	});
 
 	it("ne capture pas (plancher de Contrôle à 5)", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashPropre = 100000;
 		player.members = 100000;
@@ -410,7 +414,7 @@ describe("tueur à gage", () => {
 
 describe("tech", () => {
 	it("un Atelier = un palier max, coût croissant", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashPropre = 100000;
 		expect(world.maxTechLevel(player.id)).toBe(0);
@@ -441,7 +445,7 @@ describe("tech", () => {
 	});
 
 	it("refuse un palier sans Cash propre", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashPropre = BUILDINGS.atelier.costClean! * CONVERSION_COST;
 		const module = ownConversion(world, player.id, "atelier");
@@ -454,7 +458,7 @@ describe("tech", () => {
 	});
 
 	it("plafonne le niveau à TECH.maxLevel", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		let placed = 0;
 		for (let i = 0; i < world.territory.count && placed < 6; i += 1) {
@@ -472,7 +476,7 @@ describe("tech", () => {
 
 describe("corruption", () => {
 	it("fait baisser la Pression (cas nominal)", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashPropre = 1000000;
 		world.police.pressure = 60;
 		expect(world.playerCanCorrupt()).toBe(true);
@@ -482,7 +486,7 @@ describe("corruption", () => {
 	});
 
 	it("fait monter la Pression si le contact est grillé", () => {
-		const world = new World(38, "nightlife");
+		const world = new World(38);
 		const before = world.contactName;
 		world.player.cashPropre = 1000000;
 		world.police.pressure = 60;
@@ -493,7 +497,7 @@ describe("corruption", () => {
 	});
 
 	it("refuse si le Cash propre est insuffisant", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashPropre = 0;
 		expect(world.playerCanCorrupt()).toBe(false);
 		expect(world.playerCorrupt()).toBe(false);
@@ -501,7 +505,7 @@ describe("corruption", () => {
 	});
 
 	it("coût croissant puis plafonné", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashPropre = 1_000_000_000;
 		let previous = 0;
 		for (let use = 0; use < 12; use += 1) {
@@ -516,7 +520,7 @@ describe("corruption", () => {
 
 describe("diplomatie — pactes", () => {
 	it("propose une offre, puis bloque par cooldown", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		expect(world.playerProposePact(world.player.id)).toBe(false);
 		expect(world.playerProposePact(1)).toBe(true);
 		expect(world.offers.length).toBe(1);
@@ -528,7 +532,7 @@ describe("diplomatie — pactes", () => {
 	});
 
 	it("accepte une offre reçue (pacte + relation)", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.offers.push({ from: 1, to: world.player.id, expires: world.tick + DIPLOMACY.offerWait });
 		expect(world.playerOffers().length).toBe(1);
 		expect(world.playerOffers()[0]!.from).toBe(1);
@@ -540,7 +544,7 @@ describe("diplomatie — pactes", () => {
 	});
 
 	it("refuse une offre reçue", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.offers.push({ from: 1, to: world.player.id, expires: world.tick + DIPLOMACY.offerWait });
 		expect(world.playerRespondToOffer(1, false)).toBe(true);
 		expect(world.hasPact(0, 1)).toBe(false);
@@ -549,12 +553,12 @@ describe("diplomatie — pactes", () => {
 	});
 
 	it("refuse de répondre à une offre inexistante", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		expect(world.playerRespondToOffer(2, true)).toBe(false);
 	});
 
 	it("le pacte expire à son échéance", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.offers.push({ from: 1, to: world.player.id, expires: world.tick + DIPLOMACY.offerWait });
 		world.playerRespondToOffer(1, true);
 		const pact = world.pacts[0]!;
@@ -564,7 +568,7 @@ describe("diplomatie — pactes", () => {
 	});
 
 	it("trahir rompt le pacte, fait chuter la relation et marque le traître", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.offers.push({ from: 1, to: world.player.id, expires: world.tick + DIPLOMACY.offerWait });
 		world.playerRespondToOffer(1, true);
 		const before = world.relationBetween(0, 1);
@@ -580,7 +584,7 @@ describe("diplomatie — pactes", () => {
 
 describe("embargo", () => {
 	it("déclare, bloque les pactes et expire", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		expect(world.playerEmbargo(world.player.id)).toBe(false);
 		expect(world.playerEmbargo(1)).toBe(true);
 		expect(world.playerHasEmbargo(1)).toBe(true);
@@ -600,7 +604,7 @@ describe("embargo", () => {
 
 	it("réduit le revenu sale de la cible", () => {
 		const sale = (embargo: boolean): number => {
-			const world = new World(1, "nightlife");
+			const world = new World(1);
 			const module = firstNeutral(world);
 			world.territory.owner[module] = 1;
 			world.territory.control[module] = 100;
@@ -618,7 +622,7 @@ describe("embargo", () => {
 	});
 
 	it("rompt un pacte existant en le traitant comme une trahison", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.offers.push({ from: 1, to: world.player.id, expires: world.tick + DIPLOMACY.offerWait });
 		world.playerRespondToOffer(1, true);
 		const before = world.relationBetween(0, 1);
@@ -634,7 +638,7 @@ describe("embargo", () => {
 
 describe("fin de partie", () => {
 	it("refuse toutes les actions après une victoire", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		forceVictory(world);
 		expect(world.outcome).toBe("victory");
 		world.player.members = 100000;
@@ -660,7 +664,7 @@ describe("fin de partie", () => {
 	});
 
 	it("refuse toutes les actions après une défaite", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.police.pressure = POLICE.liquidation + 1;
 		world.step();
 		expect(world.outcome).toBe("defeat");
@@ -680,13 +684,11 @@ describe("fin de partie", () => {
 		expect(world.playerEmbargo(1)).toBe(false);
 	});
 
-	it("garde seuils, échéance et récap cohérents", () => {
-		const world = new World(1, "nightlife", { timeLimitTicks: 1000 });
-		expect(world.victoryControlThreshold()).toBe(0.42);
-		expect(world.cleanGoal()).toBe(500000);
-		expect(world.ticksLeft()).toBe(1000);
-		world.tick = 1100;
-		expect(world.ticksLeft()).toBe(-100);
+	it("garde survivants, rang et récap cohérents", () => {
+		const world = new World(1);
+		expect(world.aliveCount()).toBeGreaterThanOrEqual(1);
+		expect(world.briefing().map).toBe("paris");
+		expect(world.rankings()).toHaveLength(world.factions.length);
 
 		world.player.cashPropre = 10000;
 		const line = world.summary();
@@ -702,7 +704,7 @@ describe("fin de partie", () => {
 describe("zones", () => {
 	it("chaque quartier accepte au moins un bâtiment (spawn compris)", () => {
 		for (const seed of [0, 1, 2, 3, 7]) {
-			const world = new World(seed, "nightlife");
+			const world = new World(seed);
 			for (let i = 0; i < world.territory.count; i += 1) {
 				expect(world.allowedBuildings(i)).toContain("planque");
 			}
@@ -720,7 +722,7 @@ describe("zones", () => {
 	});
 
 	it("conversion (zone bâtie) vs terrain vague : coût et zone", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		let built = -1;
 		let vacant = -1;
 		for (let i = 0; i < world.territory.count; i += 1) {
@@ -740,7 +742,7 @@ describe("zones", () => {
 
 describe("cohérence de l'état", () => {
 	it("expose commitRatio, minCommit et defenseAt", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		expect(world.commitRatio()).toBeGreaterThan(0);
 		expect(world.minCommit()).toBeGreaterThan(0);
 
@@ -764,7 +766,7 @@ describe("cohérence de l'état", () => {
 	});
 
 	it("buildingCount / buildingCounts reflètent les constructions", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashSale = 100000;
 		const module = ownConversion(world, world.player.id, "labo");
 		expect(world.playerBuild(module, "labo")).toBe(true);
@@ -776,7 +778,7 @@ describe("cohérence de l'état", () => {
 
 describe("régressions (bugs corrigés)", () => {
 	it("refuse d'accepter ou de rompre un pacte après la fin", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.offers.push({ from: 1, to: world.player.id, expires: world.tick + 100 });
 		world.playerRespondToOffer(1, true);
 		expect(world.hasPact(0, 1)).toBe(true);
@@ -788,7 +790,7 @@ describe("régressions (bugs corrigés)", () => {
 	});
 
 	it("un embargo empêche d'accepter une offre en attente", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.offers.push({ from: 1, to: world.player.id, expires: world.tick + 100 });
 		expect(world.playerEmbargo(1)).toBe(true);
 		expect(world.playerOffers().length).toBe(0);
@@ -797,7 +799,7 @@ describe("régressions (bugs corrigés)", () => {
 	});
 
 	it("le contact change quand il est grillé", () => {
-		const world = new World(18, "nightlife");
+		const world = new World(18);
 		world.player.cashPropre = 1_000_000;
 		world.police.pressure = 60;
 		const before = world.contactName;
@@ -806,7 +808,7 @@ describe("régressions (bugs corrigés)", () => {
 	});
 
 	it("canUpgradeTech est faux après la fin", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashPropre = 100_000;
 		forceVictory(world);
 		expect(world.canUpgradeTech(0, "armement")).toBe(false);
@@ -815,7 +817,7 @@ describe("régressions (bugs corrigés)", () => {
 
 describe("raid & assauts simultanés", () => {
 	it("le raid affaiblit un quartier adjacent sans le capturer", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashSale = 100_000;
 		player.members = 100_000;
@@ -835,31 +837,28 @@ describe("raid & assauts simultanés", () => {
 	});
 
 	it("limite les assauts simultanés", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.members = 100_000;
-		// Possède une ligne et vise la ligne du dessous (indices relatifs à la largeur).
 		const max = world.maxAssaults();
-		const own0 = MODULES_W * 2;
-		const target0 = MODULES_W * 3;
-		for (let i = own0; i < own0 + max; i += 1) {
-			world.territory.owner[i] = player.id;
-			world.territory.control[i] = 100;
+		// Prend un groupe de quartiers possédés contigus avec des voisins neutres.
+		// Le joueur possède le spawn ; on vise ses voisins neutres directs.
+		const targets = [...(world.city.neighbors[SPAWN] ?? [])];
+		for (const target of targets) {
+			world.territory.owner[target] = NEUTRAL;
+			world.territory.control[target] = 100;
 		}
-		for (let i = target0; i < target0 + max + 1; i += 1) {
-			world.territory.owner[i] = NEUTRAL;
-			world.territory.control[i] = 100;
+		let launched = 0;
+		for (const target of targets) {
+			if (world.playerAttack(target)) launched += 1;
 		}
-		for (let i = 0; i < max; i += 1) {
-			expect(world.playerAttack(target0 + i)).toBe(true);
-		}
-		expect(world.playerAttack(target0 + max)).toBe(false);
+		expect(launched).toBe(Math.min(max, targets.length));
 	});
 });
 
 describe("ratio d'assaut", () => {
 	it("est borné et pilote l'engagement des troupes", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.playerSetAttackRatio(2);
 		expect(world.playerAttackRatio()).toBe(0.6);
 		world.playerSetAttackRatio(0);
@@ -871,7 +870,7 @@ describe("ratio d'assaut", () => {
 
 describe("file de construction", () => {
 	it("met en file quand les équipes sont occupées puis démarre à leur libération", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashSale = 100_000;
 		player.cashPropre = 100_000;
@@ -892,7 +891,7 @@ describe("file de construction", () => {
 	});
 
 	it("annule un ordre en file", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashSale = 100_000;
 		player.cashPropre = 100_000;
@@ -911,7 +910,7 @@ describe("file de construction", () => {
 
 describe("aménagement par lot", () => {
 	it("chiffre puis file l'aménagement des quartiers vides", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashSale = 100_000;
 		player.cashPropre = 100_000;
@@ -930,7 +929,7 @@ describe("aménagement par lot", () => {
 
 describe("butin (bâtiments objectifs)", () => {
 	it("capturer un quartier bâti rapporte une part de la valeur du bâtiment", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.members = 100_000;
 		player.cashSale = 0;
@@ -954,7 +953,7 @@ describe("butin (bâtiments objectifs)", () => {
 
 describe("descente & sabotage (armement)", () => {
 	it("la descente vole le butin sans détruire ni capturer (Armement ≥ 1)", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashSale = 100_000;
 		player.members = 100_000;
@@ -974,7 +973,7 @@ describe("descente & sabotage (armement)", () => {
 	});
 
 	it("sans Armement suffisant, pas d'opération", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashSale = 100_000;
 		player.members = 100_000;
@@ -991,7 +990,7 @@ describe("descente & sabotage (armement)", () => {
 	});
 
 	it("un Guetteur adverse bloque le sabotage", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		const player = world.player;
 		player.cashSale = 100_000;
 		player.tech.armement = 2;
@@ -999,8 +998,11 @@ describe("descente & sabotage (armement)", () => {
 		world.territory.owner[target] = 1;
 		world.territory.control[target] = 100;
 		world.territory.building[target] = BUILDING_INDEX.vente;
-		world.territory.owner[ADJACENT + 1] = 1;
-		world.territory.building[ADJACENT + 1] = BUILDING_INDEX.contre;
+		const lookout = world.city.neighbors[ADJACENT]!.find(
+			(neighbor) => neighbor !== SPAWN,
+		)!;
+		world.territory.owner[lookout] = 1;
+		world.territory.building[lookout] = BUILDING_INDEX.contre;
 
 		expect(world.playerSabotage(target)).toBe(true);
 		expect(world.territory.sabotageUntil[target]).toBe(0);

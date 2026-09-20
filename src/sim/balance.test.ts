@@ -7,17 +7,12 @@ import { describe, expect, it } from "vitest";
 import { BUILDING_TYPES, chooseBuildType, type BuildingType } from "./buildings";
 import { autoPlay, playOut } from "./bot";
 import { createRng } from "./rng";
-import { ARCHETYPES, type Archetype } from "./types";
 import { World } from "./world";
 
 function empty(): Record<BuildingType, number> {
 	const counts = {} as Record<BuildingType, number>;
 	for (const type of BUILDING_TYPES) counts[type] = 0;
 	return counts;
-}
-
-function archetypeFor(seed: number): Archetype {
-	return ARCHETYPES[seed % ARCHETYPES.length] as Archetype;
 }
 
 function assertSane(world: World): void {
@@ -77,7 +72,7 @@ describe("composition des bâtiments", () => {
 describe("bot — runs longs", () => {
 	it("reste sain et déterministe sur plusieurs seeds", () => {
 		for (let seed = 0; seed < 6; seed += 1) {
-			const world = new World(seed, archetypeFor(seed));
+			const world = new World(seed);
 			const rng = createRng((seed * 7919 + 13) >>> 0);
 			playOut(world, rng, 3000);
 			assertSane(world);
@@ -86,7 +81,7 @@ describe("bot — runs longs", () => {
 
 	it("même seed + même bot ⇒ territoire identique", () => {
 		const run = (): number[] => {
-			const world = new World(3, archetypeFor(3));
+			const world = new World(3);
 			const rng = createRng((3 * 7919 + 13) >>> 0);
 			playOut(world, rng, 1500);
 			return Array.from(world.territory.owner);
@@ -95,7 +90,7 @@ describe("bot — runs longs", () => {
 	});
 
 	it("l'économie tourne : Cash propre > 0 et chaîne Produit → sale → propre", () => {
-		const world = new World(1, archetypeFor(1));
+		const world = new World(1);
 		const rng = createRng((1 * 7919 + 13) >>> 0);
 		playOut(world, rng, 3000);
 		expect(world.player.cashPropre).toBeGreaterThan(0);
@@ -103,24 +98,24 @@ describe("bot — runs longs", () => {
 	});
 
 	it(
-		"une partie peut se terminer sur la durée cible",
+		"une partie finit par se conclure (battle royale)",
 		() => {
 			let finished = 0;
 			for (let seed = 0; seed < 4; seed += 1) {
-				const world = new World(seed, archetypeFor(seed));
+				const world = new World(seed);
 				const rng = createRng((seed * 7919 + 13) >>> 0);
-				playOut(world, rng, 15000);
+				playOut(world, rng, 60000);
 				if (world.outcome !== null) finished += 1;
 			}
 			expect(finished).toBeGreaterThan(0);
 		},
-		20000,
+		60000,
 	);
 });
 
 describe("bot — tueur à gage", () => {
 	it("un tueur ne capture pas (contrôle plancher 5)", () => {
-		const world = new World(0, archetypeFor(0));
+		const world = new World(0);
 		const rng = createRng(99);
 		for (let tick = 0; tick < 4000; tick += 1) {
 			if (tick % 20 === 0) autoPlay(world, rng);

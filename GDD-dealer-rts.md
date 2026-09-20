@@ -7,7 +7,7 @@
 
 ## 1. Pitch (résumé)
 
-Jeu **solo** de stratégie/gestion, vue **isométrique 2.5D** dans une **ville procédurale**, jouable en navigateur. Tu incarnes **le cartel** (God view) : tu ne contrôles plus un personnage, tu **commandes de loin**. Objectif : **contrôler ≥ ~60 % des quartiers** et **blanchir assez d'argent** en **20–30 min**, face à **3–5 gangs IA** et à la **police**.
+Jeu **solo** de stratégie/gestion, vue **carte réelle** (Paris, quartiers IRIS) rendue avec mapcn/MapLibre, jouable en navigateur. Tu incarnes **le cartel** (God view) : tu ne contrôles plus un personnage, tu **commandes de loin**. Objectif : **rester le dernier cartel en jeu** (battle royale), face à **5 gangs IA** et à la **police**.
 
 **Inspirations** : **OpenFront** (contrôle territorial temps réel, alliances, traîtres), gestion sous pression (police/Heat), Frostpunk (diegetic UI), gestion de cartel.
 
@@ -46,13 +46,13 @@ Jeu **solo** de stratégie/gestion, vue **isométrique 2.5D** dans une **ville p
 |---|---|
 | Modèle joueur | **God view cartel** (plus de dealer incarné — pilier 5 redéfini) |
 | Inspiration | **OpenFront** (idées, pas de code : OpenFront est AGPL-3) |
-| Échelle | **256 quartiers** (16×16 modules), **4–6 factions**, 20–30 min |
+| Échelle | **992 quartiers** (Paris IRIS), **6 factions**, battle royale |
 | Boucle | **Économie ↔ conquête à égalité** |
 | Combat | **Influence abstraite** par quartier (pas d'unités individuelles) |
 | Ressources | Abstraites : Produit, Cash sale, Cash propre, Influence |
 | Bâtiments | 7 : Labo, Point de vente, Façade, Planque, Atelier, Contre-espionnage, Dépôt |
 | Police | **Anti-leader** + **corruption** |
-| Victoire | **Contrôle ≥ ~60 %** ET **seuil de Cash propre** |
+| Victoire | **Dernier cartel en jeu** |
 | Couleur | **Information de faction** (exception assumée au N&B strict) |
 | Architecture | **Solo**, core déterministe 10 Hz, style **intents → executions**, multi différé |
 

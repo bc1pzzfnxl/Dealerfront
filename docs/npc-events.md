@@ -1,6 +1,6 @@
 # NPC & Events — Leurre, PNJ notables et choix à conséquences
 
-> Statut : **affiné (v2)** — leurre, informateur, contact corrompu, rival et choix tranchés ; périmètre MVP acté.
+> Statut : **implémenté (P26)** — pool de 3 événements à choix, un à la fois, effets traçables. — leurre, informateur, contact corrompu, rival et choix tranchés ; périmètre MVP acté.
 > Le **moteur d'agent** (cerveau, vie, QI, rôles, servir/trahir) est spécifié dans **`factions.md`** ; ce fichier couvre ses **usages notables** et les **événements à choix**.
 > ✅ **Arbitrage GDD §14D acté** : les agents/rivaux sont **inclus dès le MVP** (le GDD les plaçait en post-MVP).
 

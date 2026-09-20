@@ -112,6 +112,7 @@ Définir la **police** comme une **faction adverse non jouable**, **anti-leader 
 | 8 | Lisibilité | Indicateur/ambiance diégétique, causalité auditable |
 | 9 | Ancienne version | « Patrouilles/suspicion/dealer unique » abandonnée |
 | 10 | Fin de session | La police ne termine pas avant liquidation ; le score tranche sinon |
+| 11 | Police locale | **Heat par quartier** (0–100) : +capture 30, +tueur 20, +opération 15, +vente ×demande, +façade ×richesse ; décroissance 0,08/tick, ×3 dans les zones sous **surveillance policière** (poste ou voisin d'un poste). Les **raids visent les quartiers les plus chauds** du leader (et non les plus contrôlés). La **corruption refroidit** les quartiers du cartel (heat ÷2). |
 
 ---
 

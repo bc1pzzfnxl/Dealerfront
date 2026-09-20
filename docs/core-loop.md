@@ -21,7 +21,7 @@ Décrire la boucle d'activité du joueur-cartel et le déroulé macro d'une part
 
 ### Condition de victoire / défaite
 
-- **Victoire** : **Contrôle ≥ ~60 %** des quartiers **ET** **Cash propre ≥ seuil** (voir `win-conditions.md`).
+- **Victoire** : **dernier cartel en jeu** (battle royale, voir `win-conditions.md`).
 - **Défaites** : 0 quartier (liquidation totale), faillite, **liquidation policière**.
 
 ### Déroulé macro d'une partie
@@ -31,7 +31,7 @@ Décrire la boucle d'activité du joueur-cartel et le déroulé macro d'une part
 | **Implantation** | ~0–5 min | 1–2 quartiers, quelques Labos/Points de vente, neutre partout ailleurs, IA discrètes |
 | **Expansion** | ~5–15 min | Conquête du neutre, premiers bâtiments, premiers pactes/trahisons, police faible |
 | **Guerre de quartiers** | ~15–25 min | Affrontements entre gangs, tech, tueurs, raids de police contre le leader |
-| **Clôture** | fin | Sprint pour le seuil de contrôle / blanchiment ; la police peut liquider |
+| **Clôture** | fin | Il ne reste qu'un cartel : les faibles sont achevés (encirclement), la police peut liquider |
 
 Le rythme est piloté par la **causalité** (contrôle + Heat), pas par un chrono dur.
 
@@ -39,20 +39,19 @@ Le rythme est piloté par la **causalité** (contrôle + Heat), pas par un chron
 
 | Paramètre | Valeur | Statut |
 |---|---|---|
-| Durée cible | 20–30 min (médiane ~25) | fixé |
-| Seuil de contrôle (victoire) | ~60 % des quartiers | à équilibrer |
-| Seuil de Cash propre (victoire) | **TBD** (`win-conditions.md`) | TBD |
-| Nombre de factions | 4–6 | fixé |
-| Quartiers | 256 | fixé |
+| Durée | illimitée (jusqu'à élimination) | fixé |
+| Condition de victoire | dernier survivant (aucun seuil) | fixé |
+| Nombre de factions | 6 | fixé |
+| Quartiers | 992 (Paris IRIS) | fixé |
 | Fin de partie | causale (victoire/défaites) | fixé |
 
 ## Cas limites
 
 - **Attente passive** : ne rien faire ne baisse pas la difficulté de base, mais laisse les IA s'étendre → l'inaction est punie par le monde (pas par un artifice).
 - **Leader trop fort** : la police monte (anti-snowball) → aucun runaway gratuit.
-- **Faillite** : plus de Cash (sale et propre) pendant N ticks → défaite (seuil à définir).
+- **Faillite** : plus de Cash (sale et propre) pendant 300 ticks (30 s) → défaite.
 - **Élimination** : 0 quartier → défaite immédiate.
-- **Fin simultanée** : si deux factions atteignent le seuil le même tick → départage déterministe (`win-conditions.md`).
+- **Éliminations simultanées** : départage déterministe par quartiers, puis Membres, puis Cash (`win-conditions.md`).
 
 ## Dépendances
 
@@ -76,5 +75,5 @@ Le rythme est piloté par la **causalité** (contrôle + Heat), pas par un chron
 |---|---|---|
 | 1 | Boucle | 8 étapes (produire→vendre→blanchir→étendre→équiper→défendre→police→gangs) |
 | 2 | Équilibre | Économie ↔ conquête à égalité |
-| 3 | Victoire | Contrôle ≥ ~60 % + seuil blanchi |
+| 3 | Victoire | Dernier survivant (battle royale) |
 | 4 | Durée | 20–30 min, pilotée par la causalité |

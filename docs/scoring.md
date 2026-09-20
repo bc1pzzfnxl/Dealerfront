@@ -1,6 +1,6 @@
 # Scoring — Score final (DealerFront)
 
-> Statut : **v1 (DealerFront)** — réécrit pour le mode cartel (contrôle + blanchiment). Remplace l'ancien score « dealer ».
+> Statut : **v2 (battle royale)** — le score composite est remplacé par un **classement de puissance** (quartiers, Membres, cash). Le récap affiche la **survie + stats**.
 
 ## Objectif
 
@@ -26,7 +26,7 @@ Score = Cash_propre × (1 + b_contrôle + b_diversité + b_discrétion)
 | Composante | Rôle | Détail |
 |---|---|---|
 | **Cash propre** | Base du score | Argent blanchi effectivement. |
-| **Contrôle final** | Bonus principal | Part des 256 quartiers contrôlés (objectif de victoire). |
+| **Contrôle final** | Bonus principal | Part des 992 quartiers contrôlés (objectif de victoire). |
 | **Diversité** | Bonus modéré | Nb de quartiers/façades distincts exploités. |
 | **Discrétion** | Bonus | Temps passé sous les seuils de Pression police. |
 | **Pénalités** | Malus | Saisies, quartiers perdus. |

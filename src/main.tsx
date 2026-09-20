@@ -1,4 +1,3 @@
-import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./styles.css";
@@ -6,8 +5,6 @@ import "./styles.css";
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Élément #root introuvable");
 
-createRoot(rootElement).render(
-	<StrictMode>
-		<App />
-	</StrictMode>,
-);
+// Pas de StrictMode : le double-montage recrée la source mapcn au milieu de son
+// cycle de vie (MapLibre jette « already exists »).
+createRoot(rootElement).render(<App />);

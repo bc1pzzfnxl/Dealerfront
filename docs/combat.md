@@ -5,13 +5,13 @@
 
 ## Objectif
 
-Définir le combat **territorial** de DealerFront : comment une faction dépense son **Influence** pour prendre un **quartier** (module 6×6), comment un défenseur résiste (Planques, terrain, tech), et comment un **tueur à gage** frappe un quartier à distance. Le combat n'a **pas d'unités individuelles** : c'est une lutte de **Contrôle 0–100** alimentée par un pool d'Influence.
+Définir le combat **territorial** de DealerFront : comment une faction dépense ses **Membres** pour prendre un **quartier**, comment un défenseur résiste (Planques, terrain, tech), et comment un **tueur à gage** frappe un quartier à distance. Le combat n'a **pas d'unités individuelles** : c'est une lutte de **Contrôle 0–100** alimentée par un pool de Membres.
 
 ## Règles
 
 ### Modèle d'influence abstraite
 
-- **Quartier = module** (6×6) d'une grille 16×16 → **256 quartiers**. Chaque quartier a un **propriétaire** (faction, neutre) et un **Contrôle 0–100**.
+- **Quartier** = quartier IRIS de la carte réelle (**992 quartiers**). Chaque quartier a un **propriétaire** (faction, neutre) et un **Contrôle 0–100**.
 - **Influence** = « ressource-troupe » **par faction**, stockée dans un **pool global** (pas de logistique par unité). C'est la seule monnaie de combat.
 - L'Influence se propage **de quartier en quartier** en **BFS sur le graphe d'adjacence des rues** : on ne peut attaquer qu'un quartier **frontalier** à un quartier possédé (frontière = arête de rue). Hors de portée = pas d'attaque.
 - Un **front** peut couvrir plusieurs quartiers frontaliers ; le paquet d'Influence engagé est **réparti** selon `borderSize` (nombre de quartiers frontaliers contestés).
@@ -89,8 +89,8 @@ Adapté de la branche cible-joueur d'OpenFront. Soit `I_def` l'Influence défens
 
 | Paramètre | Valeur | Statut |
 |---|---|---|
-| Quartiers | **256** (modules 6×6, grille 16×16) | fixé |
-| Factions | **4–6** (joueur + IA) | fixé |
+| Quartiers | **992** (Paris IRIS) | fixé |
+| Factions | **6** (joueur + IA) | fixé |
 | Tick de simulation | **100 ms** (10 Hz) | fixé |
 | Contrôle | 0–100 | fixé |
 | Influence de départ par faction | ~1 000 | à équilibrer |
@@ -161,7 +161,7 @@ Adapté de la branche cible-joueur d'OpenFront. Soit `I_def` l'Influence défens
 | # | Question | Décision |
 |---|---|---|
 | 1 | Modèle de combat | Influence abstraite (pool) → Contrôle 0–100, tick 100 ms, BFS sur rues |
-| 2 | Quartier | = module 6×6 ; 256 quartiers (16×16) |
+| 2 | Quartier | = quartier IRIS ; 992 quartiers réels |
 | 3 | Expansion neutre | Garnison `G_n` + pertes `mag/5` + `tickFraction` clampé |
 | 4 | Attaque de faction | Formule ratio × bonus territoire + `D_eff` (adaptée d'OpenFront) |
 | 5 | Défense Planque | Pertes attaquant `×5`, lenteur `×3` |

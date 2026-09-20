@@ -8,16 +8,16 @@ Définir la **prise de contrôle de la ville** : qui possède quoi, comment on �
 
 ## Règles
 
-### Quartier = module
+### Quartier = zone réelle
 
-- Unité de territoire = **module 6×6** de la grille **16×16** (**256 quartiers**). La ville **préexiste** (voir `procgen.md`) : les quartiers contiennent déjà des bâtiments.
-- Chaque quartier a : un **propriétaire** (faction ou **neutre**) et un **Contrôle ∈ [0, 100]**.
-- **Adjacence** : deux quartiers sont voisins s'ils partagent une frontière (rues). L'expansion et les attaques se propagent par adjacence (BFS).
+- Unité de territoire = **quartier IRIS** de la carte réelle (Paris, **992 quartiers**, voir `procgen.md`).
+- Chaque quartier a : un **propriétaire** (faction ou **neutre**), un **Contrôle ∈ [0, 100]** et un **profil** de marché (`economy.md`).
+- **Adjacence** : deux quartiers sont voisins s'ils **partagent une frontière** (arêtes communes ; un simple coin ne compte pas). L'expansion et les attaques se propagent par adjacence (BFS).
 
 ### Membres (ressource-troupe)
 
 - Chaque faction possède un **pool de Membres**, équivalent des « troupes » d'OpenFront.
-- **Production** par tick : `(8 × quartiers possédés + 25 × logements aménagés) × (1 − membres / maxMembres)`.
+- **Production** par tick : `(8 × Σdemande des quartiers possédés + 25 × Σdemande des logements) × (1 − membres / maxMembres)` (la **demande locale** pondère, voir `economy.md`).
 - **`maxMembres = 2000 + quartiers × 1500 + logements × 2000 + dépôts × 2000`**.
 - Les Membres servent à **étendre** (neutre), **attaquer** (faction) et **défendre** (renfort). Voir `combat.md`.
 
@@ -39,15 +39,15 @@ Définir la **prise de contrôle de la ville** : qui possède quoi, comment on �
 
 ### Spawn et immunité
 
-- **4–6 factions** (joueur + 3–5 IA, voir `factions.md`).
-- Spawn : **distance minimale** entre factions, **1–2 quartiers** de départ + Membres initiaux, **immunité de spawn** (pas d'attaque pendant N ticks).
+- **6 factions** (joueur + 5 IA, voir `factions.md`).
+- Spawn : **4 quartiers bâtis les plus éloignés** (échantillonnage glouton), 1 quartier de départ + Membres initiaux.
 
 ## Paramètres chiffrés
 
 | Paramètre | Valeur de départ | Statut |
 |---|---|---|
-| Grille | 16×16 = 256 quartiers (modules 6×6) | fixé |
-| Factions | 4–6 (joueur + 3–5 IA) | fixé |
+| Carte | Paris IRIS — 992 quartiers réels | fixé |
+| Factions | 6 (joueur + 5 IA) | fixé |
 | Contrôle max | 100 | fixé |
 | Contrôle initial (quartier capturé) | ~30 | à équilibrer |
 | `maxMembres` | `2000 + quartiers × 1500 + logements × 2000 + dépôts × 2000` | à équilibrer |
@@ -55,9 +55,8 @@ Définir la **prise de contrôle de la ville** : qui possède quoi, comment on �
 | Coût d'aménagement d'un logement | 800 membres | à équilibrer |
 | Recrutement aménagé | +25 Membres/tick (perdu si le quartier est capturé) | à équilibrer |
 | Membres de départ (faction) | 3 000 | à équilibrer |
-| Garnison neutre (par quartier) | ~2 000 | à équilibrer |
-| Distance min entre factions (spawn) | ~5 quartiers | à équilibrer |
-| Immunité de spawn | 50 ticks (5 s) | inspiration OpenFront |
+| Garnison neutre (par quartier) | 60 Contrôle | fixé |
+| Spawns | 4 quartiers bâtis espacés (glouton) | fixé |
 | Régénération de Contrôle | +X/tick après Y s sans dégât | TBD |
 
 ## Cas limites
@@ -83,15 +82,16 @@ Définir la **prise de contrôle de la ville** : qui possède quoi, comment on �
 - [ ] Une faction peut étendre son territoire sur le neutre et sur une faction ennemie.
 - [ ] Le Contrôle régénère, monte et tombe de façon traçable (audit causal).
 - [ ] Un quartier capturé transfère ses bâtiments.
-- [ ] Un cluster isolé est bien perdu par son propriétaire.
-- [ ] Le déterminisme est respecté (même seed → mêmes quartiers/spawns).
+- [x] Un quartier capturé transfère ses bâtiments.
+- [x] Carte reproductible (fichier généré et versionné).
 
 ## Décisions tranchées (log)
 
 | # | Question | Décision |
 |---|---|---|
-| 1 | Unité de territoire | Module 6×6 (256 quartiers) |
+| 1 | Unité de territoire | Quartier IRIS (992 quartiers réels) |
 | 2 | Modèle | Propriétaire + Contrôle 0–100 + pool de Membres |
 | 3 | Expansion | Par adjacence (BFS), coût en Membres |
 | 4 | Anti-snowball | Clusters isolés perdus (façon OpenFront) |
-| 5 | Factions | 4–6, spawn espacé, immunité 50 ticks |
+| 5 | Factions | 4, spawns espacés (échantillonnage glouton) |
+| 6 | Adjacence | Frontières partagées (arêtes), calculées dans `scripts/build-paris-map.ts` |

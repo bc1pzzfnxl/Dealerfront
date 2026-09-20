@@ -1,6 +1,6 @@
 /**
- * Fin de partie — victoire à double condition, faillite, score. Voir
- * docs/win-conditions.md et docs/scoring.md.
+ * Fin de partie — battle royale : dernier survivant, faillite, classement.
+ * Voir docs/win-conditions.md et docs/scoring.md.
  */
 
 import { describe, expect, it } from "vitest";
@@ -18,23 +18,51 @@ function giveNeutral(world: World, factionId: number, count: number): void {
 	}
 }
 
-describe("fin de partie", () => {
-	it("la victoire exige contrôle ET Cash propre", () => {
-		const world = new World(1, "nightlife");
-		giveNeutral(world, 0, Math.ceil(world.territory.count * 0.63));
-		world.step();
-		expect(world.controlRatio(0)).toBeGreaterThanOrEqual(0.6);
-		expect(world.player.cashPropre).toBe(0);
-		expect(world.outcome).toBeNull();
+/** Élimine toutes les factions IA (0 quartier) pour ne laisser que le joueur. */
+function eliminateRivals(world: World): void {
+	for (let i = 0; i < world.territory.count; i += 1) {
+		const owner = world.territory.owner[i]!;
+		if (owner > 0) {
+			world.territory.owner[i] = NEUTRAL;
+			world.territory.control[i] = 60;
+		}
+	}
+}
 
-		world.player.cashPropre = world.cleanGoal();
+describe("fin de partie (battle royale)", () => {
+	it("aucune victoire tant qu'il reste un rival", () => {
+		const world = new World(1);
+		giveNeutral(world, 0, Math.ceil(world.territory.count * 0.6));
+		world.player.cashPropre = 5_000_000;
 		world.step();
+		expect(world.aliveCount()).toBeGreaterThan(1);
+		expect(world.outcome).toBeNull();
+	});
+
+	it("victoire au dernier cartel en jeu", () => {
+		const world = new World(1);
+		eliminateRivals(world);
+		world.step();
+		expect(world.aliveCount()).toBe(1);
 		expect(world.outcome).toBe("victory");
-		expect(world.endReason).toContain("Cash propre");
+		expect(world.endReason).toContain("Dernier cartel");
+	});
+
+	it("défaite quand le joueur n'a plus de quartier", () => {
+		const world = new World(1);
+		for (let i = 0; i < world.territory.count; i += 1) {
+			if (world.territory.owner[i]! >= 0) {
+				world.territory.owner[i] = NEUTRAL;
+				world.territory.control[i] = 60;
+			}
+		}
+		world.step();
+		expect(world.outcome).toBe("defeat");
+		expect(world.endReason).toContain("éliminé");
 	});
 
 	it("déclare la faillite après une fenêtre à zéro", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashSale = 0;
 		world.player.cashPropre = 0;
 		for (let i = 0; i < 320 && world.outcome === null; i += 1) world.step();
@@ -43,7 +71,7 @@ describe("fin de partie", () => {
 	});
 
 	it("réarme la fenêtre de faillite si la trésorerie remonte", () => {
-		const world = new World(1, "nightlife");
+		const world = new World(1);
 		world.player.cashSale = 0;
 		for (let i = 0; i < 100; i += 1) {
 			world.step();
@@ -52,35 +80,22 @@ describe("fin de partie", () => {
 		expect(world.outcome).toBeNull();
 	});
 
-	it("à l'échéance, classe par score composite", () => {
-		const world = new World(1, "nightlife", { timeLimitTicks: 40 });
-		world.player.cashPropre = 1000000;
-		for (let i = 0; i < 60 && world.outcome === null; i += 1) world.step();
-		expect(world.outcome).toBe("victory");
-		expect(world.endReason).toContain("Temps écoulé");
-		expect(world.summary().rank).toBe(1);
+	it("classe par quartiers contrôlés puis Membres", () => {
+		const world = new World(1);
+		giveNeutral(world, 1, 10);
+		world.step();
+		const ranks = world.rankings();
+		expect(ranks[0]).toBe(1);
+		expect(world.summary(1).rank).toBe(1);
 	});
 
-	it("le score est pénalisé par les éliminations et les saisies", () => {
-		const world = new World(1, "nightlife");
-		world.player.cashPropre = 1000000;
-		const base = world.score(0);
-		expect(base).toBeGreaterThan(0);
-
-		world.player.eliminations = 3;
-		expect(world.score(0)).toBeLessThan(base);
-
-		world.player.eliminations = 0;
-		world.player.seizures = 2;
-		expect(world.score(0)).toBeLessThan(base);
-	});
-
-	it("l'overtime abaisse le seuil de contrôle après l'échéance", () => {
-		const standard = new World(1, "nightlife", { timeLimitTicks: 10 });
-		expect(standard.victoryControlThreshold()).toBe(0.42);
-
-		const overtime = new World(1, "nightlife", { timeLimitTicks: 10, overtime: true });
-		overtime.tick = 10 + 600; // 1 min au-delà
-		expect(overtime.victoryControlThreshold()).toBeCloseTo(0.4);
+	it("le briefing expose survivants, rang et progression", () => {
+		const world = new World(1);
+		world.step();
+		const briefing = world.briefing();
+		expect(briefing.map).toBe("paris");
+		expect(briefing.alive).toBe(world.aliveCount());
+		expect(briefing.rank).toBeGreaterThanOrEqual(1);
+		expect(briefing.done).toBe(false);
 	});
 });

@@ -1,10 +1,10 @@
 /**
  * Types partagés du cœur de simulation.
- * Source : docs/city-sim.md, docs/procgen.md, docs/agents.md.
+ * Source : docs/city-sim.md, docs/procgen.md.
  */
 
-/** Types de zones urbaines (city-sim.md). */
-export const ZONE_TYPES = [
+/** Types de zones urbaines (city-sim.md), déduits du type IRIS pour Paris. */
+const ZONE_TYPES = [
 	"residential",
 	"commercial",
 	"nightlife",
@@ -29,31 +29,21 @@ export const ZONE_LABELS: Record<ZoneType, string> = {
 	vacant: "Terrain vague",
 };
 
-/** Index stable par zone (stockage compact dans un Uint8Array). */
-export const ZONE_INDEX: Record<ZoneType, number> = Object.fromEntries(
-	ZONE_TYPES.map((zone, index) => [zone, index]),
-) as Record<ZoneType, number>;
-
-/** Profils de génération de ville (procgen.md §Archétypes). */
-export const ARCHETYPES = [
-	"nightlife",
-	"residential",
-	"industrial",
-	"student",
-	"port",
-] as const;
-
-export type Archetype = (typeof ARCHETYPES)[number];
-
-/** Grille urbaine générée (procgen.md : modules 6×6 sur grille 48×48). */
+/**
+ * Carte jouable : une vraie ville (Paris IRIS).
+ * Zones, adjacence, départs et profils économiques par quartier.
+ */
 export interface CityGrid {
-	readonly seed: number;
-	readonly archetype: Archetype;
-	readonly width: number;
-	readonly height: number;
-	readonly moduleSize: number;
-	/** Index de zone par tuile, en row-major (width * height). */
-	readonly tiles: Uint8Array;
-	/** Zone par module, en row-major (MODULES_W * MODULES_H). */
+	/** Zone par quartier (longueur = nombre de quartiers). */
+	readonly zones: readonly ZoneType[];
+	/** Alias de `zones` (compatibilité historique). */
 	readonly modules: readonly ZoneType[];
+	/** Quartiers adjacents (partage de frontière, pas seulement un coin). */
+	readonly neighbors: readonly (readonly number[])[];
+	/** Quartiers de départ proposés aux factions. */
+	readonly spawns: readonly number[];
+	/** Demande locale (clientele) : multiplicateur de vente/recrutement (≈0,5–1,4). */
+	readonly demand: Float32Array;
+	/** Richesse locale : multiplicateur de prix et de blanchiment (≈0,6–1,4). */
+	readonly wealth: Float32Array;
 }

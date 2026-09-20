@@ -6,7 +6,6 @@
 import { BUILDING_TYPES } from "../src/sim/buildings";
 import { AUTOPLAY_EVERY, playOut } from "../src/sim/bot";
 import { createRng } from "../src/sim/rng";
-import { ARCHETYPES, type Archetype } from "../src/sim/types";
 import { World } from "../src/sim/world";
 
 const SEEDS = Number(process.env.SEEDS ?? 200);
@@ -46,10 +45,6 @@ function checkInvariants(world: World): void {
 	}
 }
 
-function archetypeFor(seed: number): Archetype {
-	return ARCHETYPES[seed % ARCHETYPES.length] as Archetype;
-}
-
 function runSeed(seed: number): {
 	outcome: string;
 	ticks: number;
@@ -64,7 +59,7 @@ function runSeed(seed: number): {
 	reason: string;
 	pacts: number;
 } {
-	const world = new World(seed, archetypeFor(seed));
+	const world = new World(seed);
 	const rng = createRng((seed * 7919 + 13) >>> 0);
 	let cleanAll = 0;
 	const ticks = playOut(world, rng, MAX_TICKS, CADENCE);
@@ -89,7 +84,7 @@ function runSeed(seed: number): {
 function determinismCheck(): boolean {
 	for (let seed = 0; seed < 8; seed += 1) {
 		const run = (): number[] => {
-			const world = new World(seed, archetypeFor(seed));
+			const world = new World(seed);
 			const rng = createRng((seed * 7919 + 13) >>> 0);
 			playOut(world, rng, 1200, CADENCE);
 			return Array.from(world.territory.owner);
@@ -131,15 +126,13 @@ for (let seed = 0; seed < SEEDS; seed += 1) {
 	totalLiquidations += result.liquidations;
 	if (result.policeDefeat) policeDefeats += 1;
 	totalPacts += result.pacts;
-	const cause = result.reason.includes("Temps écoulé")
-		? "temps écoulé"
-		: result.reason.includes("Liquidation")
-			? "liquidation policière"
-			: result.reason.includes("Faillite")
-				? "faillite"
-				: result.reason.includes("éliminé")
-					? "élimination"
-					: "victoire (contrôle + cash)";
+	const cause = result.reason.includes("Liquidation")
+		? "liquidation policière"
+		: result.reason.includes("Faillite")
+			? "faillite"
+			: result.reason.includes("éliminé")
+				? "élimination"
+				: "victoire (dernier survivant)";
 	causes[cause] = (causes[cause] ?? 0) + 1;
 }
 const elapsed = (performance.now() - start) / 1000;

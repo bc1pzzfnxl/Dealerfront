@@ -1,4 +1,3 @@
-import type { BuildingType } from "../sim/buildings";
 import type { ZoneType } from "../sim/types";
 
 /**
@@ -43,15 +42,3 @@ export function factionDisplayColor(index: number, hex: string, colorblind: bool
 	if (!colorblind) return hex;
 	return FACTION_GRAYSCALE[index % FACTION_GRAYSCALE.length]!;
 }
-
-/** Couleur pastel par type de bâtiment de cartel (DA P16 : code couleur). */
-export const BUILDING_COLORS: Record<BuildingType, string> = {
-	logement: "#C9D6E3",
-	labo: "#9FD8B4",
-	vente: "#F2CE86",
-	facade: "#F0B6D2",
-	planque: "#C6BEE8",
-	depot: "#D8C7A8",
-	atelier: "#8FC7E8",
-	contre: "#EBA6A0",
-};

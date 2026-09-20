@@ -1,8 +1,8 @@
 import { play, setEnabled, setVolume, type SoundName } from "cuelume";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IsoCanvas } from "./render/IsoCanvas";
+import { ACTION_ICONS, BUILDING_ICONS, RESOURCE_ICONS } from "./render/icons";
 import { FACTION_SYMBOLS } from "./render/palette";
-import { Radar } from "./render/Radar";
+import { WorldMap } from "./render/WorldMap";
 import {
 	BUILDINGS,
 	BUILDING_EFFECT_LABELS,
@@ -12,9 +12,8 @@ import {
 	type BuildingType,
 	NO_BUILDING,
 } from "./sim/buildings";
-import { archetypeOf } from "./sim/city";
 import { SimClock } from "./sim/clock";
-import { MODULES_H, MODULES_W, MODULE_SIZE, SIM_HZ } from "./sim/constants";
+import { SIM_HZ } from "./sim/constants";
 import { HITMAN, TECH, TECH_BRANCHES, TECH_LABELS, techCost } from "./sim/tech";
 import { POLICE_TIER_LABELS } from "./sim/police";
 import { NEUTRAL } from "./sim/territory";
@@ -36,17 +35,11 @@ const EVENT_SOUND: Record<GameEvent, SoundName> = {
 	build: "press",
 	descent: "scan",
 	sabotage: "whisper",
+	intercept: "sparkle",
+	event: "bloom",
 	alert: "error",
 	victory: "arrival",
 	defeat: "error",
-};
-
-const ARCHETYPE_LABEL: Record<string, string> = {
-	nightlife: "Vie nocturne",
-	residential: "Résidentiel",
-	industrial: "Industriel",
-	student: "Étudiant",
-	port: "Portuaire",
 };
 
 function formatCost(type: BuildingType, factor = 1): string {
@@ -87,7 +80,6 @@ function App() {
 			? "play"
 			: "select",
 	);
-	const [hubSeed, setHubSeed] = useState(1337);
 	const [seed, setSeed] = useState(1337);
 	const [running, setRunning] = useState(true);
 	const [version, setVersion] = useState(0);
@@ -124,16 +116,6 @@ function App() {
 	const hoverRef = useRef<HTMLDivElement>(null);
 	const rafRef = useRef<number | null>(null);
 	const lastRef = useRef(0);
-
-	// 3 propositions de ville (profil + seed), façon écran de sélection.
-	const proposals = useMemo(() => {
-		const list: { seed: number; archetype: string }[] = [];
-		for (let index = 0; index < 3; index += 1) {
-			const candidate = (hubSeed + index * 1013904223) >>> 0;
-			list.push({ seed: candidate, archetype: archetypeOf(candidate) });
-		}
-		return list;
-	}, [hubSeed]);
 
 	useEffect(() => {
 		try {
@@ -176,13 +158,16 @@ function App() {
 	// Sons des événements de jeu + secousse d'écran quand on est frappé.
 	useEffect(() => {
 		const events = world.drainEvents();
-		if (events.includes("lost") || events.includes("raid")) {
+		if (events.length === 0) return;
+		const hit = events.includes("lost") || events.includes("raid");
+		if (sound) {
+			for (const event of events) play(EVENT_SOUND[event]);
+		}
+		if (hit) {
 			setShake(true);
-			const timer = setTimeout(() => setShake(false), 420);
+			const timer = setTimeout(() => setShake(false), 380);
 			return () => clearTimeout(timer);
 		}
-		if (!sound) return;
-		for (const event of events) play(EVENT_SOUND[event]);
 	}, [version, world, sound]);
 
 	// Clic sur n'importe quel bouton → feedback « press ».
@@ -203,18 +188,6 @@ function App() {
 			// stockage indisponible : aide re-affichée
 		}
 	}, []);
-
-	const focus = useMemo(() => {
-		for (let i = 0; i < world.territory.count; i += 1) {
-			if (world.territory.owner[i] === world.player.id) {
-				return {
-					x: (i % MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2,
-					z: Math.floor(i / MODULES_W) * MODULE_SIZE + MODULE_SIZE / 2,
-				};
-			}
-		}
-		return { x: world.city.width / 2, z: world.city.height / 2 };
-	}, [world]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -338,6 +311,18 @@ function App() {
 		return null;
 	}, [selected, world, player]);
 
+	const interceptReason = useCallback((): string | null => {
+		if (selected === null) return "aucune cible";
+		if (world.ownerAt(selected) === player.id) return "déjà à vous";
+		if (world.ownerAt(selected) === NEUTRAL) return "cible neutre";
+		if (!world.canAttack(player.id, selected)) return "non adjacent";
+		if (!world.convoyRoutes().some((route) => route.to === selected)) return "aucun convoi";
+		if (player.tech.armement < 1) return "Armement ≥ 1 requis";
+		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		if (player.members < world.interceptCost()) return `${world.interceptCost()} membres requis`;
+		return null;
+	}, [selected, world, player]);
+
 	const batch = world.playerBatchPreview();
 
 	const raidReason = useCallback((): string | null => {
@@ -373,8 +358,8 @@ function App() {
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [act, selected, world, hitmanReason]);
 
-	const startCity = (citySeed: number) => {
-		setSeed(citySeed);
+	/** Lance une partie sur la carte réelle (Paris IRIS). */
+	const startParis = () => {
 		setSelected(null);
 		setVersion(0);
 		setRunning(true);
@@ -389,11 +374,11 @@ function App() {
 	};
 
 	const backToSelect = () => {
-		setHubSeed((value) => (value * 1103515245 + 12345) >>> 0);
 		setScreen("select");
 	};
 
 	const totalModules = world.city.modules.length;
+	const cityLabel = "Paris · 992 quartiers IRIS";
 	const playerPct = Math.round(world.controlRatio(player.id) * 100);
 	const perSecond = Math.round(world.productionPerTick(player.id) * SIM_HZ * 10) / 10;
 	const afford = (type: BuildingType) => selected !== null && world.playerCanQueue(selected, type);
@@ -406,10 +391,11 @@ function App() {
 		world.police.target >= 0 ? (world.factions[world.police.target]?.name ?? "—") : "—";
 	const policeTierLabel = POLICE_TIER_LABELS[world.policeLevel()];
 	const summary = world.summary();
-	const threshold = world.victoryControlThreshold();
-	const cleanGoal = world.cleanGoal();
-	const secondsLeft = Math.max(0, Math.ceil(world.ticksLeft() / SIM_HZ));
-	const timeLeft = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
+	const alive = world.aliveCount();
+	const gameTime = (() => {
+		const seconds = Math.floor(world.tick / SIM_HZ);
+		return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+	})();
 
 	/** Priorité stratégique d'amorçage : Labo → Point de vente → Façade. */
 	const advisedType: BuildingType | null =
@@ -437,9 +423,6 @@ function App() {
 	const ownedQuarters = world.modulesOwned(player.id);
 	const idleQuarters = Math.max(0, ownedQuarters - player.buildings);
 	const advisor = (() => {
-		if (player.cashPropre >= cleanGoal && world.controlRatio(player.id) >= threshold) {
-			return "Objectif rempli : gardez la tête du classement.";
-		}
 		if (ownedQuarters < 2) {
 			return "Capturez un quartier adjacent (sélectionnez-le puis Q) : 1 bâtiment par quartier.";
 		}
@@ -456,10 +439,7 @@ function App() {
 		if (idleQuarters > 0) {
 			return `${idleQuarters} quartier(s) vide(s) : aménagez-les (Q sur un quartier possédé).`;
 		}
-		if (world.controlRatio(player.id) < threshold) {
-			return "Étendez le territoire : sélectionnez un quartier adjacent puis Attaquer (Q).";
-		}
-		return "Blanchissez encore du Cash propre pour valider la victoire.";
+		return "Étendez le territoire : éliminez les cartels rivaux pour rester le dernier.";
 	})();
 
 	/** Chaîne économique : bâtiment → ressource, pour rendre la boucle lisible. */
@@ -529,25 +509,22 @@ function App() {
 		return (
 			<div className="select-screen">
 				<h1>DealerFront</h1>
-				<p>
-					{MODULES_W * MODULES_H} quartiers · 4 cartels · objectif : ≥ {Math.round(threshold * 100)} % et{" "}
-					{cleanGoal.toLocaleString("fr-FR")} de Cash propre
+				<p className="select-pitch">
+					Le cartel sur la vraie carte de Paris. Contrôlez le terrain, produisez, vendez,
+					blanchissez — avant la police et les rivaux.
 				</p>
-				<div className="city-choices">
-					{proposals.map((proposal) => (
-						<button
-							key={proposal.seed}
-							type="button"
-							className="city-card"
-							onClick={() => startCity(proposal.seed)}
-						>
-							<strong>{ARCHETYPE_LABEL[proposal.archetype] ?? proposal.archetype}</strong>
-							<em>seed {proposal.seed}</em>
-							<span>Possession colorée · police anti-leader · 25 min</span>
-						</button>
-					))}
+				<div className="select-loop" aria-hidden="true">
+					<span>Produire</span>
+					<span>Vendre</span>
+					<span>Blanchir</span>
 				</div>
-				<p>Choisissez une ville pour lancer la partie.</p>
+				<div className="city-choices">
+					<button type="button" className="city-card" onClick={startParis}>
+						<strong>Jouer à Paris</strong>
+						<em>992 quartiers IRIS · 6 cartels · battle royale</em>
+						<span>Objectif : rester le dernier cartel en jeu. Votre économie finance la guerre.</span>
+					</button>
+				</div>
 			</div>
 		);
 	}
@@ -555,13 +532,12 @@ function App() {
 	return (
 		<div className="game">
 			<div className={`viewport${shake ? " shake" : ""}`}>
-				<IsoCanvas
-					city={world.city}
+				<WorldMap
 					territory={world.territory}
-					factions={world.factions}
 					attacks={world.attacks}
+					convoys={world.convoyRoutes()}
+					heat={world.heat}
 					tick={world.tick}
-					focus={focus}
 					selected={selected}
 					colorblind={colorblind}
 					version={version}
@@ -590,23 +566,15 @@ function App() {
 						);
 					})}
 				</div>
-				<Radar
-					city={world.city}
-					territory={world.territory}
-					factions={world.factions}
-					attacks={world.attacks}
-					selected={selected}
-					colorblind={colorblind}
-					version={version}
-					onSelect={(module) => setSelected(module)}
-				/>
 			</div>
 
 			<div ref={hoverRef} className={`hover-card${hovered !== null ? " show" : ""}`}>
 				{hovered !== null ? (
 					<>
 						<span className="hover-owner">
-							{hoverOwnerName} · {hoverZone ? ZONE_LABELS[hoverZone] : "—"} · contrôle {hoverControl}
+							{hoverOwnerName} · {hoverZone ? ZONE_LABELS[hoverZone] : "—"} · contrôle {hoverControl} ·
+							demande ×{world.demandAt(hovered).toFixed(1)} · richesse ×
+							{world.wealthAt(hovered).toFixed(1)} · heat {Math.round(world.heatAt(hovered))}
 						</span>
 						<span className="hover-line">
 							{hoverConstruction > 0
@@ -633,54 +601,78 @@ function App() {
 				<header className="topbar card">
 					<div className="brand">
 						<h1>DealerFront</h1>
-						<span className="brand-sub">
-							seed {world.city.seed} · {world.city.archetype}
-						</span>
+						<span className="brand-sub">{cityLabel}</span>
 					</div>
 					<div className="top-stats">
-						<div className="stat">
-							<span>Membres</span>
+						<div className="stat" title="Membres (troupes)">
+							<RESOURCE_ICONS.members className="stat-icon" aria-hidden="true" />
 							<strong>{Math.round(player.members).toLocaleString("fr-FR")}</strong>
 						</div>
-						<div className="stat">
-							<span>Produit</span>
+						<div className="stat" title="Produit (stock des labos)">
+							<RESOURCE_ICONS.produit className="stat-icon" aria-hidden="true" />
 							<strong>{Math.round(player.produit)}</strong>
 						</div>
-						<div className="stat">
-							<span>Cash sale</span>
+						<div className="stat" title="Cash sale (à blanchir)">
+							<RESOURCE_ICONS.sale className="stat-icon" aria-hidden="true" />
 							<strong>{Math.round(player.cashSale).toLocaleString("fr-FR")}</strong>
 						</div>
-						<div className="stat">
-							<span>Cash propre</span>
+						<div className="stat" title="Cash propre (objectif)">
+							<RESOURCE_ICONS.clean className="stat-icon clean" aria-hidden="true" />
 							<strong className="clean">
 								{Math.round(player.cashPropre).toLocaleString("fr-FR")}
 							</strong>
 						</div>
-						<div className="stat">
-							<span>Contrôle</span>
+						<div className="stat" title="Part de la carte contrôlée">
+							<span className="stat-label">Contrôle</span>
 							<strong>{playerPct}%</strong>
 						</div>
-						<div className="stat">
-							<span>Quartiers</span>
+						<div className="stat" title="Quartiers possédés">
+							<span className="stat-label">Quartiers</span>
 							<strong>
 								{world.modulesOwned(player.id)}
 								<em>/{totalModules}</em>
 							</strong>
 						</div>
-						<div className="stat">
-							<span>Production</span>
+						<div className="stat" title="Membres produits par seconde">
+							<span className="stat-label">Prod.</span>
 							<strong>+{perSecond}/s</strong>
 						</div>
 					</div>
 					<div className="top-right">
 						<span className="objective">
-							Objectif ≥ {Math.round(threshold * 100)} % ·{" "}
-							{Math.round(player.cashPropre).toLocaleString("fr-FR")}/
-							{cleanGoal.toLocaleString("fr-FR")} propre
+							<strong>
+								{alive} cartel{alive > 1 ? "s" : ""} en jeu
+							</strong>
+							<span className="objective-sub">Dernier survivant</span>
 						</span>
-						<span className="timer">reste {timeLeft}</span>
+						<span className="timer" title="Temps de survie">
+							{gameTime}
+						</span>
 					</div>
 				</header>
+
+				{world.pendingEvent() ? (
+					<div className={`event-card ${world.pendingEvent()!.kind}`}>
+						<h3>{world.pendingEvent()!.title}</h3>
+						<p>{world.pendingEvent()!.body}</p>
+						<div className="event-choices">
+							{world.pendingEvent()!.choices.map((choice, index) => (
+								<button
+									key={choice.label}
+									type="button"
+									title={choice.detail}
+									onClick={() => {
+										world.playerChoose(index as 0 | 1);
+										setVersion((value) => value + 1);
+									}}
+								>
+									<strong>{choice.label}</strong>
+									<em>{choice.detail}</em>
+								</button>
+							))}
+						</div>
+					</div>
+				) : null}
 
 				<section className="card panel-left">
 					<p className="advisor">{advisor}</p>
@@ -711,12 +703,30 @@ function App() {
 						<code>{selected !== null ? Math.round(world.controlAt(selected)) : "—"}</code>
 					</div>
 					<div className="line">
+						<span>Logistique</span>
+						<code>{Math.round(world.retailSupplyRatio(player.id) * 100)}% approvisionné</code>
+					</div>
+					<div className="line">
+						<span>Heat</span>
+						<code>{selected !== null ? Math.round(world.heatAt(selected)) : "—"}</code>
+					</div>
+					<div className="line">
 						<span>Bâtiment</span>
 						<code>{selectedBuilding ? BUILDINGS[selectedBuilding].label : "—"}</code>
 					</div>
 					<div className="line">
 						<span>Zone</span>
 						<code>{selectedZoneLabel}</code>
+					</div>
+					<div className="line">
+						<span>Profil</span>
+						<code>
+							{selected !== null
+								? `demande ×${world.demandAt(selected).toFixed(1)} · richesse ×${world
+										.wealthAt(selected)
+										.toFixed(1)}`
+								: "—"}
+						</code>
 					</div>
 
 					<label className="slider-row" title="Part des Membres engagée à chaque assaut">
@@ -753,6 +763,7 @@ function App() {
 									{BUILDING_TYPES.map((type) => {
 										const reason = blockReason(type);
 										const zoneBlocked = reason === "zone incompatible";
+										const Icon = BUILDING_ICONS[type];
 										return (
 											<button
 												key={type}
@@ -762,9 +773,9 @@ function App() {
 												title={`${BUILDINGS[type].label} — ${BUILDING_EFFECT_LABELS[type]} · ${formatCost(type, costFactor)}${reason ? ` · ${reason}` : ""}`}
 												onClick={() => build(type)}
 											>
-												{BUILDINGS[type].label}
+												<Icon className="build-icon" aria-hidden="true" />
 												<em className={zoneBlocked ? "zone" : reason ? "lack" : undefined}>
-													{zoneBlocked ? "zone incompatible" : formatCost(type, costFactor)}
+													{zoneBlocked ? "zone" : formatCost(type, costFactor)}
 												</em>
 											</button>
 										);
@@ -789,85 +800,133 @@ function App() {
 							</>
 						)
 					) : (
-						<>
-							<button type="button" disabled={!canAttack} onClick={act}>
-								{canAttack ? `Assaut (Q) · ${engaged} engagés` : "Non attaquable"}
-							</button>
-							{canAttack ? (
-								<p className="hint-inline">
-									Siège : contrôle {targetControl} · défense ×{targetDefense.toFixed(1)}
-									{world.buildingAt(selected!) === "planque" ? " (planque)" : ""} · max{" "}
-									{world.maxAssaults()} assauts simultanés
-								</p>
-							) : (
-								<p className="hint-inline">{attackReason}</p>
-							)}
-							{selectedOwner !== player.id && selectedOwner !== NEUTRAL ? (
-								<button
-									type="button"
-									disabled={raidReason() !== null}
-									title={raidReason() ?? "Détruit le contrôle et les bâtiments, sans capturer"}
-									onClick={() => {
-										if (selected !== null && world.playerRaid(selected)) {
-											setVersion((value) => value + 1);
-										} else {
-											setNotice(`Raid : ${raidReason() ?? "impossible"}.`);
-										}
-									}}
-								>
-									Raid ({world.raidCost().sale} sale{raidReason() ? ` · ${raidReason()}` : ""})
-								</button>
-							) : null}
-							{selectedOwner !== player.id && selectedBuilding ? (
-								<button
-									type="button"
-									disabled={descentReason() !== null}
-									title={descentReason() ?? "Coup de main : vole le butin sans détruire le bâtiment"}
-									onClick={() => {
-										if (selected !== null && world.playerDescent(selected)) {
-											setVersion((value) => value + 1);
-										} else {
-											setNotice(`Descente : ${descentReason() ?? "impossible"}.`);
-										}
-									}}
-								>
-									Descente{descentReason() ? ` · ${descentReason()}` : ` (+butin)`}
-								</button>
-							) : null}
-							{selectedOwner !== player.id && selectedBuilding ? (
-								<button
-									type="button"
-									disabled={sabotageReason() !== null}
-									title={sabotageReason() ?? "Divise la production du bâtiment pendant 30 s"}
-									onClick={() => {
-										if (selected !== null && world.playerSabotage(selected)) {
-											setVersion((value) => value + 1);
-										} else {
-											setNotice(`Sabotage : ${sabotageReason() ?? "impossible"}.`);
-										}
-									}}
-								>
-									Sabotage{sabotageReason() ? ` · ${sabotageReason()}` : ` (${world.sabotageCost()})`}
-								</button>
-							) : null}
-							{selectedOwner !== player.id ? (
-								<button
-									type="button"
-									className="hitman"
-									disabled={hitmanReason() !== null}
-									title={hitmanReason() ?? "Affaiblit un quartier (Armement ≥ 2)"}
-									onClick={() => {
-										if (selected !== null && world.playerHitman(selected)) {
-											setVersion((value) => value + 1);
-										} else {
-											setNotice(`Tueur à gage : ${hitmanReason() ?? "impossible"}.`);
-										}
-									}}
-								>
-									Tueur à gage (T){hitmanReason() ? ` · ${hitmanReason()}` : ""}
-								</button>
-							) : null}
-						</>
+						<div className="command-bar">
+							{(() => {
+								const AttackIcon = ACTION_ICONS.attack;
+								const actions: {
+									key: string;
+									icon: typeof AttackIcon;
+									label: string;
+									hotkey?: string;
+									title: string;
+									disabled: boolean;
+									run: () => void;
+								}[] = [
+									{
+										key: "attack",
+										icon: AttackIcon,
+										label: canAttack ? `${engaged} engagés` : "Assaut",
+										hotkey: "Q",
+										title: canAttack
+											? `Assaut · ${engaged} Membres engagés · siège : contrôle ${targetControl}, défense ×${targetDefense.toFixed(1)}${world.buildingAt(selected!) === "planque" ? " (planque)" : ""}`
+											: attackReason,
+										disabled: !canAttack,
+										run: act,
+									},
+								];
+								if (selectedOwner !== player.id && selectedOwner !== NEUTRAL) {
+									const RaidIcon = ACTION_ICONS.raid;
+									actions.push({
+										key: "raid",
+										icon: RaidIcon,
+										label: `${world.raidCost().sale}`,
+										title: raidReason() ?? "Raid : détruit contrôle et bâtiments, sans capturer",
+										disabled: raidReason() !== null,
+										run: () => {
+											if (selected !== null && world.playerRaid(selected)) {
+												setVersion((value) => value + 1);
+											} else {
+												setNotice(`Raid : ${raidReason() ?? "impossible"}.`);
+											}
+										},
+									});
+								}
+								if (selectedOwner !== player.id && selectedBuilding) {
+									const DescentIcon = ACTION_ICONS.descent;
+									actions.push({
+										key: "descent",
+										icon: DescentIcon,
+										label: "butin",
+										title: descentReason() ?? "Descente : vole le butin sans détruire le bâtiment",
+										disabled: descentReason() !== null,
+										run: () => {
+											if (selected !== null && world.playerDescent(selected)) {
+												setVersion((value) => value + 1);
+											} else {
+												setNotice(`Descente : ${descentReason() ?? "impossible"}.`);
+											}
+										},
+									});
+									const SabotageIcon = ACTION_ICONS.sabotage;
+									actions.push({
+										key: "sabotage",
+										icon: SabotageIcon,
+										label: `${world.sabotageCost()}`,
+										title: sabotageReason() ?? "Sabotage : production ÷2 pendant 30 s",
+										disabled: sabotageReason() !== null,
+										run: () => {
+											if (selected !== null && world.playerSabotage(selected)) {
+												setVersion((value) => value + 1);
+											} else {
+												setNotice(`Sabotage : ${sabotageReason() ?? "impossible"}.`);
+											}
+										},
+									});
+									const InterceptIcon = ACTION_ICONS.intercept;
+									actions.push({
+										key: "intercept",
+										icon: InterceptIcon,
+										label: `${world.interceptCost()}`,
+										title:
+											interceptReason() ??
+											"Interception : détourne la cargaison d'un convoi et coupe la ligne",
+										disabled: interceptReason() !== null,
+										run: () => {
+											if (selected !== null && world.playerIntercept(selected)) {
+												setVersion((value) => value + 1);
+											} else {
+												setNotice(`Interception : ${interceptReason() ?? "impossible"}.`);
+											}
+										},
+									});
+								}
+								if (selectedOwner !== player.id) {
+									const HitmanIcon = ACTION_ICONS.hitman;
+									actions.push({
+										key: "hitman",
+										icon: HitmanIcon,
+										label: "T",
+										hotkey: "T",
+										title: hitmanReason() ?? "Tueur à gage : affaiblit un quartier (Armement ≥ 2)",
+										disabled: hitmanReason() !== null,
+										run: () => {
+											if (selected !== null && world.playerHitman(selected)) {
+												setVersion((value) => value + 1);
+											} else {
+												setNotice(`Tueur à gage : ${hitmanReason() ?? "impossible"}.`);
+											}
+										},
+									});
+								}
+								return actions.map((action) => {
+									const Icon = action.icon;
+									return (
+										<button
+											key={action.key}
+											type="button"
+											className="command"
+											disabled={action.disabled}
+											title={action.title}
+											onClick={action.run}
+										>
+											<Icon className="command-icon" aria-hidden="true" />
+											<span className="command-label">{action.label}</span>
+											{action.hotkey ? <kbd>{action.hotkey}</kbd> : null}
+										</button>
+									);
+								});
+							})()}
+						</div>
 					)}
 					{batch.count > 0 ? (
 						<section className="card">
@@ -1135,7 +1194,21 @@ function App() {
 							{world.log.length === 0 ? (
 								<li className="empty">—</li>
 							) : (
-								world.log.slice(-3).map((line, index) => <li key={index}>{line}</li>)
+								world.log.slice(-3).map((line, index) => {
+									const lower = line.toLowerCase();
+									const kind = /perd|raid|saisi|grill|liquid|élimin|trait/.test(lower)
+										? "loss"
+										: /prend|tech|pacte|corrupt|baisse|aménage|descente|sabot|intercept/.test(
+												lower,
+											)
+											? "gain"
+											: "info";
+									return (
+										<li key={index} className={`log-${kind}`}>
+											{line}
+										</li>
+									);
+								})
 							)}
 						</ul>
 					</section>
@@ -1145,15 +1218,16 @@ function App() {
 							glisser = caméra
 						</p>
 						<div className="hud-actions">
-							<button type="button" onClick={() => setRunning((value) => !value)}>
+							<button type="button" title="Pause / reprendre" onClick={() => setRunning((value) => !value)}>
 								{running ? "Pause" : "Démarrer"}
 							</button>
-							<button type="button" onClick={regenerate}>
+							<button type="button" title="Relancer sur une nouvelle disposition" onClick={regenerate}>
 								Nouvelle seed
 							</button>
 							<button
 								type="button"
 								className={`toggle${colorblind ? " active" : ""}`}
+								title="Mode daltonien (gris + symboles)"
 								onClick={() => setColorblind((value) => !value)}
 							>
 								Daltonien
@@ -1161,16 +1235,17 @@ function App() {
 							<button
 								type="button"
 								className={`toggle${sound ? " active" : ""}`}
+								title="Activer / couper le son"
 								onClick={() => setSound((value) => !value)}
 							>
 								{sound ? "Son" : "Muet"}
 							</button>
-							<button type="button" className="toggle" onClick={() => setShowHelp(true)}>
+							<button type="button" className="toggle" title="Aide" onClick={() => setShowHelp(true)}>
 								Aide
 							</button>
 						</div>
 						<p className="hud-foot" title={`API ${api}`}>
-							tick {world.tick} · reste {timeLeft}
+							tick {world.tick} · {gameTime}
 						</p>
 					</div>
 				</footer>
@@ -1181,9 +1256,8 @@ function App() {
 					<div className="help-card card">
 						<h2>Comment jouer</h2>
 						<p>
-							<strong>But :</strong> détenir <strong>≥ {Math.round(threshold * 100)} %</strong> des
-							quartiers <em>et</em> <strong>{cleanGoal.toLocaleString("fr-FR")} de Cash propre</strong>{" "}
-							avant la fin du temps.
+							<strong>But :</strong> rester <strong>le dernier cartel en jeu</strong>. Éliminez les
+							rivaux (0 quartier) — la police peut aussi vous liquider.
 						</p>
 						<h3>La boucle économique</h3>
 						<ol>
@@ -1205,9 +1279,9 @@ function App() {
 							un seul bâtiment par quartier.
 						</p>
 						<p>
-							<strong>Zones :</strong> on convertit le bâti existant — chaque quartier n'accepte que
-							certains bâtiments (parc → planque, police → contre-espionnage, terrain vague →
-							construction neuve…). Le détail est affiché sous le menu de construction.
+							<strong>Zones :</strong> chaque quartier n'accepte que certains bâtiments (parc →
+							planque, police → contre-espionnage…). Le détail est affiché sous le menu de
+							construction.
 						</p>
 						<h3>Guerre de quartiers</h3>
 						<p>
@@ -1229,10 +1303,18 @@ function App() {
 							Sélectionnez un quartier <strong>adjacent</strong> puis <kbd>Q</kbd> pour l'attaquer
 							(20 % de vos Membres engagés).
 						</p>
-						<h3>Police</h3>
+						<h3>Marché &amp; logistique</h3>
 						<p>
-							Dominer fait monter la Pression : <strong>Corrompre</strong> la réduit, sinon raids puis
-							liquidation.
+							Chaque quartier a un <strong>profil</strong> (demande, richesse) : un point de vente
+							rapporte plus dans un quartier riche. Une vente doit être <strong>reliée à un labo</strong>{" "}
+							par un chemin de quartiers possédés (sinon −65 % de capacité) : les{" "}
+							<strong>convois</strong> sont visibles et <strong>interceptables</strong>.
+						</p>
+						<h3>Police locale</h3>
+						<p>
+							Le crime <strong>chauffe</strong> les quartiers : les raids visent les plus chauds, et
+							les postes de police refroidissent leur zone. <strong>Corrompre</strong> réduit la
+							Pression et refroidit vos quartiers.
 						</p>
 						<p className="help-keys">
 							<kbd>clic</kbd> sélectionner · <kbd>Q</kbd> attaquer / bâtir · <kbd>T</kbd> tueur ·
@@ -1246,7 +1328,7 @@ function App() {
 			) : null}
 
 			{world.outcome !== null ? (
-				<div className="end-banner">
+				<div className={`end-banner ${world.outcome === "victory" ? "win" : "loss"}`}>
 					<h2>{world.outcome === "victory" ? "Victoire" : "Défaite"}</h2>
 					<p className="end-cause">{world.endReason}</p>
 					<div className="end-score">

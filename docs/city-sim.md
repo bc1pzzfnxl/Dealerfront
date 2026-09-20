@@ -32,13 +32,13 @@ Décrire la ville comme une **simulation** génératrice de contexte et de risqu
 La densité agit de **deux façons simultanées** :
 
 1. **Réduit la montée de suspicion** — on se fond dans la foule : `montée de suspicion × (1 − densité / 150)` (coefficient **TBD**).
-2. **Réduit la portée de vue effective des patrouilles** — `portée = 6 tuiles × (1 − densité / 300)` (soit ≈ 4,2 tuiles en zone à densité 90 ; coefficient **TBD**).
+2. **Réduit la portée de vue effective des patrouilles** — `portée` couvre le quartier et ses voisins.
 
 Une rue vide expose donc davantage (peu de camouflage **et** patrouilles qui voient loin).
 
 ### Témoignage civil
 
-- **Probabiliste**, à **portée courte (~4 tuiles)**.
+- **Probabiliste**, à **portée locale (quartier + voisins)**.
 - Probabilité **∝ densité** de la zone **et visibilité de l'action** du joueur.
 - **Se planquer** réduit fortement la probabilité ; une **action engageante** (vente, blanchiment) l'augmente (**risque accru en action**).
 - Un témoin qui signale génère : **+Pression police** (voir `police-ai.md`) **et** une **position approximative** (`police-ai.md`, recoupement).
@@ -70,7 +70,7 @@ Une rue vide expose donc davantage (peu de camouflage **et** patrouilles qui voi
 | Densités par zone (jour/nuit) | voir barème ci-dessus | à équilibrer |
 | Effet densité sur la montée de suspicion | × (1 − densité/150) | à équilibrer |
 | Effet densité sur la portée de vue | × (1 − densité/300) | à équilibrer |
-| Portée de témoignage civil | ≈ 4 tuiles | fixé |
+| Portée de témoignage civil | quartier + voisins | fixé |
 | Probabilité de témoignage | ∝ densité × visibilité action | **TBD** (coefficients) |
 | Fréquence des événements | 1–3 / run, pondérée par phase | fixé |
 | Pool d'événements | 8 types (voir tableau) | à affiner |

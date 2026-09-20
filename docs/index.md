@@ -6,7 +6,7 @@
 
 ## Le mode en une phrase
 
-Jeu **solo** de stratégie/gestion, ville procédurale iso 2.5D, où tu incarnes **le cartel** : **contrôler ≥ ~60 % des quartiers** et **blanchir assez d'argent** en 20–30 min, face à **3–5 gangs IA** et à la **police**.
+Jeu **solo** de stratégie/gestion sur une **carte réelle** (Paris, quartiers IRIS), où tu incarnes **le cartel** : **rester le dernier cartel en jeu** (battle royale), face à **5 gangs IA** et à la **police**.
 
 ## Ordre de lecture
 
@@ -64,14 +64,14 @@ Les valeurs non tranchées sont **TBD** et listées dans `open-questions.md`.
 
 | Terme | Définition |
 |---|---|
-| **Quartier** | Module 6×6 tuiles ; unité de territoire (256 au total). |
+| **Quartier** | Quartier IRIS réel ; unité de territoire (992 au total). |
 | **Influence** | Ressource-troupe d'une faction (pool), sert à conquérir/défendre. |
 | **Contrôle** | Solidité d'un quartier possédé (0–100) ; tombe à 0 → capture. |
 | **Produit** | Ressource produite par les Labos, vendue. |
 | **Cash sale** | Argent non blanchi obtenu à la vente. |
 | **Cash propre** | Argent blanchi (Façades) ; base du score et de la victoire. |
 | **Bâtiment** | Labo, Point de vente, Façade, Planque, Atelier, Contre-espionnage, Dépôt. |
-| **Faction** | Le joueur ou un gang IA (4–6 au total). |
+| **Faction** | Le joueur ou un gang IA (6 au total). |
 | **Pression police** | Jauge anti-leader (0–100) qui déclenche raids/saisies. |
 | **Tueur à gage** | Action ciblée (tech) infligeant des dégâts de zone à un quartier. |
 | **Pacte** | Alliance temporaire entre factions. |

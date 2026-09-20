@@ -19,7 +19,7 @@
 
 ## Factions & police
 
-- [ ] Nombre exact (4–6) et profils/QI des gangs IA. → `factions.md`
+- [ ] Profils/QI des gangs IA (6 factions fixées). → `factions.md`
 - [ ] **Cerveau IA** (QI, perception locale, peur, loyauté) — agents/PNJ abandonnés. → `factions.md`
 
 ## UI/Art

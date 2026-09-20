@@ -11,21 +11,20 @@ Fixer les choix techniques structurants du mode god-view : simulation de contrô
 - **Runtime** : **solo** au MVP, **tout client-side** (pas de serveur de jeu). Cloudflare Workers conservé pour l'API statique/utilitaires (`/api/*`), pas pour la simulation.
 - **Core de simulation** : **TypeScript déterministe**, **pur** (aucune dépendance React/DOM), à pas fixe **10 Hz**. Isolé pour pouvoir tourner dans un **Web Worker** plus tard.
 - **Style d'architecture** : **`intents → executions`** (inspiré d'OpenFront) : les actions du joueur et des IA deviennent des **intents**, convertis en **executions** qui sont les seules à muter l'état. Découple UI et simulation, facilite les tests et un éventuel multi.
-- **Rendu** : **Three.js** en projection **orthographique** (iso 2.5D), **god view large** (pan/zoom, iso fixe). Overlays de possession (aplats colorés) au-dessus du N&B.
+- **Rendu** : **mapcn / MapLibre** sur la **carte réelle** (Paris IRIS) — fond muet, aplats de possession/faction par `feature-state`. JSON statique, PWA-friendly.
 - **UI** : **React + TypeScript**.
-- **Pathfinding** : A* sur grille (rues) pour les convois/agents si besoin.
-- **Déterminisme** : PRNG seedé ; même seed → même ville, spawns, neutres, IA.
-- **Perf** : instancing, `memo`, mises à jour ciblées ; beaucoup de quartiers/unités → rendu symbolique (overlays) plutôt que modèles détaillés.
+- **Déterminisme** : carte générée/versionnée + PRNG seedé pour la simulation ; même seed → même déroulé, IA comprise.
+- **Perf** : mises à jour ciblées (`feature-state` par quartier, caches `recount`/`owned`/BFS), rendu symbolique (aplats + points) plutôt que modèles détaillés.
 
 ## Paramètres chiffrés
 
 | Paramètre | Valeur | Statut |
 |---|---|---|
 | Tick de simulation | 10 Hz (100 ms) | fixé |
-| Grille | 48×48 tuiles → 16×16 quartiers | fixé |
-| Factions | 4–6 | fixé |
-| Rendu | Three.js ortho, iso fixe, god view | fixé |
-| Déterminisme | génération + simulation seedées | fixé |
+| Carte | Paris IRIS — 992 quartiers réels | fixé |
+| Factions | 4 | fixé |
+| Rendu | mapcn (Map / MapGeoJSON / MapArc / MapControls) sur MapLibre | fixé |
+| Déterminisme | carte versionnée + simulation seedée | fixé |
 | Web Worker | non au MVP, prévu | différé |
 | Multi (Workers + DO) | post-MVP | différé |
 | Budget perf (agents/quartiers) | **TBD** | TBD |
@@ -46,9 +45,9 @@ Fixer les choix techniques structurants du mode god-view : simulation de contrô
 
 ## Critères de validation
 
-- [ ] La simulation tient à 10 Hz avec 4–6 factions sur 256 quartiers.
+- [x] La simulation tient à 10 Hz avec 6 factions sur 992 quartiers.
 - [ ] Le rendu god-view est fluide (overlays, instancing).
-- [ ] Une seed rejouée reproduit ville, spawns et IA.
+- [x] Une seed rejouée reproduit le déroulé et l'IA (carte identique).
 - [ ] Le core est sans dépendance navigateur (Worker-ready).
 
 ## Décisions tranchées (log)
@@ -58,12 +57,12 @@ Fixer les choix techniques structurants du mode god-view : simulation de contrô
 | 1 | Solo/multi | **Solo** au MVP, multi différé |
 | 2 | Serveur de jeu | Aucun (tout client-side) |
 | 3 | Architecture sim | **intents → executions**, core déterministe 10 Hz |
-| 4 | Rendu | Three.js ortho, god view large + overlays |
+| 4 | Rendu | mapcn / MapLibre sur carte réelle, fond muet |
 | 5 | Worker/DO | prévu mais différé |
 
 
-### P18 — carte 24×24 et optimisations
+### Carte réelle (v3)
 
-- Grille **144×144 tuiles → 24×24 = 576 quartiers** (était 16×16).
-- **Sol optimisé** : un plot par module (576) + **plateau de rues** (les interstices dessinent la voirie) au lieu d'une instance par tuile (20 736).
-- **Caméra** : zoom initial adapté à la carte (tout voir), **rotation** autorisée + damping ; ombres et `dpr` ajustés.
+- **Paris IRIS** : 992 quartiers réels, zones déduites du type IRIS, profils marché (`demand`/`wealth`), adjacence par arêtes partagées (`scripts/build-paris-map.ts`).
+- **Rendu** : **mapcn** (`Map`/`MapGeoJSON`/`MapArc`/`MapControls`) sur MapLibre ; possession + Contrôle + heat par `feature-state`, convois en points animés.
+- **Ancien mode supprimé** : grille procédurale 16×16/24×24 et rendu 3D isométrique (Three.js / R3F) retirés.

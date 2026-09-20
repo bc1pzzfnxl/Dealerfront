@@ -66,7 +66,7 @@ export const FACTION_NAMES = [
 ] as const;
 
 /** Nombre de factions par défaut (joueur + IA). */
-export const FACTION_COUNT = 4;
+export const FACTION_COUNT = 6;
 
 export function createFactions(count: number, startMembers: number): Faction[] {
 	const factions: Faction[] = [];

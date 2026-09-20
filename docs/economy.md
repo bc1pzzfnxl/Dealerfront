@@ -30,9 +30,9 @@ L'**Membres** est une ressource **séparée** : elle ne s'achète pas avec du ca
 
 ### 2. Modèle de quartier et bâtiments
 
-- La ville est une grille **16×16 = 256 quartiers** ; chaque quartier est un **module 6×6** avec un **propriétaire** et un **Contrôle 0–100** (`territory.md`).
-- La ville **préexiste** : les bâtiments (appartements, commerces, entrepôts…) sont générés. Le joueur **ne pose pas dans le vide** : il **convertit/rachète** des bâtiments existants d'un quartier possédé (voir § 4).
-- Un quartier possédé accueille un **nombre limité d'emplacements** (voir Paramètres). Chaque emplacement reçoit **un** bâtiment fonctionnel parmi les 7.
+- La carte est une **vraie ville** (Paris IRIS, **992 quartiers**) ; chaque quartier a un **propriétaire**, un **Contrôle 0–100** et un **profil** de marché (`territory.md`, `procgen.md`).
+- La ville **préexiste** : le joueur **ne pose pas dans le vide** : il **convertit/rachète** le bâti existant d'un quartier possédé, selon la **zone** du quartier (voir § 4).
+- Un quartier possédé accueille **un** bâtiment fonctionnel parmi les 8.
 
 ### 3. Les 7 bâtiments
 
@@ -40,16 +40,16 @@ Valeurs **de départ proposées (« à équilibrer »)** ; durée exprimée en *
 
 | Bâtiment | Rôle | Effet chiffré (départ) | Coût (départ) | Durée | Prérequis |
 |---|---|---|---|---|---|
-| **Labo** | Production de Produit | +2 Produit/tick par Labo | 12 500 Cash sale (×2 par Labo existant, cap 1 M) | 20 ticks (2 s) | Quartier possédé, zone compatible |
-| **Point de vente** | Produit → Cash sale | Convertit jusqu'à 2 Produit/tick ; taux 1 Produit = 15 Cash sale | 12 500 Cash sale (×2 par PdV existant, cap 1 M) | 20 ticks (2 s) | Idem |
-| **Façade** | Cash sale → Cash propre | Blanchit jusqu'à 30 Cash sale/tick ; commission **20 %** | 12 500 Cash sale (×2 par Façade existante, cap 1 M) | 50 ticks (5 s) | Idem |
+| **Labo** | Production de Produit | +1,5 Produit/tick par Labo | 12 500 Cash sale (×2 par Labo existant, cap 1 M) | 20 ticks (2 s) | Quartier possédé, zone compatible |
+| **Point de vente** | Produit → Cash sale | Convertit jusqu'à 2 Produit/tick ; prix 1 Produit = 60 × richesse locale | 12 500 Cash sale (×2 par PdV existant, cap 1 M) | 20 ticks (2 s) | Idem |
+| **Façade** | Cash sale → Cash propre | Blanchit 60 × richesse locale/tick ; commission **20 %** | 12 500 Cash sale (×2 par Façade existante, cap 1 M) | 50 ticks (5 s) | Idem |
 | **Planque** | Défense du quartier | Défense du quartier **×5** (inspiré DefensePost OpenFront, portée locale) | `min(250 000, (n+1) × 5 000)` Cash sale | 50 ticks (5 s) | Idem |
 | **Atelier** | Débloque/monte la tech | Ouvre les 3 branches (`tech.md`) ; 1 canal de recherche par Atelier | 50 000 Cash propre | 50 ticks (5 s) | Quartier possédé, zone industrielle |
 | **Contre-espionnage** | Réduit tueurs/agents ennemis | −40 % d'efficacité des tueurs/agents ennemis dans un rayon de 3 quartiers | 75 000 Cash propre | 100 ticks (10 s) | Idem |
-| **Recrutement aménagé** | Production de Membres | +25 Membres/tick | 800 Membres | immédiat | Aménager un appartement/immeuble existant |
+| **Recrutement** | Production de Membres | +25 Membres/tick (immeuble récupéré) | 800 Membres | immédiat | Aménager un appartement/immeuble existant |
 
 **Interactions :**
-- Un **Point de vente** sans **Labo** à proximité tourne au ralenti (Produit manquant) ; un **Labo** sans Point de vente accumule du Produit plafonné (voir Cas limites).
+- Un **Point de vente** doit être **relié à un Labo** par un chemin de quartiers possédés (logistique) ; sinon sa capacité tombe à 35 %. Un **Labo** sans Point de vente accumule du Produit plafonné.
 - Les **Façades** sont le **seul** débouché vers le Cash propre ; leur commission de 20 % est la friction économique centrale.
 - **Planques** et **Contre-espionnage** sont des bâtiments défensifs : ils ne produisent rien, ils protègent le rendement.
 - L'**Atelier** est le **prérequis global** de la tech : sans lui, aucun palier n'est recherchable.
@@ -89,7 +89,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 
 ### 6. Objectif économique
 
-- **Victoire** : Contrôle ≥ **60 %** des quartiers **ET** Cash propre ≥ **seuil** (`win-conditions.md`).
+- **Victoire** : **dernier cartel en jeu** (`win-conditions.md`) — l'économie finance la guerre, elle n'est plus la condition de victoire.
 - Le Cash propre n'est **pas** dépensable pour conquérir directement : il finance la **tech** (`tech.md`) et sert de **score**. La conquête se paie en **Membres**. Cette séparation force l'équilibre économie/conquête.
 - Option **Overtime** : à 30 min, le seuil de victoire baisse de **2 %/min** (inspiré OpenFront).
 
@@ -98,7 +98,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 | Paramètre | Valeur de départ | Statut |
 |---|---|---|
 | Tick de simulation | 100 ms (10 Hz) | fixé |
-| Quartiers | 256 (grille 16×16, modules 6×6) | fixé |
+| Quartiers | 992 (Paris IRIS) | fixé |
 | Emplacements de bâtiments / quartier | 3 (à équilibrer) | à équilibrer |
 | Produit/labo/tick | 2 | à équilibrer |
 | Taux Produit → Cash sale | 1 Produit = 15 Cash sale | à équilibrer |
@@ -117,7 +117,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 | Durées de construction | Labo/PdV 20 ticks · Façade/Planque/Atelier 50 · CE/Dépôt 100 | à équilibrer |
 | `structureMinDist` (emprises voisines, inspiré OpenFront) | 15 tuiles | à équilibrer |
 | Ressources de départ | 20 000 Cash sale, 0 Cash propre, 50 000 Membres | à équilibrer |
-| Seuil de victoire — Contrôle | ≥ 60 % des quartiers | fixé |
+| Condition de victoire | dernier survivant | fixé |
 | Seuil de victoire — Cash propre | **TBD** | TBD |
 | Overtime | −2 %/min après 30 min | fixé |
 | Poids des formules de Membres | exposants 0.6 / 0.73 | à équilibrer |
@@ -150,7 +150,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 - [ ] Les Membres ne peut **jamais** s'acheter avec du Cash sale/propre (séparation conquête/économie).
 - [ ] Les 7 bâtiments sont convertibles depuis au moins un type de bâtiment généré.
 - [ ] Le coût croissant des bâtiments empêche le spam d'un seul type.
-- [ ] Les seuils de victoire économiques sont atteignables en 20–30 min dans un scénario équilibré (playtest).
+- [x] L'économie permet de soutenir une guerre de longue haleine (battle royale).
 
 ## Décisions tranchées (log)
 
@@ -158,7 +158,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 |---|---|---|
 | 1 | Nature des ressources | 4 ressources abstraites : Produit, Cash sale, Cash propre, Membres |
 | 2 | Séparation conquête/économie | Les Membres ne s'achète pas ; l'économie finance la tech et le score |
-| 3 | Quartier | Module 6×6 d'une grille 16×16 (256 quartiers), propriétaire + Contrôle 0–100 |
+| 3 | Quartier | Quartier IRIS (992 quartiers réels), propriétaire + Contrôle 0–100 + profil marché |
 | 4 | Bâtiments | 7 : Labo, Point de vente, Façade, Planque, Atelier, Contre-espionnage, Dépôt |
 | 5 | Implantation | La ville préexiste ; le joueur **convertit** des bâtiments existants |
 | 6 | Coût de conversion | 50 % du coût et de la durée, quartier possédé + zone compatible |
@@ -166,8 +166,10 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 | 8 | Coût croissant | Modèle `min(1e6, 2^n × 12 500)` inspiré OpenFront City/Factory/Port |
 | 9 | Membres | `maxTroops` et régénération adaptées d'OpenFront, bonus par Dépôts |
 | 10 | Défense Planque | ×5 local, inspiré DefensePost OpenFront |
-| 11 | Victoire | Contrôle ≥ 60 % **ET** Cash propre ≥ seuil |
+| 11 | Victoire | Dernier survivant (battle royale) |
 | 12 | Overtime | Optionnel : seuil −2 %/min après 30 min |
+| 13 | Marché local | Chaque quartier a un profil : **demande** (clientele → capacité de vente et recrutement) et **richesse** (prix et capacité de blanchiment). Paris : richesse par arrondissement (INSEE), demande par type IRIS ; grille : par type de zone. Profils normalisés à moyenne 1,0 (localiser redistribue, sans changer le total). |
+| 14 | Logistique | Une vente doit être **reliée à un labo** et une façade à une vente par un chemin de quartiers possédés (BFS). Hors ligne, la capacité tombe à 35 % (plancher). Les lignes sont visibles (convois) et **interceptables** (Armement ≥ 1, 500 membres : détourne 25 % de la cargaison, coupe la ligne 25 s). |
 
 ---
 

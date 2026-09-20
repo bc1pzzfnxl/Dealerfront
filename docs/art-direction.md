@@ -118,3 +118,11 @@ Proposée (à affiner en phase artistique), **distincte aussi en niveaux de gris
 - **Frontières** : contour épais coloré là où deux propriétaires se touchent (façon OpenFront).
 - **Animations** : contour de **siège** qui pulse (couleur de l'attaquant), **flash** à la capture, **croissance** du chantier puis **pop** à la livraison du bâtiment.
 - **Ville** : gris doux, silhouettes par zone (gradins, enseignes, néons, cheminées).
+
+---
+
+## Implémentation (P25) — Système d'icônes
+
+- **Source unique** : `lucide-react` (ISC, déjà installé), tracés `currentColor` — la couleur vient de la faction ou de l'état, jamais d'un décor (R5).
+- **Une action = un logo** : tout bouton d'action porte une icône, **jamais du texte seul**.
+- Les symboles de faction (`●■▲◆`) restent, complétés par la couleur ; le **mode daltonien** conserve gris + symbole.

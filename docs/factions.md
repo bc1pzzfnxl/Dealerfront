@@ -5,7 +5,7 @@
 
 ## Objectif
 
-Définir les **4–6 factions** du mode **DealerFront** — le joueur incarne **le cartel**, face à **3–5 gangs IA** — ainsi que la **diplomatie** (pactes, demandes, embargoes, trahisons) et les **agents/PNJ notables** qui les peuplent. Une session dure **20–30 min** sur **256 quartiers** (modules 6×6, grille 16×16), avec une boucle équilibrée **économie ↔ conquête**.
+Définir les **6 factions** du mode **DealerFront** — le joueur incarne **le cartel**, face à **5 gangs IA** — ainsi que la **diplomatie** (pactes, demandes, embargoes, trahisons) et les **agents/PNJ notables** qui les peuplent. **Battle royale** sur **992 quartiers** (Paris IRIS), sans limite de temps, avec une boucle équilibrée **économie ↔ conquête**.
 
 Inspirations : **OpenFront** (territoire, alliances, traîtres) + gestion (Heat, police). Les valeurs OpenFront sont citées comme point de départ et **à équilibrer**.
 
@@ -13,9 +13,9 @@ Inspirations : **OpenFront** (territoire, alliances, traîtres) + gestion (Heat,
 
 ### Factions
 
-- **4–6 factions** : le **joueur** + **3–5 gangs IA** (nombre tiré par seed, à équilibrer).
-- Chaque faction possède : de l'**Influence** (ressource-troupe), des **quartiers** (module 6×6 ; propriétaire + **Contrôle 0–100**), des **bâtiments** (Labo, Point de vente, Façade, Planque, Atelier, Contre-espionnage, Dépôt) et des ressources abstraites (**Produit**, **Cash sale**, **Cash propre**).
-- **Spawn** : sur la ville procédurale, **distance minimale entre factions** (30 tuiles, inspiration OpenFront ; à équilibrer). Chaque faction démarre sur **1–2 quartiers** + une **Influence de départ**. Immunité de spawn **50 ticks** (inspiration OpenFront ; à équilibrer).
+- **6 factions** : le **joueur** + **5 gangs IA** (`FACTION_COUNT = 6`), battle royale.
+- Chaque faction possède : de l'**Influence** (ressource-troupe), des **quartiers** (IRIS ; propriétaire + **Contrôle 0–100**), des **bâtiments** (Labo, Point de vente, Façade, Planque, Atelier, Contre-espionnage, Dépôt) et des ressources abstraites (**Produit**, **Cash sale**, **Cash propre**).
+- **Spawn** : 4 quartiers bâtis les plus éloignés (échantillonnage glouton sur Paris). Chaque faction démarre sur **1 quartier** + des **Membres** de départ.
 - **Contrôle d'un quartier** : 0–100 ; il se gagne/perd par conquête, Influence dépensée, raids police (`police-ai.md`) et trahisons. Un quartier à Contrôle 0 change de propriétaire (`territory.md`).
 
 ### IA de faction
@@ -58,13 +58,13 @@ Les **agents autonomes** de l'ancien système deviennent des **PNJ de faction** 
 
 | Paramètre | Valeur | Statut |
 |---|---|---|
-| Nombre de factions | 4–6 (joueur + 3–5 IA) | fixé |
+| Nombre de factions | 6 (joueur + 5 IA) | fixé |
 | Quartiers de départ / faction | 1–2 + Influence de départ | à équilibrer |
-| Distance min entre factions au spawn | 30 tuiles | inspiration, à équilibrer |
+| Spawns | 4 quartiers bâtis espacés (glouton) | fixé |
 | Immunité de spawn | 50 ticks | inspiration, à équilibrer |
 | Influence de départ | **TBD** | à équilibrer |
 | Distribution QI (IA/agents) | ~N(50, 20) borné 10–90 | fixé |
-| Rayon de perception | ~8 tuiles | fixé |
+
 | Erreurs IA | probabilité ∝ (100 − QI) | fixé (principe) |
 | Cadence d'attaque IA (Easy/Medium/Hard/Impossible) | 65–100 / 55–70 / 45–60 / 30–50 ticks | inspiration, à équilibrer |
 | Tribus neutres — `attackRate` | rand(40, 80) ticks | inspiration, à équilibrer |
@@ -102,7 +102,7 @@ Les **agents autonomes** de l'ancien système deviennent des **PNJ de faction** 
 
 ## Critères de validation
 
-- [ ] Une session complète tient en **20–30 min** avec 4–6 factions.
+- [x] Une partie se conclut par élimination avec **6 factions**.
 - [ ] Chaque décision d'IA est traçable à sa perception/mémoire/routine (audit R3, pas d'omniscience).
 - [ ] Pactes, demandes, cooldowns et embargoes se comportent comme spécifié et sont **lisibles** par le joueur.
 - [ ] Une trahison survient uniquement avec cause traçable (loyauté < 20 et peur < 20, ou sollicitation).
@@ -114,9 +114,9 @@ Les **agents autonomes** de l'ancien système deviennent des **PNJ de faction** 
 
 | # | Question | Décision |
 |---|---|---|
-| 1 | Nb de factions | 4–6 (joueur + 3–5 gangs IA) |
+| 1 | Nb de factions | 6 (joueur + 5 gangs IA) |
 | 2 | Cerveau IA | Réutilise le cerveau d'agent (QI, perception, routine, peur, loyauté) |
-| 3 | Spawn | Distance min 30 tuiles, 1–2 quartiers, immunité 50 ticks |
+| 3 | Spawn | 4 quartiers bâtis espacés, 1 quartier |
 | 4 | Influence | Ressource-troupe par faction |
 | 5 | Diplomatie | Pactes 3 000 ticks ; demande 200 ; cooldown 300 ; embargo 3 000 |
 | 6 | Trahison | Loyauté < 20 **et** peur < 20 ; pénalité 300 ticks |
@@ -132,7 +132,7 @@ Les **agents autonomes** de l'ancien système deviennent des **PNJ de faction** 
 
 > Section **faisant foi** pour `src/sim/factions.ts` et `src/sim/bot.ts`. La diplomatie décrite plus haut **n'est pas encore implémentée** (P5).
 
-- **Nombre de factions** : `FACTION_COUNT = 4` (joueur + 3 gangs) — la cible 4–6 n'est pas encore tirée par seed.
+- **Nombre de factions** : `FACTION_COUNT = 6` (joueur + 5 gangs), battle royale.
 - **Noms** : Cartel, Gang Nord, Gang Est, Gang Sud (… Ouest, Syndicat au-delà de 4).
 - **Couleurs** : `#6FB7E8`, `#E0A030`, `#7FD08A`, `#A97BD8`, `#E23B2E`, `#2FB0A0` (couleur = information de faction).
 - **Ressources de départ** : Membres **3 000**, Cash sale **2 000** — **identiques pour tous** (l'asymétrie IA passe par le comportement, pas par le départ).
