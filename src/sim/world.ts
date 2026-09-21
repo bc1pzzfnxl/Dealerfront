@@ -68,9 +68,22 @@ const GUARD_UPKEEP = 1.5;
 const ARMAMENT = {
 	costClean: 3000,
 	costGrowth: 1.5,
-	maxLevel: 3,
-	bonusPerLevel: 0.25,
+	/** Plafond du **bonus** (le coût, lui, continue de croître : puits sans fin). */
+	maxLevel: 6,
+	bonusPerLevel: 0.2,
 	durationTicks: 400,
+} as const;
+
+/**
+ * Rachat de quartier : convertir du **Cash propre** en **territoire** au lieu de
+ * l'attaquer. Seulement sur un quartier **neutre adjacent**. Coût croissant avec
+ * l'empire → arbitrage permanent tech vs expansion.
+ */
+const BUY = {
+	baseCostClean: 4000,
+	perOwned: 0.15,
+	cooldownTicks: 100,
+	control: 25,
 } as const;
 const CONTROL_REGEN = 1.2;
 /** Assauts simultanés max par faction : pas de « clique-partout ». */
@@ -565,6 +578,38 @@ export class World {
 	/** Les guetteurs du joueur sont-ils payés ? */
 	playerGuardsPaid(): boolean {
 		return this.player.guardsPaid;
+	}
+
+	/** Coût de rachat d'un quartier neutre adjacent (Cash propre, croissant). */
+	buyCost(module: number): number {
+		const size = this.city.size?.[module] ?? 1;
+		return Math.round(
+			BUY.baseCostClean * size * (1 + this.modulesOwned(this.player.id) * BUY.perOwned),
+		);
+	}
+
+	playerCanBuy(module: number): boolean {
+		if (this.outcome !== null) return false;
+		if (this.ownerAt(module) !== NEUTRAL) return false;
+		if (!this.canAttack(this.player.id, module)) return false;
+		if (this.player.buyCooldown > 0) return false;
+		return this.player.cashPropre >= this.buyCost(module);
+	}
+
+	/** Rachète un quartier neutre adjacent : Cash propre → territoire. */
+	playerBuy(module: number): boolean {
+		if (!this.playerCanBuy(module)) return false;
+		this.player.cashPropre -= this.buyCost(module);
+		this.player.buyCooldown = BUY.cooldownTicks;
+		this.territory.owner[module] = this.player.id;
+		this.territory.control[module] = BUY.control;
+		this.territory.capturedAt[module] = this.tick;
+		this.player.captures += 1;
+		this.recount();
+		this.float(module, `🏷 racheté (${this.buyCost(module).toLocaleString("fr-FR")})`, "gain");
+		this.pushLog(`Quartier racheté au prix fort (module ${module})`);
+		this.events.push("capture");
+		return true;
 	}
 
 	private defenseBonus(factionId: number): number {
@@ -1808,6 +1853,7 @@ export class World {
 			if (faction.descentCooldown > 0) faction.descentCooldown -= 1;
 			if (faction.sabotageCooldown > 0) faction.sabotageCooldown -= 1;
 			if (faction.interceptCooldown > 0) faction.interceptCooldown -= 1;
+			if (faction.buyCooldown > 0) faction.buyCooldown -= 1;
 		}
 		this.produce();
 		this.sell();

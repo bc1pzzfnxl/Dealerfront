@@ -1082,3 +1082,38 @@ describe("trésorerie de guerre (armement payant)", () => {
 		expect(world.armamentCost()).toBeGreaterThan(cost);
 	});
 });
+
+describe("rachat de quartier (Cash propre → territoire)", () => {
+	it("convertit du Cash propre en quartier neutre adjacent", () => {
+		const world = new World(1);
+		const player = world.player;
+		player.cashPropre = 1_000_000;
+		const target = ADJACENT;
+		world.territory.owner[target] = NEUTRAL;
+		world.territory.control[target] = 60;
+		const cost = world.buyCost(target);
+
+		expect(world.playerCanBuy(target)).toBe(true);
+		expect(world.playerBuy(target)).toBe(true);
+		expect(world.ownerAt(target)).toBe(player.id);
+		expect(player.cashPropre).toBe(1_000_000 - cost);
+
+		// Cooldown : pas d'enchaînement immédiat sur un autre quartier neutre adjacent.
+		expect(player.buyCooldown).toBeGreaterThan(0);
+		let next = -1;
+		for (let i = 0; i < world.territory.count; i += 1) {
+			if (world.territory.owner[i] === NEUTRAL && world.canAttack(player.id, i)) {
+				next = i;
+				break;
+			}
+		}
+		if (next >= 0) expect(world.playerCanBuy(next)).toBe(false);
+	});
+
+	it("refuse un quartier ennemi (le rachat ne concerne que le neutre)", () => {
+		const world = new World(1);
+		world.player.cashPropre = 1_000_000;
+		world.territory.owner[ADJACENT] = 1;
+		expect(world.playerCanBuy(ADJACENT)).toBe(false);
+	});
+});

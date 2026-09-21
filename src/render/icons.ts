@@ -86,6 +86,7 @@ export const ACTION_ICONS = {
 	intercept: Truck,
 	hitman: Skull,
 	batch: Boxes,
+	buy: Coins,
 } as const;
 
 export type ActionIcon = keyof typeof ACTION_ICONS;

@@ -122,7 +122,8 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 Le Cash **sale** et **propre** ne sont pas que des scores : ils **achètent la guerre**.
 
 - **Soldes des guetteurs** (`GUARD_UPKEEP = 1,5` sale/tick par Guetteur) : le renseignement se paie. Guetteurs **impayés = aveugles** (plus d'alerte de descente, plus de contre-sabotage, plus de réduction de tueur). Un cartel pauvre est sourd.
-- **Trésorerie d'armement** (`ARMAMENT`) : acheter de l'armement en **Cash propre** donne `+25 %` d'attaque pendant **40 s**, cumulable **×3**, coût **croissant** (`3000 × 1,5^n`). On investit avant une offensive — l'argent décide du tempo militaire.
+- **Trésorerie d'armement** (`ARMAMENT`) : acheter de l'armement en **Cash propre** donne `+20 %` d'attaque pendant **40 s**, cumulable jusqu'à **×6**, coût **croissant** (`3000 × 1,5^n`) — puits permanent. On investit avant une offensive : l'argent décide du tempo militaire.
+- **Rachat de quartier** (`BUY`) : convertir du **Cash propre** en **territoire** sans combattre. Cible = quartier **neutre adjacent**. Coût `4000 × taille × (1 + 0,15 × quartiers possédés)`, recharge 10 s, contrôle établi 25. Arbitrage permanent **tech vs expansion** : le même Cash propre achète l'armement, la tech **ou** la carte.
 
 ### 6. Objectif économique
 

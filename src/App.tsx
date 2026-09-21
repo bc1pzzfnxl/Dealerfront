@@ -915,6 +915,24 @@ function App() {
 										run: act,
 									},
 								];
+								if (selectedOwner === NEUTRAL && world.canAttack(player.id, selected!)) {
+									const BuyIcon = ACTION_ICONS.buy;
+									const cost = world.buyCost(selected!);
+									actions.push({
+										key: "buy",
+										icon: BuyIcon,
+										label: cost.toLocaleString("fr-FR"),
+										title: `Racheter ce quartier au prix fort (Cash propre) — coût croissant avec votre empire.`,
+										disabled: !world.playerCanBuy(selected!),
+										run: () => {
+											if (selected !== null && world.playerBuy(selected)) {
+												setVersion((value) => value + 1);
+											} else {
+												setNotice("Rachat : Cash propre insuffisant ou recharge en cours.");
+											}
+										},
+									});
+								}
 								if (selectedOwner !== player.id && selectedOwner !== NEUTRAL) {
 									const RaidIcon = ACTION_ICONS.raid;
 									actions.push({

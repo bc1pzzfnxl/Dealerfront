@@ -42,6 +42,8 @@ export interface Faction {
 	armamentLevel: number;
 	/** Nombre d'achats d'armement (coût croissant). */
 	armamentUses: number;
+	/** Cooldown de rachat de quartier (ticks). */
+	buyCooldown: number;
 	/** Quartiers pris (toute capture, neutre comprise). */
 	captures: number;
 	/** Quartiers perdus. */
@@ -107,6 +109,7 @@ export function createFactions(count: number, startMembers: number): Faction[] {
 			armamentUntil: 0,
 			armamentLevel: 0,
 			armamentUses: 0,
+			buyCooldown: 0,
 			captures: 0,
 			quartersLost: 0,
 			eliminations: 0,
