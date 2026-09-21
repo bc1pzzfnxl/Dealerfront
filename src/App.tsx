@@ -6,7 +6,6 @@ import { WorldMap } from "./render/WorldMap";
 import {
 	BUILDINGS,
 	BUILDING_EFFECT_LABELS,
-	BUILD_TICKS,
 	BUILDING_TYPES,
 	chooseBuildType,
 	type BuildingType,
@@ -408,19 +407,6 @@ function App() {
 					? "facade"
 					: null;
 
-	/** Bâtiment suggéré sur le quartier sélectionné (priorité d'amorçage, sinon composition). */
-	const recommendedType =
-		isOwned && selectedBuilding === null && selected !== null
-			? advisedType !== null && world.playerCanBuild(selected, advisedType)
-				? advisedType
-				: chooseBuildType(
-						world.buildingCounts(player.id),
-						world.modulesOwned(player.id),
-						(candidate) => world.playerCanQueue(selected, candidate),
-						{ atelier: TECH.maxLevel },
-					)
-			: null;
-
 	const ownedQuarters = world.modulesOwned(player.id);
 	const idleQuarters = Math.max(0, ownedQuarters - player.buildings);
 	const advisor = (() => {
@@ -771,16 +757,23 @@ function App() {
 										const reason = blockReason(type);
 										const zoneBlocked = reason === "zone incompatible";
 										const Icon = BUILDING_ICONS[type];
+										const bonus =
+											selected !== null
+												? world.zoneBonusAt(selected, type)
+												: 1;
 										return (
 											<button
 												key={type}
 												type="button"
-												className={type === recommendedType ? "recommended" : undefined}
+												className={bonus > 1 ? "bonus" : undefined}
 												disabled={!afford(type)}
-												title={`${BUILDINGS[type].label} — ${BUILDING_EFFECT_LABELS[type]} · ${formatCost(type, costFactor(type))}${reason ? ` · ${reason}` : ""}`}
+												title={`${BUILDINGS[type].label} — ${BUILDING_EFFECT_LABELS[type]} · ${formatCost(type, costFactor(type))}${bonus > 1 ? ` · zone favorable ×${bonus.toFixed(2)}` : ""}${reason ? ` · ${reason}` : ""}`}
 												onClick={() => build(type)}
 											>
 												<Icon className="build-icon" aria-hidden="true" />
+												{bonus > 1 ? (
+													<span className="bonus-tag">×{bonus.toFixed(2)}</span>
+												) : null}
 												<em className={zoneBlocked ? "zone" : reason ? "lack" : undefined}>
 													{zoneBlocked ? "zone" : formatCost(type, costFactor(type))}
 												</em>
@@ -788,21 +781,12 @@ function App() {
 										);
 									})}
 								</div>
-								{recommendedType ? (
-									<p className="hint-inline">
-										<strong>Conseillé :</strong> {BUILDINGS[recommendedType].label} —{" "}
-										{BUILDING_EFFECT_LABELS[recommendedType]}
-									</p>
-								) : null}
 								<p
 									className="hint-inline"
 									title={allowedHere.map((type) => BUILDINGS[type].label).join(", ")}
 								>
 									Zone <strong>{selectedZoneLabel}</strong> —{" "}
-									{isConversion
-										? "conversion −50 %"
-										: `chantier${recommendedType ? ` ${Math.round(BUILD_TICKS[recommendedType] / SIM_HZ)} s` : ""}`}
-									.
+									{isConversion ? "conversion −50 %" : "chantier"}.
 								</p>
 							</>
 						)
@@ -1287,6 +1271,13 @@ function App() {
 							<strong>Zones :</strong> chaque quartier n'accepte que certains bâtiments (parc →
 							planque, police → contre-espionnage…). Le détail est affiché sous le menu de
 							construction.
+						</p>
+						<p>
+							<strong>Bonus de zone :</strong> un bâtiment produit plus dans une zone faite pour
+							lui — <strong>résidentiel</strong> bonifie le recrutement, <strong>commercial</strong> la
+							vente, <strong>laverie</strong> le blanchiment, <strong>friche industrielle</strong> les
+							labos/ateliers, <strong>police</strong> le contre-espionnage, <strong>parc</strong> la
+							planque. Les boutons favorisés sont marqués <strong>×1,5</strong>.
 						</p>
 						<h3>Guerre de quartiers</h3>
 						<p>

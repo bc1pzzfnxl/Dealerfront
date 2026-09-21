@@ -21,6 +21,7 @@ import {
 	NO_BUILDING,
 	ZONE_BUILDINGS,
 	buildingCostGrowth,
+	zoneBuildBonus,
 } from "./buildings";
 import { PARIS_MAP } from "./maps/paris";
 import { createRng, type Rng } from "./rng";
@@ -290,6 +291,8 @@ export class World {
 	private retailDemand: number[] = [];
 	private retailWeighted: number[] = [];
 	private launderWealth: number[] = [];
+	/** Labos pondérés par le bonus de zone (recalculé par tick). */
+	private laboWeight: number[] = [];
 	/** Part de la capacité reliée à une source (labo/vente) — logistique. */
 	private retailSupply: number[] = [];
 	private launderSupply: number[] = [];
@@ -340,6 +343,7 @@ export class World {
 		this.retailDemand = this.factions.map(() => 0);
 		this.retailWeighted = this.factions.map(() => 0);
 		this.launderWealth = this.factions.map(() => 0);
+		this.laboWeight = this.factions.map(() => 0);
 		this.retailSupply = this.factions.map(() => 1);
 		this.launderSupply = this.factions.map(() => 1);
 		this.recount();
@@ -447,6 +451,12 @@ export class World {
 	/** Richesse locale d'un quartier (prix, blanchiment). */
 	wealthAt(module: number): number {
 		return this.city.wealth[module] ?? 1;
+	}
+
+	/** Bonus de rendement d'un bâtiment dans la zone du quartier (1 = neutre). */
+	zoneBonusAt(module: number, type: BuildingType): number {
+		const zone = this.city.modules[module];
+		return zone ? zoneBuildBonus(zone, type) : 1;
 	}
 
 	attackBonus(factionId: number): number {
@@ -1718,7 +1728,7 @@ export class World {
 				faction.members + Math.max(0, this.productionPerTick(faction.id)),
 			);
 			const labos =
-				this.buildingCount(faction.id, "labo") * this.sabotageFactor(faction.id, "labo");
+				(this.laboWeight[faction.id] ?? 0) * this.sabotageFactor(faction.id, "labo");
 			if (labos > 0) faction.produit += labos * BUILDING_EFFECTS.produitPerLabo;
 		}
 	}
@@ -2187,6 +2197,7 @@ export class World {
 			this.retailDemand[f] = 0;
 			this.retailWeighted[f] = 0;
 			this.launderWealth[f] = 0;
+			this.laboWeight[f] = 0;
 		}
 		for (let i = 0; i < this.territory.count; i += 1) {
 			const owner = this.territory.owner[i]!;
@@ -2195,18 +2206,27 @@ export class World {
 			// Marché local : demande (clientele) et richesse (prix) du quartier.
 			const demand = this.city.demand[i] ?? 1;
 			const wealth = this.city.wealth[i] ?? 1;
+			const zone = this.city.modules[i]!;
 			this.recruitDemand[owner] = (this.recruitDemand[owner] ?? 0) + demand;
 			const buildIndex = this.territory.building[i]!;
 			if (buildIndex === NO_BUILDING) continue;
 			const type = BUILDING_TYPES[buildIndex];
 			if (!type) continue;
 			this.counts[owner]![type] += 1;
-			if (type === "logement") this.housingDemand[owner] = (this.housingDemand[owner] ?? 0) + demand;
-			if (type === "vente") {
-				this.retailDemand[owner] = (this.retailDemand[owner] ?? 0) + demand;
-				this.retailWeighted[owner] = (this.retailWeighted[owner] ?? 0) + demand * wealth;
+			// Bonus de zone : le bâtiment produit plus dans une zone favorable.
+			const bonus = zoneBuildBonus(zone, type);
+			if (type === "logement") {
+				this.housingDemand[owner] = (this.housingDemand[owner] ?? 0) + demand * bonus;
 			}
-			if (type === "facade") this.launderWealth[owner] = (this.launderWealth[owner] ?? 0) + wealth;
+			if (type === "labo") this.laboWeight[owner] = (this.laboWeight[owner] ?? 0) + bonus;
+			if (type === "vente") {
+				this.retailDemand[owner] = (this.retailDemand[owner] ?? 0) + demand * bonus;
+				this.retailWeighted[owner] =
+					(this.retailWeighted[owner] ?? 0) + demand * wealth * bonus;
+			}
+			if (type === "facade") {
+				this.launderWealth[owner] = (this.launderWealth[owner] ?? 0) + wealth * bonus;
+			}
 			if (this.territory.sabotageUntil[i]! > this.tick) this.sabotaged[owner]![type] += 1;
 		}
 		for (const faction of this.factions) {

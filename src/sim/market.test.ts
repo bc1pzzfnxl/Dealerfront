@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BUILDING_INDEX } from "./buildings";
+import { BUILDING_INDEX, zoneBuildBonus } from "./buildings";
 import { NEUTRAL } from "./territory";
+import type { ZoneType } from "./types";
 import { World } from "./world";
 
 /** Premier quartier neutre (hors spawns). */
@@ -50,5 +51,42 @@ describe("marché local", () => {
 
 	it("reste déterministe (même seed, même résultat)", () => {
 		expect(saleAt(1.0)).toBe(saleAt(1.0));
+	});
+});
+
+/** Premier quartier neutre de la zone demandée. */
+function firstNeutralZone(world: World, zone: ZoneType): number {
+	for (let i = 0; i < world.territory.count; i += 1) {
+		if (world.territory.owner[i] === NEUTRAL && world.city.modules[i] === zone) return i;
+	}
+	throw new Error(`aucun quartier neutre de zone ${zone}`);
+}
+
+/** Produit généré par un labo selon la zone du quartier. */
+function laboOutput(zone: ZoneType): number {
+	const world = new World(1);
+	const module = firstNeutralZone(world, zone);
+	world.territory.owner[module] = 1;
+	world.territory.control[module] = 100;
+	world.territory.building[module] = BUILDING_INDEX.labo;
+	const faction = world.factions[1]!;
+	faction.produit = 0;
+	world.step();
+	return faction.produit;
+}
+
+describe("bonus de zone", () => {
+	it("les friches industrielles bonifient les labos", () => {
+		expect(laboOutput("industrial")).toBeGreaterThan(laboOutput("residential"));
+	});
+
+	it("le résidentiel bonifie le recrutement, pas la production", () => {
+		expect(zoneBuildBonus("residential", "logement")).toBeGreaterThan(1);
+		expect(zoneBuildBonus("residential", "labo")).toBe(1);
+	});
+
+	it("les terrains vagues n'ont aucun bonus", () => {
+		expect(zoneBuildBonus("vacant", "labo")).toBe(1);
+		expect(zoneBuildBonus("vacant", "logement")).toBe(1);
 	});
 });

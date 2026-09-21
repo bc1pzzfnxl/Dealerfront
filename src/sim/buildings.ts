@@ -155,6 +155,36 @@ export function canBuildInZone(zone: ZoneType, type: BuildingType): boolean {
 	return ZONE_BUILDINGS[zone].includes(type);
 }
 
+/**
+ * Bonus de rendement d'un bâtiment selon la **zone** du quartier.
+ * Un quartier résidentiel rend les logements plus productifs, un quartier
+ * commerçant les points de vente, etc. Multiplicateur appliqué à la capacité
+ * (production/vente/blanchiment) — jamais au coût. `1` = pas de bonus.
+ * Spécialise le territoire : on ne bâtit plus « n'importe où ».
+ */
+export const ZONE_BUILD_BONUS: Record<ZoneType, Partial<Record<BuildingType, number>>> = {
+	// Habitations : le recrutement y est le plus efficace.
+	residential: { logement: 1.5, planque: 1.15 },
+	// Commerces : la vente y est reine, la façade un peu aidée.
+	commercial: { vente: 1.5, facade: 1.15 },
+	// Vie nocturne : vente et blanchiment au coude à coude.
+	nightlife: { vente: 1.3, facade: 1.3 },
+	// Friches : production et outillage.
+	industrial: { labo: 1.5, atelier: 1.4, depot: 1.3 },
+	// Laveries : blanchiment maximal.
+	laundry: { facade: 1.6 },
+	// Postes détournés : renseignement.
+	police: { contre: 1.6 },
+	// Parcs : planque bien cachée.
+	park: { planque: 1.5 },
+	// Terrains vagues : rien à bonifier (construction neuve).
+	vacant: {},
+};
+
+export function zoneBuildBonus(zone: ZoneType, type: BuildingType): number {
+	return ZONE_BUILD_BONUS[zone]?.[type] ?? 1;
+}
+
 /** Zones « bâties » : c'est là qu'on peut convertir un bâti existant. */
 export const BUILT_ZONES: readonly ZoneType[] = [
 	"residential",

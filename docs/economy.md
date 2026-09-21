@@ -75,6 +75,18 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 - **Recrutement** exige un **immeuble existant** (zone bâtie) : impossible sur terrain vague ou dans un parc.
 - Un bâtiment converti **remplace** la fonction d'origine (ex. appartements → Labos consomme la population du quartier, effet secondaire à équilibrer avec `city-sim.md`).
 - La conversion **réutilise** l'emprise : elle coûte et dure **moins cher** qu'une construction neuve, mais reste soumise au **coût croissant** par nombre de bâtiments du même type.
+- **Bonus de zone** : un bâtiment produit **plus** dans une zone faite pour lui (`ZONE_BUILD_BONUS`, multiplicateur appliqué à la capacité de production/vente/blanchiment, jamais au coût). Spécialise le territoire : bâtir « n'importe où » n'est plus optimal.
+
+| Zone | Bâtiment bonifié | Multiplicateur |
+|---|---|---|
+| résidentiel | Logement (recrutement) | ×1,50 (planque ×1,15) |
+| commercial | Point de vente | ×1,50 (façade ×1,15) |
+| nightlife | Point de vente + Façade | ×1,30 |
+| industriel | Labo ×1,50 · Atelier ×1,40 · Dépôt ×1,30 | — |
+| laverie | Façade (blanchiment) | ×1,60 |
+| police | Contre-espionnage | ×1,60 |
+| parc | Planque (défense) | ×1,50 |
+| terrain vague | aucun (construction neuve) | ×1,00 |
 
 ### 5. Rendements et formules
 
