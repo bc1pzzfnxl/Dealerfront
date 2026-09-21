@@ -254,6 +254,7 @@ describe("construction — annulation du chantier", () => {
 			troops: 100000,
 			arrivesAt: 0,
 			startControl: 1,
+			initialTroops: 100000,
 		});
 		world.step();
 		expect(world.ownerAt(module)).toBe(1);
@@ -912,6 +913,23 @@ describe("file de construction", () => {
 		expect(world.playerCancelOrder(c)).toBe(true);
 		expect(world.queueLength()).toBe(0);
 		expect(world.constructionLeft(c)).toBe(0);
+	});
+
+	it("un ordre inabordable ne bloque plus la file et finit purgé", () => {
+		const world = new World(1);
+		const player = world.player;
+		const rich = ownConversion(world, player.id, "vente");
+		const poor = ownConversion(world, player.id, "logement");
+		// Le logement (payé en Membres) est hors de portée ; la vente (Cash sale) est abordable.
+		player.members = 0;
+		player.cashSale = 100_000;
+		expect(world.playerQueueBuild(poor, "logement")).toBe(true);
+		expect(world.playerQueueBuild(rich, "vente")).toBe(true);
+		// La vente démarre malgré le logement inabordable placé devant.
+		expect(world.constructionLeft(rich)).toBeGreaterThan(0);
+		// Passé le délai de grâce, l'ordre inabordable est purgé (plus de blocage).
+		for (let i = 0; i < 320; i += 1) world.step();
+		expect(world.playerBuildOrders().some((order) => order.type === "logement")).toBe(false);
 	});
 });
 

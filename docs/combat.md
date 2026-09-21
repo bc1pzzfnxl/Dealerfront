@@ -188,7 +188,7 @@ Adapté de la branche cible-joueur d'OpenFront. Soit `I_def` l'Influence défens
 - **Zones** : `résidentiel 1,0 · commercial 1,2 · nightlife 1,1 · industriel 0,8 · parc 1,4 · police 2,0 · blanchisserie 1,0 · vacant 0,5`.
 - **Pertes attaquant** : `troupes −= dégâts × 6` ; attaque retirée quand épuisée ou cible capturée.
 - **Contrôle** : régénère `+1,0/tick × (1 + 0,2 × Logistique)` (sauf quartiers attaqués ce tick), plafond 100.
-- **Capture** : `Contrôle ≤ 0` → changement de propriétaire, Contrôle remis à **30**, **bâtiment détruit** (remis à vide).
+- **Capture** : `Contrôle ≤ 0` → changement de propriétaire, **bâtiment détruit** (remis à vide). Le **Contrôle établi** n'est plus fixe : il est **proportionnel aux troupes survivantes** (`base + 26 × survivants/engagés`, borné 8–48 ; base 16 si la cible était neutre, 10 sinon). Un assaut écrasant sécurise le quartier, un siège coûteux le laisse précaire. Si la cible est **disputée** (un autre assaut actif dessus — guerre entre gangs), le Contrôle établi est **réduit de 40 %**.
 
 ### Adjacence & IA
 

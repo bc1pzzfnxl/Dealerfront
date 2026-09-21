@@ -623,7 +623,7 @@ function App() {
 							<RESOURCE_ICONS.sale className="stat-icon" aria-hidden="true" />
 							<strong>{Math.round(player.cashSale).toLocaleString("fr-FR")}</strong>
 						</div>
-						<div className="stat" title="Cash propre (objectif)">
+						<div className="stat" title="Cash propre (blanchi)">
 							<RESOURCE_ICONS.clean className="stat-icon clean" aria-hidden="true" />
 							<strong className="clean">
 								{Math.round(player.cashPropre).toLocaleString("fr-FR")}
@@ -1181,7 +1181,7 @@ function App() {
 							<code>{Math.round(world.playerLaunderRatio() * 100)}%</code>
 						</label>
 						<p className="hint-inline">
-							Baissez pour garder du Cash sale (achats), montez pour l'objectif de victoire.
+							Part de la capacité des façades affectée au blanchiment. Baissez pour garder du Cash sale (achats).
 						</p>
 					</section>					{world.playerBuildOrders().length > 0 ? (
 					<section className="card loop-card queue-card">
@@ -1291,7 +1291,7 @@ function App() {
 								<strong>Point de vente</strong> → Produit devient Cash sale.
 							</li>
 							<li>
-								<strong>Façade</strong> → Cash sale devient <strong>Cash propre</strong> (l'objectif).
+								<strong>Façade</strong> → Cash sale devient <strong>Cash propre</strong>.
 							</li>
 						</ol>
 						<p>

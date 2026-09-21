@@ -59,6 +59,8 @@ export const TRAVEL_TICKS = 12;
 const BUILD_CREWS = 2;
 /** Longueur max de la file d'ordres par faction. */
 const QUEUE_MAX = 12;
+/** Durée (ticks) avant de purger un ordre durablement inabordable (libère la file). */
+const QUEUE_GRACE = 300;
 /** Part de la valeur d'un bâtiment prise en butin à la capture. */
 const LOOT_RATIO = 0.4;
 /** Descente : coup de main pour voler le butin sans détruire (gaté Armement). */
@@ -196,6 +198,8 @@ export interface BuildOrder {
 	factionId: number;
 	module: number;
 	type: BuildingType;
+	/** Tick de mise en file (purge des ordres durablement inabordables). */
+	queuedAt: number;
 }
 
 export interface Attack {
@@ -208,6 +212,8 @@ export interface Attack {
 	arrivesAt: number;
 	/** Contrôle de la cible au début de l'assaut (pour la jauge de conquête). */
 	startControl: number;
+	/** Troupes engagées au départ (pour le contrôle établi après capture). */
+	initialTroops: number;
 }
 
 export type Outcome = null | "victory" | "defeat";
@@ -1499,7 +1505,7 @@ export class World {
 	/** Met un ordre en file ; démarre immédiatement si une équipe est libre. */
 	playerQueueBuild(module: number, type: BuildingType): boolean {
 		if (!this.playerCanQueue(module, type)) return false;
-		this.buildOrders.push({ factionId: this.player.id, module, type });
+		this.buildOrders.push({ factionId: this.player.id, module, type, queuedAt: this.tick });
 		this.processBuildQueues();
 		return true;
 	}
@@ -1521,21 +1527,40 @@ export class World {
 			while (guard > 0) {
 				guard -= 1;
 				if (this.activeConstructions(faction.id) >= BUILD_CREWS) break;
-				const index = this.buildOrders.findIndex((order) => order.factionId === faction.id);
-				if (index < 0) break;
-				const order = this.buildOrders[index]!;
-				const valid =
-					this.ownerAt(order.module) === faction.id &&
-					this.territory.building[order.module] === NO_BUILDING &&
-					this.territory.construction[order.module] === 0 &&
-					canBuildInZone(this.city.modules[order.module]!, order.type);
-				if (!valid) {
-					this.buildOrders.splice(index, 1);
-					continue;
+				// On cherche le premier ordre **valide et abordable** de la faction.
+				// Un ordre invalide est retiré ; un ordre inabordable ne bloque plus
+				// les suivants (et est purgé s'il le reste trop longtemps).
+				let started = false;
+				for (let k = 0; k < this.buildOrders.length; k += 1) {
+					const order = this.buildOrders[k]!;
+					if (order.factionId !== faction.id) continue;
+					const valid =
+						this.ownerAt(order.module) === faction.id &&
+						this.territory.building[order.module] === NO_BUILDING &&
+						this.territory.construction[order.module] === 0 &&
+						canBuildInZone(this.city.modules[order.module]!, order.type);
+					if (!valid) {
+						this.buildOrders.splice(k, 1);
+						k -= 1;
+						continue;
+					}
+					if (!this.canAfford(faction, order.type, this.buildCostFactor(faction.id, order.module, order.type))) {
+						if (this.tick - order.queuedAt > QUEUE_GRACE) {
+							this.buildOrders.splice(k, 1);
+							k -= 1;
+							if (faction.isPlayer) {
+								this.pushLog(`Ordre annulé (fonds insuffisants) : ${BUILDINGS[order.type].label}`);
+							}
+							continue;
+						}
+						continue;
+					}
+					this.buildOrders.splice(k, 1);
+					this.startBuild(faction.id, order.module, order.type);
+					started = true;
+					break;
 				}
-				if (!this.canAfford(faction, order.type, this.buildCostFactor(faction.id, order.module, order.type))) break;
-				this.buildOrders.splice(index, 1);
-				this.startBuild(faction.id, order.module, order.type);
+				if (!started) break;
 			}
 		}
 	}
@@ -1685,6 +1710,7 @@ export class World {
 			troops,
 			arrivesAt: this.tick + TRAVEL_TICKS,
 			startControl: this.territory.control[module]!,
+			initialTroops: troops,
 		});
 		// Guetteur : un Contre-espionnage adjacent à la cible alerte le défenseur joueur.
 		const defender = this.territory.owner[module];
@@ -1898,8 +1924,22 @@ export class World {
 			if (control <= 0) {
 				const previous = this.territory.owner[attack.target];
 				const destroyed = this.buildingAt(attack.target);
+				// Contrôle établi ∝ troupes survivantes : un assaut écrasant sécurise
+				// plus qu'un siège coûteux. Une cible disputée par un autre assaut
+				// (guerre entre gangs) reste précaire.
+				const survived =
+					attack.initialTroops > 0
+						? Math.max(0, Math.min(1, attack.troops / attack.initialTroops))
+						: 0;
+				const contested = this.attacks.some(
+					(other) => other !== attack && other.target === attack.target,
+				);
+				const base = previous === NEUTRAL ? 16 : 10;
+				const gain = base + 26 * survived;
 				this.territory.owner[attack.target] = attack.factionId;
-				this.territory.control[attack.target] = CAPTURE_CONTROL;
+				this.territory.control[attack.target] = Math.round(
+					Math.max(8, Math.min(48, contested ? gain * 0.6 : gain)),
+				);
 				this.territory.building[attack.target] = NO_BUILDING;
 				this.territory.capturedAt[attack.target] = this.tick;
 				this.cancelConstruction(attack.target);
