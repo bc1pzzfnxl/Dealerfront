@@ -953,6 +953,7 @@ describe("butin (bâtiments objectifs)", () => {
 		world.territory.owner[target] = 1;
 		world.territory.control[target] = 1;
 		world.territory.building[target] = BUILDING_INDEX.vente;
+		world.city.demand[target] = 0; // la cible ne vend pas pendant le siège
 		const victim = world.factions[1]!;
 		victim.cashSale = 10_000;
 

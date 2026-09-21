@@ -53,6 +53,20 @@ describe("marché local", () => {
 	it("reste déterministe (même seed, même résultat)", () => {
 		expect(saleAt(1.0)).toBe(saleAt(1.0));
 	});
+
+	it("un point de vente sans labo vend quand même (fournisseur extérieur)", () => {
+		const world = new World(1);
+		const module = firstNeutral(world);
+		world.territory.owner[module] = 1;
+		world.territory.control[module] = 100;
+		world.territory.building[module] = BUILDING_INDEX.vente;
+		world.city.demand[module] = 1;
+		const faction = world.factions[1]!;
+		faction.produit = 0;
+		faction.cashSale = 0;
+		world.step();
+		expect(faction.cashSale).toBeGreaterThan(0);
+	});
 });
 
 /** Premier quartier neutre de la zone demandée. */

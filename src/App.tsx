@@ -426,6 +426,17 @@ function App() {
 		if (ownedQuarters < 2) {
 			return "Capturez un quartier adjacent (sélectionnez-le puis Q) : 1 bâtiment par quartier.";
 		}
+		// Chaîne économique : on signale d'abord ce qui manque, dans l'ordre.
+		const counts = world.buildingCounts(player.id);
+		if (counts.vente > 0 && counts.labo === 0) {
+			return "Vos points de vente achètent le Produit à l'extérieur (marge réduite). Bâtissez un Labo pour produire le vôtre.";
+		}
+		if (counts.labo > 0 && counts.vente === 0) {
+			return "Votre Produit dort au labo. Bâtissez un Point de vente pour le convertir en Cash sale.";
+		}
+		if (counts.vente > 0 && counts.facade === 0) {
+			return "Sans Façade, le Cash sale s'accumule sans devenir propre (tech, corruption). Bâtissez une Façade.";
+		}
 		if (advisedType !== null) {
 			const spec = BUILDINGS[advisedType];
 			if (spec.costSale && player.cashSale < spec.costSale) {

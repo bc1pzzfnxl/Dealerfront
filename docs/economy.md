@@ -49,7 +49,7 @@ Valeurs **de départ proposées (« à équilibrer »)** ; durée exprimée en *
 | **Recrutement** | Production de Membres | +25 Membres/tick (immeuble récupéré) | 800 Membres | immédiat | Aménager un appartement/immeuble existant |
 
 **Interactions :**
-- Un **Point de vente** doit être **relié à un Labo** par un chemin de quartiers possédés (logistique) ; sinon sa capacité tombe à 35 %. Un **Labo** sans Point de vente accumule du Produit plafonné.
+- Un **Point de vente** **tourne toujours** : il vend d'abord le **Produit maison** (marge pleine), puis s'**approvisionne à l'extérieur** pour le complément (marge réduite, `EXTERNAL_SUPPLY_MARGIN = 0,6`). Être **relié à un Labo** par un chemin de quartiers possédés porte la capacité à 100 % (sinon 35 %) — la logistique **bonifie**, elle ne **bloque** plus. Un **Labo** sans Point de vente accumule du Produit plafonné.
 - Les **Façades** sont le **seul** débouché vers le Cash propre ; leur commission de 20 % est la friction économique centrale.
 - **Planques** et **Contre-espionnage** sont des bâtiments défensifs : ils ne produisent rien, ils protègent le rendement.
 - L'**Atelier** est le **prérequis global** de la tech : sans lui, aucun palier n'est recherchable.

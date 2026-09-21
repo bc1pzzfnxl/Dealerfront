@@ -81,6 +81,13 @@ const RAID = { costSale: 2500, costMembers: 800, control: 35, cooldownTicks: 300
  * par un chemin de quartiers possédés. Hors ligne, la capacité tombe au plancher.
  */
 const SUPPLY_FLOOR = 0.35;
+/**
+ * Marge conservée sur le Produit **acheté à un fournisseur extérieur** quand le
+ * stock maison ne suffit pas. Permet à un point de vente de tourner sans labo
+ * (marge réduite) — un dealer peut toujours s'approvisionner, sinon l'ordre de
+ * construction pouvait bloquer le joueur.
+ */
+const EXTERNAL_SUPPLY_MARGIN = 0.6;
 /** Routes de convoi affichées par faction (logistique visible). */
 const MAX_CONVOY_ROUTES = 4;
 /** Interception : détourne la cargaison d'un convoi ennemi et coupe la ligne. */
@@ -1790,13 +1797,16 @@ export class World {
 			const demand = this.retailDemand[faction.id] ?? 0;
 			const supply = SUPPLY_FLOOR + (1 - SUPPLY_FLOOR) * (this.retailSupply[faction.id] ?? 1);
 			const ventes = demand * supply * this.sabotageFactor(faction.id, "vente");
-			if (ventes === 0 || faction.produit <= 0) continue;
+			if (ventes === 0) continue;
 			const capacity = ventes * BUILDING_EFFECTS.produitPerVente;
-			const sold = Math.min(faction.produit, capacity);
-			faction.produit -= sold;
+			// Produit maison d'abord ; le complément vient d'un fournisseur extérieur.
+			const fromStock = Math.min(faction.produit, capacity);
+			faction.produit -= fromStock;
+			const external = capacity - fromStock;
+			const margin = fromStock + external * EXTERNAL_SUPPLY_MARGIN;
 			const avgWealth = demand > 0 ? (this.retailWeighted[faction.id] ?? 0) / demand : 1;
 			const embargo = this.isEmbargoed(faction.id) ? 1 - EMBARGO.salePenalty : 1;
-			faction.cashSale += sold * BUILDING_EFFECTS.pricePerProduit * avgWealth * embargo;
+			faction.cashSale += margin * BUILDING_EFFECTS.pricePerProduit * avgWealth * embargo;
 		}
 	}
 
