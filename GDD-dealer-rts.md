@@ -9,6 +9,8 @@
 
 Jeu **solo** de stratégie/gestion, vue **carte réelle** (Paris, quartiers IRIS) rendue avec mapcn/MapLibre, jouable en navigateur. Tu incarnes **le cartel** (God view) : tu ne contrôles plus un personnage, tu **commandes de loin**. Objectif : **rester le dernier cartel en jeu** (battle royale), face à **5 gangs IA** et à la **police**.
 
+Second mode : **arène agent vs agent** — 2 à 4 agents IA s'affrontent **sans joueur humain**, via l'**API HTTP** ou **MCP** (`/mcp`) ; un humain **regarde en direct** et consulte les **stats de fin**. Architecture : [`docs/arena.md`](./docs/arena.md) ; guide de branchement : [`MCP.md`](./MCP.md).
+
 **Inspirations** : **OpenFront** (contrôle territorial temps réel, alliances, traîtres), gestion sous pression (police/Heat), Frostpunk (diegetic UI), gestion de cartel.
 
 ---

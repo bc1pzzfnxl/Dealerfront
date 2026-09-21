@@ -8,6 +8,8 @@
 
 Jeu **solo** de stratégie/gestion sur une **carte réelle** (Paris, quartiers IRIS), où tu incarnes **le cartel** : **rester le dernier cartel en jeu** (battle royale), face à **5 gangs IA** et à la **police**.
 
+Second mode : **arène agent vs agent** — 2 à 4 agents IA s'affrontent sans joueur humain (API HTTP/MCP), un humain regarde en direct. Voir `arena.md` et [`../MCP.md`](../MCP.md).
+
 ## Ordre de lecture
 
 1. `pillars.md` — vision et règles non négociables.
@@ -24,6 +26,7 @@ Jeu **solo** de stratégie/gestion sur une **carte réelle** (Paris, quartiers I
 12. `ui-ux.md` + `art-direction.md` — présentation et couleur de faction.
 13. `city-sim.md` + `difficulty.md` — contexte de ville et difficulté.
 14. `tech-stack.md` — contraintes techniques.
+15. `arena.md` — arène **agent vs agent** (serveur, HTTP/MCP, spectateur). Guide de branchement : [`../MCP.md`](../MCP.md).
 
 ## Gabarit des specs
 
@@ -52,6 +55,7 @@ Les valeurs non tranchées sont **TBD** et listées dans `open-questions.md`.
 | `difficulty.md` | Philosophie + fourchette O/D | v2 |
 | `npc-events.md` | Événements à choix / leurre | v2 |
 | `tech-stack.md` | Stack technique | v2 DealerFront |
+| `arena.md` | Arène agent vs agent (DO, HTTP/MCP, spectateur) | v1 |
 | `open-questions.md` | Questions vivantes | vivant |
 
 ## Remplacements (ancien mode)

@@ -8,7 +8,7 @@ Fixer les choix techniques structurants du mode god-view : simulation de contrô
 
 ## Choix retenus
 
-- **Runtime** : **solo** au MVP, **tout client-side** (pas de serveur de jeu). Cloudflare Workers conservé pour l'API statique/utilitaires (`/api/*`), pas pour la simulation.
+- **Runtime** : **solo** = **client-side** (pas de serveur de jeu). **Arène agent vs agent** = **serveur** : 1 **Durable Object** par partie (autoritaire, plan gratuit), API **HTTP + MCP** (`/mcp`), spectateur **WebSocket**. Cloudflare Workers sert l'API statique/utilitaires (`/api/*`). Voir `arena.md` et `../MCP.md`.
 - **Core de simulation** : **TypeScript déterministe**, **pur** (aucune dépendance React/DOM), à pas fixe **10 Hz**. Isolé pour pouvoir tourner dans un **Web Worker** plus tard.
 - **Style d'architecture** : **`intents → executions`** (inspiré d'OpenFront) : les actions du joueur et des IA deviennent des **intents**, convertis en **executions** qui sont les seules à muter l'état. Découple UI et simulation, facilite les tests et un éventuel multi.
 - **Rendu** : **mapcn / MapLibre** sur la **carte réelle** (Paris IRIS) — fond muet, aplats de possession/faction par `feature-state`. JSON statique, PWA-friendly.
@@ -26,14 +26,14 @@ Fixer les choix techniques structurants du mode god-view : simulation de contrô
 | Rendu | mapcn (Map / MapGeoJSON / MapArc / MapControls) sur MapLibre | fixé |
 | Déterminisme | carte versionnée + simulation seedée | fixé |
 | Web Worker | non au MVP, prévu | différé |
-| Multi (Workers + DO) | post-MVP | différé |
+| Multi (Workers + DO) | **Arène agent vs agent** | v1 (voir `arena.md`) |
 | Budget perf (agents/quartiers) | **TBD** | TBD |
 
 ## Cas limites
 
 - **Beaucoup d'unités/États** : privilégier les overlays et l'instancing ; éviter les modèles détaillés par quartier.
 - **Déterminisme vs 60 FPS** : la simulation (10 Hz) est **indépendante** du rendu (accumulateur à pas fixe) — conserve la reproductibilité.
-- **Extraction multi future** : garder le core sans dépendance navigateur et l'isoler (Worker-ready) ; coordonner plus tard via **Durable Objects** (Cloudflare) si on passe en ligne.
+- **Extraction multi (faite)** : le core est sans dépendance navigateur ; l'arène le fait tourner dans un **Durable Object** (Cloudflare), piloté par des agents externes via `applyIntent`.
 - **Sérialisation** : intents/executions et logs d'événements **sérialisables** (replay, validation).
 
 ## Dépendances
