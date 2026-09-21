@@ -12,8 +12,20 @@ export const POLICE = {
 	crimeWeight: 0.0015,
 	/** Crime signal decay (per tick). */
 	crimeDecay: 0.985,
-	/** Passive Pressure decay (per tick). */
-	baseDecay: 0.002,
+	/**
+	 * Passive Pressure decay (per tick) at zero pressure. Decay is
+	 * **proportional** (see `decayHalf`): without it, any sustained capture rate
+	 * makes Pressure a one-way ratchet — playing *better* (expanding faster) got
+	 * you liquidated, which is the opposite of punishing domination.
+	 */
+	baseDecay: 0.0075,
+	/**
+	 * Decay half-life: decay doubles at this Pressure. Pressure settles where
+	 * `crimeWeight × crime = baseDecay × (1 + P / decayHalf)` — so a calm cartel
+	 * falls back to 0, a normal war settles around 50, and a *sustained* rampage
+	 * still climbs to liquidation.
+	 */
+	decayHalf: 60,
 	/**
 	 * Domination floor. In a battle royale, the leader naturally holds a large
 	 * share: excess is no longer measured against `1/nb factions` but against a

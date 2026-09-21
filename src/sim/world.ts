@@ -1324,8 +1324,12 @@ export class World {
 		// Battle royale: we don't punish a mere lead, only crushing domination.
 		const excess = Math.max(0, leaderShare - POLICE.dominationShare);
 
+		// Proportional decay: the hotter the Pressure, the faster it cools, so it
+		// settles at an equilibrium instead of ratcheting to liquidation.
 		let delta =
-			POLICE.excessWeight * excess + POLICE.crimeWeight * state.crime - POLICE.baseDecay;
+			POLICE.excessWeight * excess +
+			POLICE.crimeWeight * state.crime -
+			POLICE.baseDecay * (1 + state.pressure / POLICE.decayHalf);
 		if (state.window > 0) delta -= POLICE.corruptionSuppress;
 		state.crime *= POLICE.crimeDecay;
 		const floor = excess * POLICE.dominationFloor;
