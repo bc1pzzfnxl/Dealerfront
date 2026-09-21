@@ -33,3 +33,6 @@ coverage/
 dist-dashboard/
 data/
 src/dashboard/sim-data.json
+
+# Playwright MCP artifacts (local tooling)
+.playwright-mcp/
