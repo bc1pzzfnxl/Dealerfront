@@ -794,43 +794,43 @@ function App() {
 							: null}
 					</div>
 
+					<div className="action-grid">
 					<button
 						type="button"
-						className="expand-btn"
+						className="action-btn"
 						title="Attaque automatiquement le quartier voisin le plus faible (neutre ou ennemi hors pacte)."
 						onClick={() => {
 							if (world.playerAttackBest()) setVersion((value) => value + 1);
 							else setNotice("Expansion : aucune cible adjacente attaquable.");
 						}}
 					>
-						Étendre <kbd>E</kbd>
+						Étendre <em><kbd>E</kbd></em>
 					</button>
 
 					<button
 						type="button"
-						className="expand-btn"
+						className="action-btn"
 						disabled={!world.playerCanBuyArmement()}
 						title={`Trésorerie de guerre : +25 % d'attaque pendant 40 s (cumulable ×3). Coût croissant en Cash propre.`}
 						onClick={() => {
 							if (world.playerBuyArmement()) setVersion((value) => value + 1);
 						}}
 					>
-						Armement{" "}
-						<code>{world.armamentCost().toLocaleString("fr-FR")} propre</code>
+						Armement <em>{world.armamentCost().toLocaleString("fr-FR")}</em>
 					</button>
 
 					<button
 						type="button"
-						className="expand-btn"
+						className="action-btn"
 						disabled={!world.playerCanHireMercenaries()}
 						title={`Mercenaires : +${world.mercMembers()} Membres immédiats. Coût croissant en Cash sale.`}
 						onClick={() => {
 							if (world.playerHireMercenaries()) setVersion((value) => value + 1);
 						}}
 					>
-						Mercenaires{" "}
-						<code>{world.mercCost().toLocaleString("fr-FR")} sale</code>
+						Mercenaires <em>{world.mercCost().toLocaleString("fr-FR")}</em>
 					</button>
+					</div>
 
 					<label
 						className="slider-row"

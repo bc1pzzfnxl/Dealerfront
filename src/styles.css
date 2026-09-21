@@ -466,6 +466,28 @@ kbd {
 	color: var(--muted);
 }
 
+.action-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0.3rem;
+	margin-top: 0.4rem;
+}
+
+.action-grid .action-btn {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.1rem;
+	padding: 0.35rem 0.2rem;
+	font-size: 0.72rem;
+}
+
+.action-grid .action-btn em {
+	font-style: normal;
+	font-size: 0.66rem;
+	color: var(--muted);
+}
+
 .expand-btn {
 	display: flex;
 	align-items: center;
