@@ -112,6 +112,7 @@ Define the **police** as a **non-playable opposing faction**, **anti-leader (ant
 | 8 | Readability | Diegetic indicator/mood, auditable causality |
 | 9 | Old version | "Patrols/suspicion/single dealer" abandoned |
 | 10 | Session end | The police do not end it before liquidation; the score decides otherwise |
+| 10a | **Signal scope** | Only the **leader's** captures feed `crime` (the police hunt the leader, not the map). The domination floor is a **ramp** from 50% share: 60% → 18, 80% → 54, 100% → 90. Below 50% a lead draws no attention at all. |
 | 10b | **Pressure decay** | Decay is **proportional** (`baseDecay × (1 + P / decayHalf)`, 0.006 and 60): Pressure settles at an equilibrium instead of ratcheting to liquidation. A flat decay made any sustained capture rate a one-way trip to 95 — playing *better* (expanding faster) got you liquidated. Equilibrium ≈ 50 for a normal war, ~95 only for a real rampage. |
 | 11 | Local police | **Heat per quarter** (0–100): +capture 30, +strike 20, +operation 15, +storefront 0.15×demand, +front 0.08×wealth; decay **proportional to heat** `0.08 × (1 + heat/30)` (a hot quarter cools faster → equilibrium below 100: demand 1 ≈ 26, demand 2 ≈ 82), ×3 in zones under **police surveillance**. **Raids target the leader's hottest quarters** and **destroy their building**. **Corruption cools** the cartel's quarters (heat ÷2). |
 

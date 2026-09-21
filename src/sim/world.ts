@@ -111,8 +111,13 @@ const BUILD_CREWS = 2;
 const LOOT_RATIO = 0.2;
 /** Bust: heist to steal loot without destroying (gated by Armament). */
 const BUST = { costSale: 2000, costMembers: 600, requiredArmament: 1, cooldownTicks: 250 } as const;
-/** Share of its army an AI is willing to leave on the field at once. */
-const AI_MAX_COMMIT = 0.5;
+/**
+ * Share of its army an AI is willing to leave on the field at once. Each front
+ * commits `attackRatio` (20%), so 0.5 capped it at ~3 fronts — far more timid
+ * than a player, who pushes every border at once. The reserve still matters
+ * (committed troops are not defending), it just no longer strangles the war.
+ */
+const AI_MAX_COMMIT = 0.7;
 /** Fronts an AI pushes per decision (mirrors the balancing bot's policy). */
 const AI_FRONTS = 2;
 const AI_INTERVAL = 20;
@@ -455,7 +460,7 @@ export class World {
 		this.contactIndex = seed % CONTACT_NAMES.length;
 
 		this.territory.control.fill(NEUTRAL_GARRISON);
-		const spawns = this.city.spawns.slice(0, this.factions.length);
+		const spawns = this.pickSpawns(this.factions.length);
 		// Spawn is always buildable: force a "built" zone on each spawn.
 		const modules = this.city.modules as ZoneType[];
 		spawns.forEach((module, index) => {
@@ -2393,7 +2398,11 @@ export class World {
 				const taker = this.factions[attack.factionId]!.name;
 				const loser = previous === NEUTRAL ? "neutral" : this.factions[previous]!.name;
 				this.pushLog(`${taker} takes a quarter from ${loser}`);
-				this.police.crime += 1;
+				// Only the **leader's** activity feeds the anti-leader Pressure: the
+				// signal must track the faction the police actually hunt, not the
+				// total violence of the map. Counting every capture made the leader
+				// pay for five other gangs' wars (and liquidated them for it).
+				if (attack.factionId === this.police.target) this.police.crime += 1;
 				// Loot: buildings are valuable objectives.
 				if (destroyed && previous !== NEUTRAL && previous !== attack.factionId) {
 					const gained = this.loot(attack.factionId, previous, destroyed);
@@ -2975,6 +2984,42 @@ export class World {
 	private pushLog(message: string): void {
 		this.log.push(message);
 		if (this.log.length > 8) this.log.shift();
+	}
+
+	/**
+	 * One spawn per faction. The map ships fewer spawns than the faction count
+	 * (Paris ships 4, the game plays 6), so the extras are derived
+	 * deterministically: the built quarters farthest from every spawn already
+	 * taken. Without this the extra gangs start with **zero** quarter — dead on
+	 * arrival, and the game silently plays 4 cartels instead of 6.
+	 */
+	private pickSpawns(count: number): number[] {
+		const chosen = this.city.spawns.slice(0, count);
+		const built = this.city.modules
+			.map((zone, index) => ({ zone, index }))
+			.filter(({ zone }) => BUILT_ZONES.includes(zone))
+			.map(({ index }) => index);
+		const distance = (a: number, b: number): number => {
+			const from = PARIS_CENTROIDS[a];
+			const to = PARIS_CENTROIDS[b];
+			if (!from || !to) return 0;
+			return (from[0] - to[0]) ** 2 + (from[1] - to[1]) ** 2;
+		};
+		while (chosen.length < count && built.length > 0) {
+			let best = -1;
+			let bestDistance = -1;
+			for (const candidate of built) {
+				if (chosen.includes(candidate)) continue;
+				const nearest = Math.min(...chosen.map((c) => distance(c, candidate)));
+				if (nearest > bestDistance) {
+					bestDistance = nearest;
+					best = candidate;
+				}
+			}
+			if (best < 0) break;
+			chosen.push(best);
+		}
+		return chosen;
 	}
 
 	/** Neighbors of a quarter (adjacency provided by the map). */

@@ -39,6 +39,7 @@ Load a **real map** (quarters, zones, profiles) then **set up** the game: factio
 
 ## Edge cases
 
+- **Spawns**: the map ships **4** spawns (farthest-point sampling among built zones) but the game plays **6** cartels. The extras are **derived at runtime** (`World.pickSpawns`) as the built quarters farthest from every spawn already taken — otherwise the extra gangs start with zero quarter.
 - **Isolated quarter** (no neighbor): impossible in Paris (adjacency verified: no isolated quarter).
 - **City without fronts**: commercial/activity zones provide fronts — hard constraint.
 - **Determinism**: the map file is **generated once** and versioned — same build ⇒ same map.

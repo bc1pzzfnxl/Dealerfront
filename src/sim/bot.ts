@@ -12,7 +12,7 @@ import type { World } from "./world";
 /** Bot decision cadence (in ticks). */
 export const AUTOPLAY_EVERY = 20;
 /** Fronts the bot pushes per decision — a player does not click one quarter at a time. */
-const BOT_FRONTS = 2;
+const BOT_FRONTS = 3;
 
 export function autoPlay(world: World, rng: Rng): void {
 	const player = world.player;
@@ -52,7 +52,7 @@ export function autoPlay(world: World, rng: Rng): void {
 	// every simulated game far beyond the real pacing.
 	for (let push = 0; push < BOT_FRONTS; push += 1) {
 		// Keep a reserve: committed troops are troops that are not defending.
-		if (world.committedShare(player.id) >= 0.5) break;
+		if (world.committedShare(player.id) >= 0.7) break;
 		const targets: number[] = [];
 		for (let i = 0; i < world.territory.count; i += 1) {
 			if (pushed.has(i)) continue;

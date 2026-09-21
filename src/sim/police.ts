@@ -27,16 +27,14 @@ export const POLICE = {
 	 */
 	decayHalf: 60,
 	/**
-	 * Domination floor. In a battle royale, the leader naturally holds a large
-	 * share: excess is no longer measured against `1/nb factions` but against a
-	 * **crushing domination threshold** (~80% of the map). Below it, no floor
-	 * pressure; above it, the police hound you. Since dominating is required to
-	 * finish, the threshold is high: the police punish *total* domination, not
-	 * a lead.
+	 * Domination floor. The police are **anti-leader**: the more of the map the
+	 * leader holds, the harder the floor pushes. It is a *ramp*, not a cliff —
+	 * the old `share > 0.8` threshold never fired in practice (a 6-cartel leader
+	 * sits around 20–40%), so the police were driven by crime alone.
 	 */
-	dominationFloor: 60,
-	/** Map share beyond which a leader is "crushing". */
-	dominationShare: 0.8,
+	dominationFloor: 180,
+	/** Map share below which a lead draws no police attention at all. */
+	dominationShare: 0.5,
 	/** Tiers. */
 	raidThreshold: 40,
 	multiThreshold: 70,

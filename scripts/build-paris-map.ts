@@ -258,7 +258,7 @@ function adjacent(features: Feature[]): number[][] {
 }
 
 /** Greedy farthest-point sampling among built zones. */
-function pickSpawns(centroids: Position[], zones: ZoneType[], count = 4): number[] {
+function pickSpawns(centroids: Position[], zones: ZoneType[], count = 6): number[] {
 	const candidates = zones
 		.map((zone, i) => ({ zone, i }))
 		.filter(({ zone }) => BUILT.includes(zone))

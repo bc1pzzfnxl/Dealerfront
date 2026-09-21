@@ -151,6 +151,20 @@ describe("economy bootstrap", () => {
 	});
 });
 
+describe("spawns", () => {
+	it("gives every faction a starting quarter", () => {
+		// The Paris map ships fewer spawns (4) than the faction count (6); the
+		// extras are derived. A faction with no quarter is dead on arrival, and the
+		// game silently plays with fewer cartels than intended.
+		const world = new World(1);
+		expect(world.factions.length).toBe(6);
+		for (const faction of world.factions) {
+			expect(world.modulesOwned(faction.id)).toBeGreaterThan(0);
+			expect(faction.eliminated).toBe(false);
+		}
+	});
+});
+
 describe("elimination", () => {
 	it("a faction with no quarter left is out, whatever removed it", () => {
 		const world = new World(1);
