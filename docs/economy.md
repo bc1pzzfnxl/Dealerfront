@@ -309,5 +309,5 @@ Un quartier possédé et **vide** ne peut être converti que vers les types **co
 
 ### P19 — bâtiments objectifs (butin)
 
-- Capturer un quartier **bâti** rapporte **40 % de la valeur du bâtiment** (prélevé sur le défenseur, dans sa monnaie de coût), en plus du quartier. Les bâtiments deviennent donc des **cibles à valeur**.
+- Capturer un quartier **bâti** rapporte **20 % de la valeur du bâtiment** (prélevé sur le défenseur, dans sa monnaie de coût), en plus du quartier. *Abaissé de 40 % → 20 % pour freiner le snowball.* Les bâtiments restent des **cibles à valeur**.
 - Un **Contre-espionnage** adjacent à un quartier attaqué **alerte** son propriétaire (événement, texte flottant, son) : rôle de **guetteur**.

@@ -455,6 +455,17 @@ kbd {
 	letter-spacing: 0;
 }
 
+.notice.danger {
+	border-left-color: var(--danger);
+	background-color: rgba(226, 59, 46, 0.12);
+	color: var(--text);
+}
+
+.slider-row .def-part {
+	font-style: normal;
+	color: var(--muted);
+}
+
 .expand-btn {
 	display: flex;
 	align-items: center;

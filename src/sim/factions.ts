@@ -26,8 +26,12 @@ export interface Faction {
 	attackRatio: number;
 	/** Part de la capacité des façades effectivement blanchie (0–1). */
 	launderRatio: number;
-	/** Cooldown du tueur à gage (ticks). */
+	/** Cooldowns **propres** à chaque opération (ticks) — évite le faux choix. */
 	hitmanCooldown: number;
+	raidCooldown: number;
+	descentCooldown: number;
+	sabotageCooldown: number;
+	interceptCooldown: number;
 	/** Nombre de corruptions achetées (coût croissant). */
 	corruptionUses: number;
 	/** Quartiers pris (toute capture, neutre comprise). */
@@ -84,6 +88,10 @@ export function createFactions(count: number, startMembers: number): Faction[] {
 			buildings: 0,
 			tech: { armement: 0, protection: 0, logistique: 0 },
 			hitmanCooldown: 0,
+			raidCooldown: 0,
+			descentCooldown: 0,
+			sabotageCooldown: 0,
+			interceptCooldown: 0,
 			attackRatio: 0.2,
 			launderRatio: 0.5,
 			corruptionUses: 0,

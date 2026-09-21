@@ -291,7 +291,7 @@ function App() {
 		if (!world.canAttack(player.id, selected)) return "non adjacent";
 		if (!world.buildingAt(selected)) return "pas de bâtiment";
 		if (player.tech.armement < 1) return "Armement ≥ 1 requis";
-		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		if (player.descentCooldown > 0) return `recharge ${Math.ceil(player.descentCooldown / SIM_HZ)} s`;
 		const cost = world.descentCost();
 		if (player.cashSale < cost.sale) return `${cost.sale} sale requis`;
 		if (player.members < cost.members) return `${cost.members} membres requis`;
@@ -305,7 +305,7 @@ function App() {
 		if (!world.canAttack(player.id, selected)) return "non adjacent";
 		if (!world.buildingAt(selected)) return "pas de bâtiment";
 		if (player.tech.armement < 2) return "Armement ≥ 2 requis";
-		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		if (player.sabotageCooldown > 0) return `recharge ${Math.ceil(player.sabotageCooldown / SIM_HZ)} s`;
 		if (player.cashSale < world.sabotageCost()) return `${world.sabotageCost()} sale requis`;
 		return null;
 	}, [selected, world, player]);
@@ -317,7 +317,7 @@ function App() {
 		if (!world.canAttack(player.id, selected)) return "non adjacent";
 		if (!world.convoyRoutes().some((route) => route.to === selected)) return "aucun convoi";
 		if (player.tech.armement < 1) return "Armement ≥ 1 requis";
-		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		if (player.interceptCooldown > 0) return `recharge ${Math.ceil(player.interceptCooldown / SIM_HZ)} s`;
 		if (player.members < world.interceptCost()) return `${world.interceptCost()} membres requis`;
 		return null;
 	}, [selected, world, player]);
@@ -332,7 +332,7 @@ function App() {
 		const cost = world.raidCost();
 		if (player.cashSale < cost.sale) return `${cost.sale} sale requis`;
 		if (player.members < cost.members) return `${cost.members} membres requis`;
-		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		if (player.raidCooldown > 0) return `recharge ${Math.ceil(player.raidCooldown / SIM_HZ)} s`;
 		return null;
 	}, [selected, world, player]);
 
@@ -657,9 +657,9 @@ function App() {
 						</div>
 					</div>
 					<div className="top-right">
-						<span className="objective">
+						<span className="objective" title="Votre rang (1 = leader)">
 							<strong>
-								{alive} cartel{alive > 1 ? "s" : ""} en jeu
+								Rang {world.playerRank()} · {alive} cartel{alive > 1 ? "s" : ""} en jeu
 							</strong>
 							<span className="objective-sub">Dernier survivant</span>
 						</span>
@@ -695,6 +695,12 @@ function App() {
 				<section className="card panel-left">
 					<p className="advisor">{advisor}</p>
 					{notice ? <p className="notice">{notice}</p> : null}
+					{world.bankruptcyTicksLeft() > 0 ? (
+						<p className="notice danger">
+							<strong>Faillite dans {Math.ceil(world.bankruptcyTicksLeft() / SIM_HZ)} s</strong> —
+							relancez la chaîne Produit → Cash sale (labo + point de vente).
+						</p>
+					) : null}
 					<div className="quarter-head">
 						<h2>
 							Quartier <em>{selected !== null ? `#${selected}` : "—"}</em>
@@ -793,9 +799,12 @@ function App() {
 								setVersion((value) => value + 1);
 							}}
 						/>
-						<code>
+						<code title={`Assaut ${engaged.toLocaleString("fr-FR")} · Défense ${Math.max(0, Math.round(player.members - engaged)).toLocaleString("fr-FR")}`}>
 							{Math.round(world.playerAttackRatio() * 100)}% ·{" "}
 							{engaged.toLocaleString("fr-FR")}
+							<em className="def-part">
+								/{Math.max(0, Math.round(player.members - engaged)).toLocaleString("fr-FR")}
+							</em>
 						</code>
 					</label>
 
@@ -821,13 +830,14 @@ function App() {
 											selected !== null
 												? world.zoneBonusAt(selected, type)
 												: 1;
+										const owned = world.buildingCount(player.id, type);
 										return (
 											<button
 												key={type}
 												type="button"
 												className={bonus > 1 ? "bonus" : undefined}
 												disabled={!afford(type)}
-												title={`${BUILDINGS[type].label} : ${BUILDING_EFFECT_LABELS[type]}${bonus > 1 ? ` · zone ×${bonus.toFixed(2).replace(".", ",")}` : ""}${reason ? ` — ${reason}` : ""}`}
+												title={`${BUILDINGS[type].label} : ${BUILDING_EFFECT_LABELS[type]}${bonus > 1 ? ` · zone ×${bonus.toFixed(2).replace(".", ",")}` : ""}${owned > 0 ? ` · ${owned} déjà bâtis (coût +35 %/unité)` : ""}${reason ? ` — ${reason}` : ""}`}
 												onClick={() => build(type)}
 											>
 												<Icon className="build-icon" aria-hidden="true" />

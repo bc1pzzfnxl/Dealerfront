@@ -62,7 +62,7 @@ const QUEUE_MAX = 12;
 /** Durée (ticks) avant de purger un ordre durablement inabordable (libère la file). */
 const QUEUE_GRACE = 300;
 /** Part de la valeur d'un bâtiment prise en butin à la capture. */
-const LOOT_RATIO = 0.4;
+const LOOT_RATIO = 0.2;
 /** Descente : coup de main pour voler le butin sans détruire (gaté Armement). */
 const DESCENT = { costSale: 2000, costMembers: 600, requiredArmement: 1, cooldownTicks: 250 } as const;
 /** Sabotage : production d'un bâtiment divisée par 2 pendant N ticks (gaté Armement). */
@@ -1141,7 +1141,7 @@ export class World {
 		if (this.ownerAt(module) === NEUTRAL) return false;
 		if (this.player.cashSale < RAID.costSale) return false;
 		if (this.player.members < RAID.costMembers) return false;
-		return this.player.hitmanCooldown <= 0;
+		return this.player.raidCooldown <= 0;
 	}
 
 	/** Raid : affaiblit un quartier adjacent (Contrôle + bâtiments) sans le capturer. */
@@ -1149,7 +1149,7 @@ export class World {
 		if (!this.playerCanRaid(module)) return false;
 		this.player.cashSale -= RAID.costSale;
 		this.player.members -= RAID.costMembers;
-		this.player.hitmanCooldown = RAID.cooldownTicks;
+		this.player.raidCooldown = RAID.cooldownTicks;
 		this.territory.control[module] = Math.max(
 			5,
 			this.territory.control[module]! - RAID.control,
@@ -1214,7 +1214,7 @@ export class World {
 		if (owner === NEUTRAL || owner === this.player.id) return false;
 		if (!this.buildingAt(module)) return false;
 		if (this.player.tech.armement < DESCENT.requiredArmement) return false;
-		if (this.player.hitmanCooldown > 0) return false;
+		if (this.player.descentCooldown > 0) return false;
 		return (
 			this.player.cashSale >= DESCENT.costSale && this.player.members >= DESCENT.costMembers
 		);
@@ -1227,7 +1227,7 @@ export class World {
 		const type = this.buildingAt(module)!;
 		this.player.cashSale -= DESCENT.costSale;
 		this.player.members -= DESCENT.costMembers;
-		this.player.hitmanCooldown = DESCENT.cooldownTicks;
+		this.player.descentCooldown = DESCENT.cooldownTicks;
 		// Un Guetteur adverse gêne l'opération (butin réduit, échec si réseau dense).
 		const guards = this.guardedBy(owner, module);
 		if (guards >= 2) {
@@ -1263,7 +1263,7 @@ export class World {
 		if (!this.buildingAt(module)) return false;
 		if (this.player.tech.armement < SABOTAGE.requiredArmement) return false;
 		if (this.territory.sabotageUntil[module]! > this.tick) return false;
-		if (this.player.hitmanCooldown > 0) return false;
+		if (this.player.sabotageCooldown > 0) return false;
 		return this.player.cashSale >= SABOTAGE.costSale;
 	}
 
@@ -1272,7 +1272,7 @@ export class World {
 		if (!this.playerCanSabotage(module)) return false;
 		const owner = this.ownerAt(module);
 		this.player.cashSale -= SABOTAGE.costSale;
-		this.player.hitmanCooldown = SABOTAGE.cooldownTicks;
+		this.player.sabotageCooldown = SABOTAGE.cooldownTicks;
 		if (this.guardedBy(owner, module) >= 1) {
 			this.pushLog(`Sabotage déjoué (guetteurs, module ${module})`);
 			this.events.push("alert");
@@ -1302,7 +1302,7 @@ export class World {
 		if (!this.canAttack(this.player.id, module)) return false;
 		if (!this.convoyTo(module)) return false;
 		if (this.player.tech.armement < INTERCEPT.requiredArmement) return false;
-		if (this.player.hitmanCooldown > 0) return false;
+		if (this.player.interceptCooldown > 0) return false;
 		return this.player.members >= INTERCEPT.costMembers;
 	}
 
@@ -1312,7 +1312,7 @@ export class World {
 		const route = this.convoyTo(module)!;
 		const victim = this.factions[route.factionId]!;
 		this.player.members -= INTERCEPT.costMembers;
-		this.player.hitmanCooldown = INTERCEPT.cooldownTicks;
+		this.player.interceptCooldown = INTERCEPT.cooldownTicks;
 		const gained = this.stealCargo(this.player, victim, route.kind);
 		this.territory.sabotageUntil[module] = this.tick + INTERCEPT.disruptTicks;
 		this.addHeat(module, HEAT.operation);
@@ -1809,6 +1809,10 @@ export class World {
 		this.recount();
 		for (const faction of this.factions) {
 			if (faction.hitmanCooldown > 0) faction.hitmanCooldown -= 1;
+			if (faction.raidCooldown > 0) faction.raidCooldown -= 1;
+			if (faction.descentCooldown > 0) faction.descentCooldown -= 1;
+			if (faction.sabotageCooldown > 0) faction.sabotageCooldown -= 1;
+			if (faction.interceptCooldown > 0) faction.interceptCooldown -= 1;
 		}
 		this.produce();
 		this.sell();
@@ -2486,6 +2490,17 @@ export class World {
 	}
 
 	/** Classement déterministe par puissance (quartiers, membres, cash, id). */
+	/** Rang du joueur (1 = leader). */
+	playerRank(): number {
+		return this.rankings().indexOf(this.player.id) + 1;
+	}
+
+	/** Ticks restants avant la faillite (0 si pas en découvert). */
+	bankruptcyTicksLeft(): number {
+		if (this.brokeTicks <= 0) return 0;
+		return Math.max(0, BANKRUPT_TICKS - this.brokeTicks);
+	}
+
 	rankings(): number[] {
 		return this.factions
 			.map((faction) => faction.id)
