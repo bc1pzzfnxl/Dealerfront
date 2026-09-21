@@ -15,6 +15,7 @@ import {
 	CONVERSION_TIME,
 	canBuildInZone,
 	chooseBuildType,
+	chainIncomplete,
 	CONVERSION_COST,
 	missingEconomyStep,
 	type BuildingType,
@@ -112,7 +113,9 @@ const LOOT_RATIO = 0.2;
 const BUST = { costSale: 2000, costMembers: 600, requiredArmament: 1, cooldownTicks: 250 } as const;
 /** Share of its army an AI is willing to leave on the field at once. */
 const AI_MAX_COMMIT = 0.5;
-const AI_INTERVAL = 25;
+/** Fronts an AI pushes per decision (mirrors the balancing bot's policy). */
+const AI_FRONTS = 2;
+const AI_INTERVAL = 20;
 const MIN_COMMIT = 400;
 /** Raid: weakens an adjacent quarter without capturing it. */
 const RAID = { costSale: 2500, costMembers: 800, control: 35, cooldownTicks: 300 } as const;
@@ -2425,11 +2428,13 @@ export class World {
 			this.aiCooldowns[i] = (this.aiCooldowns[i] ?? 0) - 1;
 			if ((this.aiCooldowns[i] ?? 0) > 0) continue;
 			this.aiCooldowns[i] = AI_INTERVAL;
-			// Diplomacy: responds to pacts and proposes them (always, before shortcuts).
+			// Housekeeping and war must not compete for the same decision: an AI
+			// that spends its turn building never attacks, and is permanently on
+			// the back foot. So these are all *additive* — the assault below always
+			// gets its chance.
 			this.aiDiplomacy(i);
-			// Reactive defense before any other action.
-			if (this.aiDefend(i)) continue;
-			if (this.rng() < 0.4 && this.aiBuild(i)) continue;
+			this.aiDefend(i);
+			if (this.rng() < 0.4) this.aiBuild(i);
 
 			// Tech: levels up a branch if a Workshop allows it.
 			if (this.rng() < 0.3) {
@@ -2445,19 +2450,26 @@ export class World {
 			) {
 				this.corruptPolice(i);
 			}
-			// Operations (bust): armament required, hence tech investment.
-			if (this.rng() < 0.3 && this.aiOperate(i)) continue;
-			// Interception of an adjacent enemy convoy.
-			if (this.rng() < 0.2 && this.aiIntercept(i)) continue;
-			// Occasional heavy strike on an adjacent enemy quarter.
-			if (this.rng() < 0.15 && this.aiStrike(i)) continue;
-			// Keep a reserve: the pool you commit is the pool that is not defending.
-			if (this.committedShare(i) > AI_MAX_COMMIT) continue;
-			// Force concentration: reinforce the ongoing assault before opening a front.
-			const active = this.attacks.find((attack) => attack.factionId === i);
-			const focus =
-				active && this.canAttack(i, active.target) ? active.target : this.pickAiTarget(i);
-			if (focus !== null) this.attackFrom(i, focus);
+			if (this.rng() < 0.3) this.aiOperate(i);
+			if (this.rng() < 0.2) this.aiIntercept(i);
+			if (this.rng() < 0.15) this.aiStrike(i);
+			// Push a couple of fronts. The first is **force concentration**: reinforce
+			// the ongoing assault before opening a new one. The rest expand the war.
+			const pushed = new Set<number>();
+			for (let push = 0; push < AI_FRONTS; push += 1) {
+				// Keep a reserve: the pool you commit is the pool that is not defending.
+				if (this.committedShare(i) > AI_MAX_COMMIT) break;
+				const active = this.attacks.find(
+					(attack) => attack.factionId === i && !pushed.has(attack.target),
+				);
+				const focus =
+					active && this.canAttack(i, active.target)
+						? active.target
+						: this.pickAiTarget(i);
+				if (focus === null || pushed.has(focus)) break;
+				pushed.add(focus);
+				if (!this.attackFrom(i, focus)) break;
+			}
 		}
 	}
 
@@ -2480,6 +2492,8 @@ export class World {
 		const bootstrap = missingEconomyStep(counts, (t) =>
 			this.canAfford(faction, t, CONVERSION_COST),
 		);
+		// Save up for the missing chain step instead of building filler.
+		if (bootstrap === null && chainIncomplete(counts)) return false;
 		for (let i = 0; i < this.territory.count; i += 1) {
 			if (this.territory.owner[i] !== factionId) continue;
 			if (this.territory.building[i] !== NO_BUILDING) continue;
@@ -2701,6 +2715,11 @@ export class World {
 			}
 		}
 		for (const faction of this.factions) {
+			// Elimination is decided by the map, not by *how* the quarters were
+			// lost: an encirclement or a police raid can zero a faction out without
+			// going through the assault path. Without this it lingers forever as an
+			// inert zombie that still gets an AI turn every 2.5 s.
+			if ((this.owned[faction.id] ?? 0) === 0) faction.eliminated = true;
 			const c = this.counts[faction.id]!;
 			faction.housing = c.housing;
 			faction.buildings =

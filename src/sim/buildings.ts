@@ -128,8 +128,13 @@ export const BUILDING_EFFECT_LABELS: Record<BuildingType, string> = {
 	counter: "alerts on busts · −15% hitman · hinders busts",
 };
 
-/** Bootstrap order of the economy chain (build first). */
-export const ECONOMY_CHAIN: readonly BuildingType[] = ["lab", "storefront", "front"];
+/**
+ * Bootstrap order of the economy chain. A **Storefront comes first**: it sells
+ * straight away thanks to the external supplier (`EXTERNAL_SUPPLY_MARGIN`),
+ * while a Lab with nowhere to sell just piles up dead Product. Getting this
+ * order wrong bankrupts the bootstrap — no income, so no second building.
+ */
+export const ECONOMY_CHAIN: readonly BuildingType[] = ["storefront", "lab", "front"];
 
 /**
  * Next missing step of the economy chain, if affordable.
@@ -144,6 +149,15 @@ export function missingEconomyStep(
 		if (counts[type] === 0 && affordable(type)) return type;
 	}
 	return null;
+}
+
+/**
+ * True while the economy chain is incomplete: the cartel must **save** for the
+ * missing step instead of spending on filler. Without it a broke cartel spams
+ * Housing (paid in Members, always affordable) and never earns a single coin.
+ */
+export function chainIncomplete(counts: Record<BuildingType, number>): boolean {
+	return ECONOMY_CHAIN.some((type) => counts[type] === 0);
 }
 
 /**

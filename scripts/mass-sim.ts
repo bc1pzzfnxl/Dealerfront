@@ -75,7 +75,7 @@ function runSeed(seed: number): {
 		pressure: world.police.pressure,
 		raids: world.police.raids,
 		liquidations: world.police.liquidations,
-		policeDefeat: world.outcome === "defeat" && world.endReason.includes("Liquidation"),
+		policeDefeat: world.outcome === "defeat" && world.endReason.includes("liquidation"),
 		reason: world.endReason,
 		pacts: world.pacts.length,
 	};
@@ -126,13 +126,17 @@ for (let seed = 0; seed < SEEDS; seed += 1) {
 	totalLiquidations += result.liquidations;
 	if (result.policeDefeat) policeDefeats += 1;
 	totalPacts += result.pacts;
-	const cause = result.reason.includes("Liquidation")
-		? "police liquidation"
-		: result.reason.includes("Bankruptcy")
-			? "bankruptcy"
-			: result.reason.includes("eliminated")
-				? "elimination"
-				: "victory (last survivor)";
+	// Match the actual `endReason` strings (sentence case: "Police liquidation…").
+	const cause =
+		result.outcome === "none"
+			? "unfinished"
+			: result.reason.includes("liquidation")
+				? "police liquidation"
+				: result.reason.includes("Bankruptcy")
+					? "bankruptcy"
+					: result.reason.includes("eliminated")
+						? "elimination"
+						: "victory (last survivor)";
 	causes[cause] = (causes[cause] ?? 0) + 1;
 }
 const elapsed = (performance.now() - start) / 1000;

@@ -4,7 +4,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { BUILDING_TYPES, chooseBuildType, type BuildingType } from "./buildings";
+import {
+	BUILDING_TYPES,
+	chainIncomplete,
+	chooseBuildType,
+	ECONOMY_CHAIN,
+	type BuildingType,
+} from "./buildings";
 import { autoPlay, playOut } from "./bot";
 import { createRng } from "./rng";
 import { World } from "./world";
@@ -113,8 +119,56 @@ describe("bot — long runs", () => {
 	);
 });
 
-describe("bot — hitman", () => {
-	it("a hitman does not capture (control floor 5)", () => {
+describe("economy bootstrap", () => {
+	it("puts the Storefront first: it earns even without a Lab", () => {
+		// A Lab first piles up Product nobody can sell → dead money → no second
+		// building. This ordering is what bankrupted every simulated cartel.
+		expect(ECONOMY_CHAIN[0]).toBe("storefront");
+	});
+
+	it("reports an incomplete chain until Storefront + Lab + Front exist", () => {
+		const counts = empty();
+		expect(chainIncomplete(counts)).toBe(true);
+		counts.storefront = 1;
+		expect(chainIncomplete(counts)).toBe(true);
+		counts.lab = 1;
+		expect(chainIncomplete(counts)).toBe(true);
+		counts.front = 1;
+		expect(chainIncomplete(counts)).toBe(false);
+	});
+
+	it("the bot actually earns Dirty cash early instead of spamming Housing", () => {
+		const world = new World(0);
+		const rng = createRng(13);
+		for (let tick = 0; tick < 1500; tick += 1) {
+			if (tick % 20 === 0) autoPlay(world, rng);
+			world.step();
+		}
+		const player = world.player;
+		expect(world.buildingCount(player.id, "storefront")).toBeGreaterThan(0);
+		expect(world.buildingCount(player.id, "front")).toBeGreaterThan(0);
+		expect(player.dirtyCash).toBeGreaterThan(5000);
+	});
+});
+
+describe("elimination", () => {
+	it("a faction with no quarter left is out, whatever removed it", () => {
+		const world = new World(1);
+		const victim = world.factions[1]!;
+		// Hand the last quarter over directly, the way an encirclement or a police
+		// raid does — bypassing the assault path that used to be the only place
+		// marking a faction eliminated.
+		for (let i = 0; i < world.territory.count; i += 1) {
+			if (world.territory.owner[i] === 1) world.territory.owner[i] = 0;
+		}
+		expect(victim.eliminated).toBe(false);
+		world.step();
+		expect(victim.eliminated).toBe(true);
+	});
+});
+
+describe("bot — heavy strike", () => {
+	it("a strike does not capture (control floor 5)", () => {
 		const world = new World(0);
 		const rng = createRng(99);
 		for (let tick = 0; tick < 4000; tick += 1) {

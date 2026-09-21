@@ -18,7 +18,7 @@ export const POLICE = {
 	 * makes Pressure a one-way ratchet — playing *better* (expanding faster) got
 	 * you liquidated, which is the opposite of punishing domination.
 	 */
-	baseDecay: 0.0075,
+	baseDecay: 0.006,
 	/**
 	 * Decay half-life: decay doubles at this Pressure. Pressure settles where
 	 * `crimeWeight × crime = baseDecay × (1 + P / decayHalf)` — so a calm cartel
