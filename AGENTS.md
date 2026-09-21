@@ -37,6 +37,7 @@ Hébergement : **Cloudflare Workers** (API/utilitaires) + **assets statiques** (
 | `bun run test` | Tests Vitest |
 | `bun run sim:mass` | Simulation massive d'équilibrage (bot, 200 seeds × 15 000 ticks ; `SEEDS`/`TICKS` en env) |
 | `bun run sim:bench` | 100 parties → SQLite (`data/sim.sqlite`) + export JSON dashboard (`SEEDS`/`CADENCE`/`TICKS`) |
+| `bun run scripts/playtest.ts` | **Audit de jouabilité** : exerce toutes les actions joueur + 8 parties complètes |
 | `bun run dashboard:dev` | **Dashboard d'équilibrage local** (`http://localhost:5174`, racine = le dashboard) — lancer `sim:bench` d'abord |
 | `bun run dashboard:build` | Build du dashboard (`dist-dashboard/`, **hors git et hors déploiement**) |
 | `bun run cf-typegen` | Régénérer `worker-configuration.d.ts` |
@@ -107,5 +108,6 @@ bun run typecheck && bun run test && bun run build
 - **Police locale (P23)** : **heat par quartier** (monte au crime, retombe, ×3 près des postes réels) ; les **raids visent les quartiers les plus chauds** ; la **corruption refroidit** les quartiers du cartel (÷2). Heat rendu en contour orange. Testé (`police.test.ts`).
 - **À venir** : rien de bloquant (P1–P13 faits). Reste optionnel : coût croissant par type, sélection multiple + prévisualisation chiffrée, motifs daltoniens, overtime (codé mais désactivé), équilibrage (les parties gagnées « au score » dominent). **Agents/PNJ notables : abandonnés** (décision, voir `docs/factions.md`).
 - **Battle royale (P26)** : **victoire = dernier cartel en jeu** (plus de seuil de contrôle/cash ni d'horloge), **6 factions**. **Encirclement** : un cluster fermé (≥ 8 quartiers, ≥ 35 % de la faction, plus petit que l'encercleur) capitule d'un coup. **Événements à choix** (3 types) : un à la fois, deux options à effet traçable. **100 seeds** : 94 victoires / 6 défaites, 0 sans-fin, 0 violation. Détails dans `docs/win-conditions.md`, `docs/core-loop.md`, `docs/factions.md`, `docs/npc-events.md`.
+- **Économie localisée (P27)** : **bonus de bâtiment par zone** (`ZONE_BUILD_BONUS` : résidentiel→logement, commercial→vente, laverie→façade, industriel→labo/atelier, police→contre, parc→planque) + **coût croissant par type** (`×1,35^n`). **Cycle jour/nuit** (`TICKS_PER_HOUR = 120`, jour = 4,8 min) : **heures de pointe** par zone (`ZONE_RUSH`, facteur `1 + amplitude·cos`, moyenne 1/jour) → commercial le jour, nightlife la nuit. Icônes de bâtiment sur la carte (source GeoJSON `buildings`), pulsation verte à la livraison d'un chantier, jauge de conquête (fill contenu). Détails dans `docs/economy.md`.
 - **Performance** : cœur sim optimisé via comptages sans allocation par tick et caches (`recount`, `owned`, `underAttack`, `supplySignature`). Rendu : **`feature-state` incrémental** (seuls les quartiers changés sont mis à jour), convois recalculés par tick. Logistique : BFS uniquement quand propriété/bâtiments changent.
 - **Aucune base de données** (solo, sans méta).
