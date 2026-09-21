@@ -1312,8 +1312,8 @@ function App() {
 						</p>
 						<p>
 							Le siège fait baisser le <strong>Contrôle</strong> de la cible (il régénère seul) ;
-							à zéro, le quartier est pris. Un <strong>remplissage coloré</strong> part des bords
-							vers le centre pour montrer l'avancée du siège.
+							à zéro, le quartier est pris. Le quartier se <strong>remplit de blanc</strong> à mesure
+							que le Contrôle baisse.
 						</p>
 						<h3>Marché &amp; logistique</h3>
 						<p>

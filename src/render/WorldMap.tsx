@@ -339,47 +339,27 @@ function EffectStates({
 				},
 			});
 		}
-		// Jauge de conquête : trait épais qui grossit *vers l'intérieur* du quartier
-		// (offset négatif) au fur et à mesure que le Contrôle baisse.
-		// `zoom` doit rester l'entrée de plus haut niveau de l'expression.
+		// Jauge de conquête : le quartier se remplit de blanc à mesure que son
+		// Contrôle baisse. Un `fill` reste **contenu dans le polygone** (un trait
+		// épais déborderait aux angles).
 		if (!map.getLayer("iris-conquest")) {
-			const progress = ["coalesce", ["feature-state", "conquest"], 0] as never;
-			const conquestWidth = [
-				"interpolate",
-				["linear"],
-				["zoom"],
-				11,
-				["*", progress, 12],
-				13,
-				["*", progress, 40],
-				15,
-				["*", progress, 130],
-				17,
-				["*", progress, 255],
-			] as never;
-			const conquestOffset = [
-				"interpolate",
-				["linear"],
-				["zoom"],
-				11,
-				["*", progress, 6],
-				13,
-				["*", progress, 20],
-				15,
-				["*", progress, 65],
-				17,
-				["*", progress, 127.5],
-			] as never;
 			map.addLayer({
 				id: "iris-conquest",
-				type: "line",
+				type: "fill",
 				source: SOURCE_ID,
 				paint: {
-					"line-color": "#ffffff",
-					"line-width": conquestWidth,
-					"line-offset": conquestOffset,
-					"line-opacity": 0.6,
-					"line-blur": 2.5,
+					"fill-color": "#ffffff",
+					"fill-opacity": [
+						"interpolate",
+						["linear"],
+						["coalesce", ["feature-state", "conquest"], 0],
+						0,
+						0,
+						0.02,
+						0.08,
+						1,
+						0.62,
+					] as never,
 				},
 			});
 		}
