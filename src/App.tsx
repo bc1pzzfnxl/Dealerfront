@@ -565,12 +565,25 @@ function App() {
 			<div ref={hoverRef} className={`hover-card${hovered !== null ? " show" : ""}`}>
 				{hovered !== null ? (
 					<>
-						<span className="hover-owner">
-							{hoverOwnerName} · {hoverZone ? ZONE_LABELS[hoverZone] : "—"} · contrôle {hoverControl} ·
-							demande ×{world.demandAt(hovered).toFixed(1)} · richesse ×
-							{world.wealthAt(hovered).toFixed(1)} · heat {Math.round(world.heatAt(hovered))}
-						</span>
-						<span className="hover-line">
+						<div className="hover-head">
+							<span className="hover-owner">{hoverOwnerName}</span>
+							<span className="hover-zone">{hoverZone ? ZONE_LABELS[hoverZone] : "—"}</span>
+						</div>
+						<div className="hover-grid">
+							<span>
+								Contrôle <strong>{hoverControl}</strong>
+							</span>
+							<span>
+								Demande <strong>×{world.demandAt(hovered).toFixed(1)}</strong>
+							</span>
+							<span>
+								Richesse <strong>×{world.wealthAt(hovered).toFixed(1)}</strong>
+							</span>
+							<span>
+								Heat <strong>{Math.round(world.heatAt(hovered))}</strong>
+							</span>
+						</div>
+						<div className="hover-building">
 							{hoverConstruction > 0
 								? `Chantier : ${hoverPending ? BUILDINGS[hoverPending].label : "—"} (${Math.ceil(hoverConstruction / SIM_HZ)} s)`
 								: hoverBuilding
@@ -586,7 +599,7 @@ function App() {
 												: ""
 										}`
 									: "Aucun bâtiment"}
-						</span>
+						</div>
 					</>
 				) : null}
 			</div>
@@ -786,12 +799,12 @@ function App() {
 												type="button"
 												className={bonus > 1 ? "bonus" : undefined}
 												disabled={!afford(type)}
-												title={`${BUILDINGS[type].label} — ${BUILDING_EFFECT_LABELS[type]} · ${formatCost(type, costFactor(type))}${bonus > 1 ? ` · zone favorable ×${bonus.toFixed(2)}` : ""}${reason ? ` · ${reason}` : ""}`}
+												title={`${BUILDINGS[type].label} : ${BUILDING_EFFECT_LABELS[type]}${bonus > 1 ? ` · zone ×${bonus.toFixed(2).replace(".", ",")}` : ""}${reason ? ` — ${reason}` : ""}`}
 												onClick={() => build(type)}
 											>
 												<Icon className="build-icon" aria-hidden="true" />
 												{bonus > 1 ? (
-													<span className="bonus-tag">×{bonus.toFixed(2)}</span>
+													<span className="bonus-tag">×{bonus.toFixed(2).replace(".", ",")}</span>
 												) : null}
 												<em className={zoneBlocked ? "zone" : reason ? "lack" : undefined}>
 													{zoneBlocked ? "zone" : formatCost(type, costFactor(type))}
@@ -828,7 +841,7 @@ function App() {
 										label: canAttack ? `${engaged} engagés` : "Assaut",
 										hotkey: "Q",
 										title: canAttack
-											? `Assaut · ${engaged} Membres engagés · siège : contrôle ${targetControl}, défense ×${targetDefense.toFixed(1)}${world.buildingAt(selected!) === "planque" ? " (planque)" : ""}`
+											? `Assaut : ${engaged} engagés · contrôle ${targetControl} · défense ×${targetDefense.toFixed(1)}${world.buildingAt(selected!) === "planque" ? " (planque)" : ""}`
 											: attackReason,
 										disabled: !canAttack,
 										run: act,
@@ -889,7 +902,7 @@ function App() {
 										label: `${world.interceptCost()}`,
 										title:
 											interceptReason() ??
-											"Interception : détourne la cargaison d'un convoi et coupe la ligne",
+											"Interception : détourne un convoi et coupe la ligne",
 										disabled: interceptReason() !== null,
 										run: () => {
 											if (selected !== null && world.playerIntercept(selected)) {
