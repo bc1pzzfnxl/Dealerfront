@@ -338,9 +338,19 @@ function App() {
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.code === "Escape") {
+				setSelected(null);
+				return;
+			}
 			if (event.code === "KeyQ" || event.code === "KeyA") {
 				event.preventDefault();
 				act();
+				return;
+			}
+			if (event.code === "KeyE") {
+				event.preventDefault();
+				if (world.playerAttackBest()) setVersion((value) => value + 1);
+				else setNotice("Expansion : aucune cible adjacente attaquable.");
 				return;
 			}
 			if (event.code === "KeyT") {
@@ -533,6 +543,7 @@ function App() {
 					version={version}
 					onModuleClick={(module) => setSelected(module)}
 					onModuleHover={setHovered}
+					onEmptyClick={() => setSelected(null)}
 					onProjector={(project) => {
 						projectorRef.current = project;
 					}}
@@ -723,12 +734,17 @@ function App() {
 							<strong>{Math.round(world.retailSupplyRatio(player.id) * 100)}%</strong>
 							Logistique
 						</span>
-						<span
-							title={`Zone : ${selectedZoneLabel}${selectedBuilding ? ` · ${BUILDINGS[selectedBuilding].label}` : ""}`}
-						>
-							<strong>{selectedBuilding ? BUILDINGS[selectedBuilding].label : selectedZoneLabel}</strong>
-							Bâti
-						</span>
+						{selectedBuilding ? (
+							<span title={BUILDING_EFFECT_LABELS[selectedBuilding]}>
+								<strong>{BUILDINGS[selectedBuilding].label}</strong>
+								Bâtiment
+							</span>
+						) : (
+							<span title="Profil de zonage du quartier (pas un bâtiment)">
+								<strong>{selectedZoneLabel}</strong>
+								Zone
+							</span>
+						)}
 					</div>
 					<div className="quarter-foot">
 						<span>
@@ -748,6 +764,18 @@ function App() {
 								})()
 							: null}
 					</div>
+
+					<button
+						type="button"
+						className="expand-btn"
+						title="Attaque automatiquement le quartier voisin le plus faible (neutre ou ennemi hors pacte)."
+						onClick={() => {
+							if (world.playerAttackBest()) setVersion((value) => value + 1);
+							else setNotice("Expansion : aucune cible adjacente attaquable.");
+						}}
+					>
+						Étendre <kbd>E</kbd>
+					</button>
 
 					<label
 						className="slider-row"
@@ -1211,7 +1239,7 @@ function App() {
 							{world.log.length === 0 ? (
 								<li className="empty">—</li>
 							) : (
-								world.log.slice(-3).map((line, index) => {
+								world.log.slice(-6).map((line, index) => {
 									const lower = line.toLowerCase();
 									const kind = /perd|raid|saisi|grill|liquid|élimin|trait/.test(lower)
 										? "loss"

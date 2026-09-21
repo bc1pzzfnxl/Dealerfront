@@ -25,7 +25,7 @@ import {
 	zoneTimeFactor,
 } from "./buildings";
 import { START_HOUR, TICKS_PER_HOUR } from "./constants";
-import { PARIS_MAP } from "./maps/paris";
+import { PARIS_CENTROIDS, PARIS_MAP } from "./maps/paris";
 import { createRng, type Rng } from "./rng";
 import { createFactions, FACTION_COUNT, type Faction } from "./factions";
 import { HITMAN, TECH, TECH_BRANCHES, type TechBranch, techCost } from "./tech";
@@ -132,6 +132,16 @@ export interface PendingEvent {
 	/** Couleur suggérée (info / gain / perte). */
 	kind: "info" | "gain" | "loss";
 	choices: [EventChoice, EventChoice];
+}
+
+/** Nom de gang d'après la position géographique réelle (centre de Paris). */
+function spawnDirectionName(center: readonly [number, number]): string {
+	const dLng = center[0] - 2.3522;
+	const dLat = center[1] - 48.8566;
+	const ns = dLat > 0.008 ? "Nord" : dLat < -0.008 ? "Sud" : "";
+	const ew = dLng > 0.008 ? "Est" : dLng < -0.008 ? "Ouest" : "";
+	const dir = [ns, ew].filter(Boolean).join("-");
+	return dir ? `Gang ${dir}` : "Gang du Centre";
 }
 
 const ZONE_DEFENSE: Record<ZoneType, number> = {
@@ -333,6 +343,21 @@ export class World {
 				modules[module] = BUILT_ZONES[index % BUILT_ZONES.length]!;
 			}
 		});
+		// Nomme les gangs d'après leur position réelle (évite « Gang Nord » au sud).
+		const usedNames = new Set<string>([this.factions[0]!.name]);
+		for (let i = 1; i < this.factions.length; i += 1) {
+			const center = PARIS_CENTROIDS[spawns[i]!];
+			if (!center) continue;
+			const base = spawnDirectionName(center);
+			let name = base;
+			let n = 2;
+			while (usedNames.has(name)) {
+				name = `${base} ${n}`;
+				n += 1;
+			}
+			usedNames.add(name);
+			this.factions[i]!.name = name;
+		}
 		this.factions.forEach((faction, index) => {
 			const module = spawns[index]!;
 			this.territory.owner[module] = faction.id;
@@ -1014,6 +1039,33 @@ export class World {
 		return true;
 	}
 
+	/**
+	 * Meilleure cible adjacente pour une expansion automatique : le quartier
+	 * attaquable au **Contrôle le plus faible** (neutre ou ennemi hors pacte).
+	 * Permet d'étendre sans micro-gérer chaque clic.
+	 */
+	bestAdjacentTarget(): number {
+		let best = -1;
+		let bestScore = Number.POSITIVE_INFINITY;
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (!this.canAttack(this.player.id, i)) continue;
+			const owner = this.territory.owner[i]!;
+			if (owner !== NEUTRAL && this.hasPact(this.player.id, owner)) continue;
+			const score = this.territory.control[i]!;
+			if (score < bestScore) {
+				bestScore = score;
+				best = i;
+			}
+		}
+		return best;
+	}
+
+	/** Attaque automatiquement la meilleure cible adjacente. */
+	playerAttackBest(): boolean {
+		const target = this.bestAdjacentTarget();
+		return target >= 0 && this.playerAttack(target);
+	}
+
 	playerCanAttack(module: number): boolean {
 		if (this.outcome !== null) return false;
 		if (!this.canAttack(this.player.id, module)) return false;
@@ -1297,12 +1349,12 @@ export class World {
 		const anchor = this.playerAnchor();
 		if (event.id === "livraison") {
 			if (choice === 0) {
-				player.cashSale += 8000;
+				player.cashSale += 3500;
 				if (anchor >= 0) {
 					this.addHeat(anchor, HEAT.operation * 3);
-					this.float(anchor, "+8 000 sale", "gain");
+					this.float(anchor, "+3 500 sale", "gain");
 				}
-				this.pushLog("Livraison acceptée : +8 000 sale, heat en hausse");
+				this.pushLog("Livraison acceptée : +3 500 sale, heat en hausse");
 			} else {
 				player.cashPropre += 4000;
 				this.pushLog("Livraison refusée : +4 000 propre");
@@ -1321,13 +1373,27 @@ export class World {
 			}
 		} else if (event.id === "facade") {
 			if (choice === 0) {
-				if (anchor >= 0 && this.territory.building[anchor] === NO_BUILDING) {
-					this.territory.building[anchor] = BUILDING_INDEX.facade;
-					this.territory.builtAt[anchor] = this.tick;
-					this.recount();
-					this.float(anchor, "🏛 Façade offerte", "gain");
+				// On cherche un quartier possédé, vide et compatible façade.
+				let free = -1;
+				for (let i = 0; i < this.territory.count; i += 1) {
+					if (this.territory.owner[i] !== this.player.id) continue;
+					if (this.territory.building[i] !== NO_BUILDING) continue;
+					if (this.territory.construction[i]! > 0) continue;
+					if (!canBuildInZone(this.city.modules[i]!, "facade")) continue;
+					free = i;
+					break;
 				}
-				this.pushLog("Façade concurrente rachetée");
+				if (free >= 0) {
+					this.territory.building[free] = BUILDING_INDEX.facade;
+					this.territory.builtAt[free] = this.tick;
+					this.recount();
+					this.float(free, "🏛 Façade offerte", "gain");
+					this.pushLog(`Façade concurrente rachetée (module ${free})`);
+				} else {
+					// Aucun local libre : on compense en Cash propre (choix jamais inutile).
+					player.cashPropre += 3000;
+					this.pushLog("Façade rachetée : aucun local libre → +3 000 propre");
+				}
 			} else {
 				player.cashSale += 5000;
 				this.pushLog("Façade revendue : +5 000 sale");
@@ -1350,7 +1416,7 @@ export class World {
 				body: "Un fournisseur propose une cargaison hors circuit : paiement immédiat, mais la police rôde.",
 				kind: "info",
 				choices: [
-					{ label: "Accepter", detail: "+8 000 sale · heat en hausse" },
+					{ label: "Accepter", detail: "+3 500 sale · heat en hausse" },
 					{ label: "Refuser", detail: "+4 000 propre" },
 				],
 			},

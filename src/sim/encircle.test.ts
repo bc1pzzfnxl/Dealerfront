@@ -49,7 +49,7 @@ describe("événements à choix", () => {
 		});
 		const sale = world.player.cashSale;
 		expect(world.playerChoose(0)).toBe(true);
-		expect(world.player.cashSale).toBe(sale + 8000);
+		expect(world.player.cashSale).toBe(sale + 3500);
 		expect(world.pendingEvent()).toBeNull();
 	});
 

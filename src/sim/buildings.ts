@@ -129,25 +129,28 @@ export function missingEconomyStep(
 
 /**
  * Compatibilité zone → bâtiment de cartel (conversion d'un bâti existant).
- * Voir docs/economy.md §4 : une conversion incompatible est refusée. Chaque
- * zone accepte au moins un type (jamais de blocage total).
+ * Voir docs/economy.md §4. La **chaîne économique** (logement, labo, vente,
+ * façade, planque) est constructible **partout** : le zonage n'est plus un
+ * blocage paralysant mais une **incitation** (bonus de rendement, §bonus de
+ * zone). Seuls les bâtiments spécialisés (Dépôt, Atelier, Guetteur) restent
+ * réservés à certaines zones.
  */
 export const ZONE_BUILDINGS: Record<ZoneType, readonly BuildingType[]> = {
 	// Immeubles d'habitation : cœur économique + défense.
 	residential: ["logement", "labo", "vente", "facade", "planque", "contre"],
-	// Commerces : idem (+ contre-espionnage en arrière-boutique).
-	commercial: ["logement", "labo", "vente", "facade", "planque", "contre"],
+	// Commerces : cœur économique + Atelier (arrière-boutique) + Guetteur.
+	commercial: ["logement", "labo", "vente", "facade", "planque", "atelier", "contre"],
 	// Vie nocturne : cœur économique + planque (arrière-salle).
 	nightlife: ["logement", "labo", "vente", "facade", "planque"],
 	// Friches industrielles : tout, plus Dépôt et Atelier.
 	industrial: ["logement", "labo", "vente", "facade", "planque", "depot", "atelier", "contre"],
 	// Laveries : cœur économique + contre-espionnage.
 	laundry: ["logement", "labo", "vente", "facade", "planque", "contre"],
-	// Postes détournés : uniquement contre-espionnage et planque.
-	police: ["contre", "planque"],
-	// Parcs : seulement une planque dissimulée.
-	park: ["planque"],
-	// Terrains vagues : construction neuve seulement (rien à réquisitionner pour recruter).
+	// Postes détournés : cœur économique (planque, guetteur).
+	police: ["logement", "labo", "vente", "facade", "planque", "contre"],
+	// Parcs : cœur économique + planque dissimulée.
+	park: ["logement", "labo", "vente", "facade", "planque"],
+	// Terrains vagues : construction neuve (rien à réquisitionner pour recruter).
 	vacant: ["labo", "vente", "facade", "planque", "depot", "atelier"],
 };
 

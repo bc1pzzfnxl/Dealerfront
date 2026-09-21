@@ -1,0 +1,72 @@
+1. Le Concept Global & Pitch
+DealerFront propose une proposition rare et alléchante : transposer les mécaniques d'un RTS/Grand Strategy territorial (type Risk, Hearts of Iron ou Go) dans le milieu du grand banditisme contemporain, sur la véritable découpe administrative des 992 quartiers IRIS de Paris.
+
+Le jeu parvient à poser une ambiance "thriller urbain / cartel" sombre et austère, sans fioritures superflues, portée par une trilogie économique claire : Produire 
+→
+→ Vendre 
+→
+→ Blanchir.
+
+Le résultat est un jeu surprenant de profondeur systémique, mais qui se heurte actuellement à des frictions majeures d'ergonomie, de micro-gestion et de lisibilité.
+
+2. Analyse du Game Design : Une Richesse Systémique Indéniable
+En explorant le moteur de simulation (qui tourne à 10 ticks/seconde), on découvre une formule de game design particulièrement bien pensée.
+
+A. La boucle économique à double vitesse (Sale vs Propre)
+C'est le point fort indéniable du design :
+
+Le Cash Sale est abondant, rapide à générer via les Points de vente, et sert aux dépenses de terrain (expansion, chantiers, raids, opérations spéciales).
+Le Cash Propre est rare, coûteux (les façades prélèvent une commission de 25 %), mais il est vital : il finance les paliers technologiques (Ateliers d'armement, de logistique et de protection), les tueurs à gages et surtout la corruption policière.
+L'interdépendance logistique : Un labo sans point de vente sature ses stocks de produit pour rien (comme nous l'avons expérimenté au début, avec 3 500 unités de produit bloquées). Un point de vente sans labo ou coupé par un embargo subit une sévère pénalité de rentabilité.
+B. Le zonage urbain et les heures de pointe (Cycle Circadien)
+L'intégration des spécificités parisiennes dans le gameplay est remarquable :
+
+Bonus de zone : Un quartier commercial offre 
+×
+1.5
+×1.5 aux points de vente ; une zone résidentielle favorise le recrutement de membres ; une zone industrielle accélère les labos et ateliers ; les laveries boostent le blanchiment.
+Heures de pointe : Le jeu simule une horloge (24h). Le commercial culmine à 13h, la nightlife explose à 23h, le résidentiel recrute en soirée (19h) et les labos tournent la nuit (02h). Cette variation temporelle incite théoriquement à planifier ses attaques et ses récoltes selon l'heure de la journée.
+C. Le système d'encerclement territorial (L'influence du Go)
+Une trouvaille excellente : le moteur vérifie tous les 5 ticks si une poche de quartiers d'une faction est totalement encerclée par les quartiers d'une faction rivale. Si c'est le cas, la poche entière capitule et bascule instantanément dans le camp de l'assiégeant. Cela apporte une dimension géométrique tactique : plutôt que de grignoter les 992 quartiers un par un, on cherche à couper les salients ennemis pour les "avaler".
+
+D. La Police : Un mécanisme anti-snowball impitoyable
+La police mesure la criminalité globale et concentre sa pression sur le leader (le cartel contrôlant le plus de quartiers).
+Plus la pression monte, plus les raids policiers frappent (démolition de bâtiments, perte de contrôle, saisie de cash propre).
+À 100 de pression, c'est la liquidation policière : mort subite pour le joueur ("Votre cartel est tombé").
+Pour contrer cela, le joueur doit payer des pots-de-vin à des contacts ("Le Frisé", etc.) dont le coût explose exponentiellement à chaque utilisation, avec une chance que le contact soit "grillé" et provoque un retour de flamme.
+3. Le Ressenti Gameplay & Prise en Main (Ce qui marche et ce qui pèche)
+✅ Les satisfactions immédiates
+L'illusion d'échelle : Se retrouver avec 1 quartier au cœur de Paris parmi 991 autres zones neutres ou hostiles crée un vrai sentiment de départ "au bas de l'échelle".
+Le feedback textuel flottant : Voir les petits textes animés sur la carte (+134.5/s, Planque prête, Livraison acceptée) et les flux de convois en pointillés rend la carte vivante.
+La tension des événements aléatoires : Les choix moraux/stratégiques (ex: L'indicateur : dépenser 6 000 de sale pour faire baisser la pression ou l'éliminer pour gagner du cash mais faire grimper la police) bousculent la routine.
+❌ Les gros points noirs de jouabilité
+1. Le syndrome du "Click-Fest" et la micro-fatigue
+Pour capturer un quartier neutre : il faut cliquer sur le quartier, appuyer sur Q 4 à 6 fois (attendre que les troupes arrivent à destination à chaque assaut), puis recliquer pour bâtir.
+Sur une carte de 992 quartiers, répéter cette boucle manuelle devient rapidement fastidieux et épuisant. Même si le développeur a intelligemment ajouté un bouton "Aménager en lot" (batch build) pour pallier ce problème, la phase de conquête pure reste ultra-répétitive.
+Manque d'ordres macro : Impossible de faire une sélection multiple, de tracer une ligne de front ou d'ordonner une "expansion automatique" vers un secteur.
+2. Lisibilité de la carte et géométrie des IRIS
+Les polygones IRIS parisiens sont très hétérogènes : au centre (1er, 2e, 3e arrondissements), les polygones sont minuscules et serrés ; en périphérie ou près des bois, ils sont immenses. À un niveau de zoom global, cliquer précisément sur un minuscule polygone sans heurter son voisin est frustrant.
+Le filtre de nuit : Quand l'horloge passe en nuit (21h-06h), l'overlay assombrit tellement la carte que les frontières noires des quartiers deviennent quasi indiscernables sur l'écran.
+3. Problèmes d'UI et d'intégration visuelle
+Crampage vertical et scrollbars parasites : Les fenêtres d'information (le panneau d'alerte/conseil en haut à gauche et le bloc Police en haut à droite) sont trop petites : elles affichent des barres de défilement inélégantes et coupent le texte (ex: "Vise: Gang Sud" tronqué sur sa ligne inférieure).
+Manque d'impact visuel des combats : Deux cartels qui s'affrontent sur un quartier ne se manifestent que par une fine flèche en pointillés et un chiffre de contrôle qui descend. Il manque une dramaturgie visuelle : pas de flashs, pas d'effets sonores percutants de guerre de territoire, pas d'état de "quartier contesté / en feu".
+4. Équilibrage & Faiblesses du Game Design
+La "rupture" des événements narratifs :
+L'économie de début de partie est très serrée (on commence à 2 000 de cash sale). Or, l'événement Livraison risquée nous a immédiatement proposé +8 000 de cash sale en un seul clic. Cet afflux massif court-circuite complètement la tension économique initiale : en un quart de seconde, on passe de la disette à la construction débridée.
+L'IA opportuniste mais prévisible :
+En inspectant l'algorithme pickAiTarget, l'IA cible à 60% la faction la plus faible du plateau et se focalise sur le leader si celui-ci dépasse un certain seuil. Cela conduit les bots à se comporter soit en meute contre le joueur dès qu'il prend l'avantage, soit à dévorer passivement les zones neutres sans véritable intention tactique (comme tenter un encerclement délibéré).
+L'injustice de la défaite par Liquidation :
+Si la pression policière atteint 100, une faction IA est simplement dissoute, mais le joueur subit un Game Over instantané. Si vous êtes en tête avec une grosse armée mais à court de Cash Propre pour payer le contact corrompu, vous pouvez perdre la partie brutalement sans pouvoir riposter par les armes.
+5. Pistes d'Amélioration & Recommandations
+Si ce prototype devait devenir un jeu commercial ou une référence du web RTS :
+
+Domaine	Problème Actuel	Solution Recommandée
+Ergonomie / Macro	Micro-gestion insoutenable sur 992 polygones	Ajouter le Drag & Drop ou la sélection multiple au lasso pour lancer des assauts coordonnés sur plusieurs quartiers adjacents.
+Combat & Sensation	Affrontements froids et statiques	Ajouter un statut visuel "Quartier en guerre" (hachures animées, fumée, sons de sirènes/tirs atténués) pour ressentir le chaos urbain.
+UI & Layout	Textes tronqués, scrollbars dans les cartes d'en-tête	Ajuster la typographie, passer en flex/grid dynamique sans hauteur fixe rigide, et intégrer les alertes diplomatiques sous forme de notifications toast animées.
+Carte & Lisibilité	Carte illisible la nuit, quartiers centraux trop petits	Éclaircir les contours de quartiers pendant la nuit (passer d'un trait noir sombre à un trait gris clair phosphorescent) et ajouter un centrage automatique (focus caméra) avec F.
+Diplomatie	Traitée comme un simple état binaire (pacte / non-pacte)	Permettre des actions concrètes : financer un gang rival pour attaquer un voisin commun, ou négocier des lignes de ravitaillement partagées.
+Conclusion
+DealerFront a une vraie âme et un cœur systémique solide. Le mélange entre géographie réelle, boucle financière criminelle et mécanique d'encerclement territorial à la Go est d'une grande intelligence conceptuelle.
+
+Pour l'instant, c'est un excellent prototype de simulateur stratégique, mais un RTS encore rude pour le joueur : la friction ergonomique et la surcharge de micro-clics masquent une partie du plaisir tactique. En résolvant l'automatisation de la conquête et le polish de l'interface, le jeu pourrait devenir une véritable pépite du genre sur navigateur.

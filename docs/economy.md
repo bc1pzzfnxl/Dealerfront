@@ -71,7 +71,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 
 **Contraintes :**
 - Le quartier doit être **possédé** par la faction (Contrôle ≥ seuil de possession, `territory.md`).
-- Le **type de zone** doit être compatible (tableau ci-dessus) ; une conversion incompatible est refusée.
+- **Zonage = incitation, pas blocage** : la **chaîne économique** (Logement, Labo, Point de vente, Façade, Planque) est constructible dans **toutes** les zones ; seuls les bâtiments **spécialisés** (Dépôt, Atelier, Guetteur) restent réservés (Dépôt/Atelier → industriel ou terrain vague ; Atelier aussi en commercial ; Guetteur → pas en terrain vague). Le rendement est modulé par le **bonus de zone** (voir §5bis).
 - **Recrutement** exige un **immeuble existant** (zone bâtie) : impossible sur terrain vague ou dans un parc.
 - Un bâtiment converti **remplace** la fonction d'origine (ex. appartements → Labos consomme la population du quartier, effet secondaire à équilibrer avec `city-sim.md`).
 - La conversion **réutilise** l'emprise : elle coûte et dure **moins cher** qu'une construction neuve, mais reste soumise au **coût croissant** par nombre de bâtiments du même type.

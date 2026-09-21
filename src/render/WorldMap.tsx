@@ -1,6 +1,6 @@
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Geometry, Point } from "geojson";
-import type { GeoJSONSource } from "maplibre-gl";
+import type { GeoJSONSource, MapMouseEvent } from "maplibre-gl";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
 	Map,
@@ -58,6 +58,7 @@ interface WorldMapProps {
 	version: number;
 	onModuleClick: (module: number) => void;
 	onModuleHover: (module: number | null) => void;
+	onEmptyClick: () => void;
 	onProjector: (project: (module: number) => { x: number; y: number } | null) => void;
 }
 
@@ -89,6 +90,7 @@ export function WorldMap({
 	version,
 	onModuleClick,
 	onModuleHover,
+	onEmptyClick,
 	onProjector,
 }: WorldMapProps) {
 	const [collection, setCollection] = useState<FeatureCollection<Geometry, IrisProps> | null>(
@@ -186,6 +188,7 @@ export function WorldMap({
 						selected={selected}
 					/>
 					<ProjectorBridge onProjector={onProjector} />
+					<DeselectOnEmpty onEmptyClick={onEmptyClick} />
 					<CenterOnPlayer territory={territory} />
 				</>
 			) : null}
@@ -228,6 +231,7 @@ function EffectStates({
 	const prevOwner = useRef<Int16Array | null>(null);
 	const prevBuildings = useRef<string>("");
 	const prevAttacked = useRef<Set<number>>(new Set());
+	const hqRef = useRef<number>(-1);
 	const prevControl = useRef<Uint8Array | null>(null);
 	const prevHeat = useRef<Uint8Array | null>(null);
 	const prevFlash = useRef<Uint8Array | null>(null);
@@ -407,6 +411,32 @@ function EffectStates({
 				},
 			});
 		}
+		// QG du joueur : anneau blanc pulsant (repère « vous êtes ici »).
+		if (!map.getLayer("iris-hq")) {
+			map.addLayer({
+				id: "iris-hq",
+				type: "line",
+				source: SOURCE_ID,
+				paint: {
+					"line-color": "#ffffff",
+					"line-width": [
+						"interpolate",
+						["linear"],
+						["coalesce", ["feature-state", "hqPulse"], 0],
+						0,
+						1.5,
+						1,
+						4.5,
+					] as never,
+					"line-opacity": [
+						"case",
+						["boolean", ["feature-state", "hq"], false],
+						0.9,
+						0,
+					] as never,
+				},
+			});
+		}
 		// Icônes de bâtiment : MapLibre n'autorise `feature-state` qu'en *paint*,
 		// pas en layout (icon-image) ni en filter. On passe donc par une source
 		// GeoJSON de points portant le type de bâtiment en propriété.
@@ -431,7 +461,7 @@ function EffectStates({
 				id: "iris-buildings",
 				type: "symbol",
 				source: BUILDING_SOURCE,
-				minzoom: 10,
+				minzoom: 12.5,
 				layout: {
 					"icon-image": ["concat", "bld-", ["get", "type"]],
 					"icon-size": [
@@ -560,6 +590,33 @@ function EffectStates({
 		}
 	}, [map, isLoaded, version, territory, heat, tick]);
 
+	// QG : premier quartier possédé par le joueur (repère visuel).
+	useEffect(() => {
+		if (!map || !isLoaded || !map.getSource(SOURCE_ID)) return;
+		let anchor = -1;
+		for (let i = 0; i < territory.count; i += 1) {
+			if (territory.owner[i] === 0) {
+				anchor = i;
+				break;
+			}
+		}
+		if (anchor === hqRef.current) return;
+		if (hqRef.current >= 0) {
+			map.setFeatureState({ source: SOURCE_ID, id: hqRef.current }, { hq: false });
+		}
+		hqRef.current = anchor;
+		if (anchor >= 0) map.setFeatureState({ source: SOURCE_ID, id: anchor }, { hq: true });
+	}, [map, isLoaded, territory, version]);
+
+	// Pulsation du QG (recalculée à chaque tick).
+	useEffect(() => {
+		if (!map || !isLoaded || !map.getSource(SOURCE_ID) || hqRef.current < 0) return;
+		map.setFeatureState(
+			{ source: SOURCE_ID, id: hqRef.current },
+			{ hqPulse: (Math.sin(tick / 9) + 1) / 2 },
+		);
+	}, [map, isLoaded, tick, version]);
+
 	useEffect(() => {
 		if (!map || !isLoaded || selected === null || !map.getSource(SOURCE_ID)) return;
 		map.setFeatureState({ source: SOURCE_ID, id: selected }, { selected: true });
@@ -596,6 +653,26 @@ function ProjectorBridge({
 	return null;
 }
 
+/** Désélectionne quand on clique sur la carte hors de tout quartier. */
+function DeselectOnEmpty({ onEmptyClick }: { onEmptyClick: () => void }) {
+	const { map, isLoaded } = useMap();
+	const latest = useRef(onEmptyClick);
+	latest.current = onEmptyClick;
+
+	useEffect(() => {
+		if (!map || !isLoaded) return;
+		const handler = (event: MapMouseEvent) => {
+			if (map.queryRenderedFeatures(event.point).length === 0) latest.current();
+		};
+		map.on("click", handler);
+		return () => {
+			map.off("click", handler);
+		};
+	}, [map, isLoaded]);
+
+	return null;
+}
+
 /** Centre la vue sur le premier quartier du joueur. */
 function CenterOnPlayer({ territory }: { territory: Territory }) {
 	const { map, isLoaded } = useMap();
@@ -605,7 +682,7 @@ function CenterOnPlayer({ territory }: { territory: Territory }) {
 		for (let i = 0; i < territory.count; i += 1) {
 			if (territory.owner[i] !== 0) continue;
 			const center = PARIS_CENTROIDS[i];
-			if (center) map.jumpTo({ center: [center[0], center[1]] });
+			if (center) map.jumpTo({ center: [center[0], center[1]], zoom: 13.5 });
 			break;
 		}
 	}, [map, isLoaded, territory]);

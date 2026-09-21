@@ -133,7 +133,7 @@ Les **agents autonomes** de l'ancien système deviennent des **PNJ de faction** 
 > Section **faisant foi** pour `src/sim/factions.ts` et `src/sim/bot.ts`. La diplomatie décrite plus haut **n'est pas encore implémentée** (P5).
 
 - **Nombre de factions** : `FACTION_COUNT = 6` (joueur + 5 gangs), battle royale.
-- **Noms** : Cartel, Gang Nord, Gang Est, Gang Sud (… Ouest, Syndicat au-delà de 4).
+- **Noms** : le joueur est le **Cartel** ; les gangs IA sont nommés d'après leur **position réelle** sur la carte (Nord/Sud/Est/Ouest + combinaisons, dédupliqués) pour éviter toute incohérence entre le nom et la géographie.
 - **Couleurs** : `#6FB7E8`, `#E0A030`, `#7FD08A`, `#A97BD8`, `#E23B2E`, `#2FB0A0` (couleur = information de faction).
 - **Ressources de départ** : Membres **3 000**, Cash sale **2 000** — **identiques pour tous** (l'asymétrie IA passe par le comportement, pas par le départ).
 - **IA** : une décision toutes les **25 ticks (2,5 s)** ; construire / tech / tueur / attaquer selon `chooseBuildType` (voir `economy.md`).
