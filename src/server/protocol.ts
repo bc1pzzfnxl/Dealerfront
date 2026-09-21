@@ -80,6 +80,7 @@ export interface ActResponse {
 /** Message broadcast to spectators. */
 export type SpectatorMessage =
 	| { kind: "state"; view: ArenaView; snapshot: WorldSnapshot }
-	| { kind: "finished"; view: ArenaView };
+	/** Finished games still ship the final snapshot, so a late spectator sees the map. */
+	| { kind: "finished"; view: ArenaView; snapshot?: WorldSnapshot };
 
 export type { Intent };

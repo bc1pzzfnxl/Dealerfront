@@ -31,21 +31,21 @@ export function useArenaSocket(id: string | null): ArenaSocket {
 		socket.onmessage = (event) => {
 			const message = JSON.parse(event.data as string) as SpectatorMessage;
 			setView(message.view);
-			if (message.kind !== "state") {
-				setVersion((value) => value + 1);
-				return;
-			}
+			// A finished game still ships a snapshot: without it a late spectator
+			// would sit on "Connecting…" forever instead of seeing the final map.
 			const snapshot = message.snapshot;
-			let mirror = worldRef.current;
-			if (!mirror || mirror.factions.length !== snapshot.factions.length) {
-				mirror = new World(0, {
-					factionCount: snapshot.factions.length,
-					controlled: snapshot.factions.map((faction) => faction.id),
-				});
-				worldRef.current = mirror;
-				setWorld(mirror);
+			if (snapshot) {
+				let mirror = worldRef.current;
+				if (!mirror || mirror.factions.length !== snapshot.factions.length) {
+					mirror = new World(0, {
+						factionCount: snapshot.factions.length,
+						controlled: snapshot.factions.map((faction) => faction.id),
+					});
+					worldRef.current = mirror;
+					setWorld(mirror);
+				}
+				mirror.applySnapshot(snapshot);
 			}
-			mirror.applySnapshot(snapshot);
 			setVersion((value) => value + 1);
 		};
 		return () => socket.close();

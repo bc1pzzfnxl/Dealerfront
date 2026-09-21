@@ -75,12 +75,18 @@ function Section({
 }
 
 function App() {
-	const [arenaId, setArenaId] = useState<string | null>(null);
-	const [screen, setScreen] = useState<"select" | "play" | "arena" | "spectate">(() =>
-		typeof window !== "undefined" && new URLSearchParams(window.location.search).has("play")
-			? "play"
-			: "select",
+	// `?arena=<id>` deep-links straight into a live spectator (shareable).
+	const [arenaId, setArenaId] = useState<string | null>(() =>
+		typeof window !== "undefined"
+			? new URLSearchParams(window.location.search).get("arena")
+			: null,
 	);
+	const [screen, setScreen] = useState<"select" | "play" | "arena" | "spectate">(() => {
+		if (typeof window === "undefined") return "select";
+		const params = new URLSearchParams(window.location.search);
+		if (params.has("arena")) return "spectate";
+		return params.has("play") ? "play" : "select";
+	});
 	const [seed, setSeed] = useState(1337);
 	const [running, setRunning] = useState(true);
 	const [version, setVersion] = useState(0);
