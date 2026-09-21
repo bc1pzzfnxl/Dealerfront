@@ -1,32 +1,32 @@
-# Open Questions — Questions vivantes (DealerFront)
+# Open Questions — Living questions (DealerFront)
 
-> Fichier vivant : décisions non tranchées. Une question résolue est **retirée** et reportée dans la spec concernée.
-> Les valeurs **implémentées** vivent dans les sections « Implémentation » des specs.
+> Living file: unsettled decisions. A resolved question is **removed** and recorded in the relevant spec.
+> **Implemented** values live in the "Implementation" sections of the specs.
 
-## Fondations
+## Foundations
 
-- [ ] Fourchette opportunité/danger propre au mode. → `difficulty.md`, `procgen.md`
-- [ ] Équilibrage fin économie ↔ conquête (rendements, vitesse, durée de partie). → `economy.md`, `combat.md`
+- [ ] Opportunity/danger range specific to the mode. → `difficulty.md`, `procgen.md`
+- [ ] Fine balancing of economy ↔ conquest (output, speed, game length). → `economy.md`, `combat.md`
 
-## Territoire
+## Territory
 
-- [ ] Sort des bâtiments quand un quartier change de main : **détruits** (code actuel) vs **transférés** (spec). → `territory.md`
-- [ ] Distance min entre spawns / nombre de quartiers de départ (spawns fixes aux coins aujourd'hui). → `procgen.md`
+- [ ] Fate of buildings when a quarter changes hands: **destroyed** (current code) vs **transferred** (spec). → `territory.md`
+- [ ] Min distance between spawns / number of starting quarters (currently fixed spawns at corners). → `procgen.md`
 
-## Économie
+## Economy
 
-- [ ] **Coût croissant par type** (par nombre de bâtiments du même type). → `economy.md`
+- [ ] **Increasing cost per type** (per number of buildings of the same type). → `economy.md`
 
 ## Factions & police
 
-- [ ] Profils/QI des gangs IA (6 factions fixées). → `factions.md`
-- [ ] **Cerveau IA** (QI, perception locale, peur, loyauté) — agents/PNJ abandonnés. → `factions.md`
+- [ ] AI gang profiles/IQ (6 factions fixed). → `factions.md`
+- [ ] **AI brain** (IQ, local perception, fear, loyalty) — agents/NPCs abandoned. → `factions.md`
 
 ## UI/Art
 
-- [ ] Sélection multiple (glisser-rectangle) et taille de sélection max. → `ui-ux.md`
-- [ ] Motifs de faction (hachures) en complément des valeurs/symboles. → `art-direction.md`
+- [ ] Multi-select (drag-rectangle) and max selection size. → `ui-ux.md`
+- [ ] Faction patterns (hatching) in addition to values/symbols. → `art-direction.md`
 
 ## Tech
 
-- [ ] Adoption du style **intents → executions** (OpenFront) dans le core solo. → `tech-stack.md`
+- [ ] Adoption of the **intents → executions** style (OpenFront) in the solo core. → `tech-stack.md`

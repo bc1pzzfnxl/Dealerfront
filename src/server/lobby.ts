@@ -1,6 +1,6 @@
 /**
- * Lobby — Durable Object singleton : liste des arènes (en cours et terminées)
- * pour l'écran d'accueil du spectateur. Voir docs/arena.md.
+ * Lobby — singleton Durable Object: list of arenas (active and finished)
+ * for the spectator home screen. See docs/arena.md.
  */
 
 import { DurableObject } from "cloudflare:workers";
@@ -24,7 +24,7 @@ export class Lobby extends DurableObject<Env> {
 		if (url.pathname.endsWith("/update")) {
 			const view = (await request.json()) as ArenaView;
 			this.arenas.set(view.id, view);
-			// On garde les parties en cours + un historique borné des terminées.
+			// Keep active games + a bounded history of finished ones.
 			const all = [...this.arenas.values()].sort((a, b) => b.turn - a.turn);
 			const active = all.filter((arena) => arena.phase !== "finished");
 			const finished = all.filter((arena) => arena.phase === "finished").slice(0, MAX_HISTORY);

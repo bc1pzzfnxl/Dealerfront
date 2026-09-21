@@ -1,88 +1,88 @@
-# Game Design Document — "Dealer RTS" (orchestrateur)
+# Game Design Document — "Dealer RTS" (orchestrator)
 
-> **Point d'entrée du projet.** Ce document **orchestre** les spécifications modulaires du dossier [`docs/`](docs/index.md).
-> Statut : **DealerFront (v1)** — bascule d'un dealer incarné vers un **god-view cartel** (contrôle de quartiers). Détails et décisions dans les specs ; points ouverts dans [`docs/open-questions.md`](docs/open-questions.md).
-
----
-
-## 1. Pitch (résumé)
-
-Jeu **solo** de stratégie/gestion, vue **carte réelle** (Paris, quartiers IRIS) rendue avec mapcn/MapLibre, jouable en navigateur. Tu incarnes **le cartel** (God view) : tu ne contrôles plus un personnage, tu **commandes de loin**. Objectif : **rester le dernier cartel en jeu** (battle royale), face à **5 gangs IA** et à la **police**.
-
-Second mode : **arène agent vs agent** — 2 à 4 agents IA s'affrontent **sans joueur humain**, via l'**API HTTP** ou **MCP** (`/mcp`) ; un humain **regarde en direct** et consulte les **stats de fin**. Architecture : [`docs/arena.md`](./docs/arena.md) ; guide de branchement : [`MCP.md`](./MCP.md).
-
-**Inspirations** : **OpenFront** (contrôle territorial temps réel, alliances, traîtres), gestion sous pression (police/Heat), Frostpunk (diegetic UI), gestion de cartel.
+> **Project entry point.** This document **orchestrates** the modular specs in the [`docs/`](docs/index.md) folder.
+> Status: **DealerFront (v1)** — switch from an embodied dealer to a **god-view cartel** (quarter control). Details and decisions in the specs; open points in [`docs/open-questions.md`](docs/open-questions.md).
 
 ---
 
-## 2. Carte du projet — spec par spec
+## 1. Pitch (summary)
 
-| Thème | Spec |
+**Solo** strategy/management game, **real map** view (Paris, IRIS quarters) rendered with mapcn/MapLibre, playable in the browser. You play **the cartel** (God view): you no longer control a character, you **command from afar**. Objective: **stay the last cartel in play** (battle royale), against **5 AI gangs** and the **police**.
+
+Second mode: **agent-vs-agent arena** — 2 to 4 AI agents fight **with no human player**, via the **HTTP API** or **MCP** (`/mcp`); a human **watches live** and checks the **end stats**. Architecture: [`docs/arena.md`](./docs/arena.md); connection guide: [`MCP.md`](./MCP.md).
+
+**Inspirations**: **OpenFront** (real-time territorial control, alliances, traitors), management under pressure (police/Heat), Frostpunk (diegetic UI), cartel management.
+
+---
+
+## 2. Project map — spec by spec
+
+| Theme | Spec |
 |---|---|
-| Vision & piliers | [`docs/pillars.md`](docs/pillars.md) |
-| Boucle & déroulé | [`docs/core-loop.md`](docs/core-loop.md) |
-| Territoire (quartiers, Influence, Contrôle) | [`docs/territory.md`](docs/territory.md) |
-| Combat (bagarres, défense, tueurs) | [`docs/combat.md`](docs/combat.md) |
-| Économie (ressources, 7 bâtiments) | [`docs/economy.md`](docs/economy.md) |
-| Tech / matos | [`docs/tech.md`](docs/tech.md) |
-| Factions (gangs IA, diplomatie, agents) | [`docs/factions.md`](docs/factions.md) |
+| Vision & pillars | [`docs/pillars.md`](docs/pillars.md) |
+| Loop & pacing | [`docs/core-loop.md`](docs/core-loop.md) |
+| Territory (quarters, Influence, Control) | [`docs/territory.md`](docs/territory.md) |
+| Combat (brawls, defense, hitmen) | [`docs/combat.md`](docs/combat.md) |
+| Economy (resources, 7 buildings) | [`docs/economy.md`](docs/economy.md) |
+| Tech / gear | [`docs/tech.md`](docs/tech.md) |
+| Factions (AI gangs, diplomacy, agents) | [`docs/factions.md`](docs/factions.md) |
 | Police (anti-leader, corruption) | [`docs/police-ai.md`](docs/police-ai.md) |
-| Génération & mise en place | [`docs/procgen.md`](docs/procgen.md) |
-| Commandement god-view | [`docs/command.md`](docs/command.md) |
-| Victoire / défaite | [`docs/win-conditions.md`](docs/win-conditions.md) |
-| Score final | [`docs/scoring.md`](docs/scoring.md) |
+| Generation & setup | [`docs/procgen.md`](docs/procgen.md) |
+| God-view command | [`docs/command.md`](docs/command.md) |
+| Victory / defeat | [`docs/win-conditions.md`](docs/win-conditions.md) |
+| Final score | [`docs/scoring.md`](docs/scoring.md) |
 | UI/UX | [`docs/ui-ux.md`](docs/ui-ux.md) |
-| Direction artistique | [`docs/art-direction.md`](docs/art-direction.md) |
-| Ville (zones, densité) | [`docs/city-sim.md`](docs/city-sim.md) |
-| Difficulté | [`docs/difficulty.md`](docs/difficulty.md) |
-| Événements à choix | [`docs/npc-events.md`](docs/npc-events.md) |
-| Stack technique | [`docs/tech-stack.md`](docs/tech-stack.md) |
-| Index & glossaire | [`docs/index.md`](docs/index.md) |
-| Questions ouvertes | [`docs/open-questions.md`](docs/open-questions.md) |
+| Art direction | [`docs/art-direction.md`](docs/art-direction.md) |
+| City (zones, density) | [`docs/city-sim.md`](docs/city-sim.md) |
+| Difficulty | [`docs/difficulty.md`](docs/difficulty.md) |
+| Choice events | [`docs/npc-events.md`](docs/npc-events.md) |
+| Tech stack | [`docs/tech-stack.md`](docs/tech-stack.md) |
+| Index & glossary | [`docs/index.md`](docs/index.md) |
+| Open questions | [`docs/open-questions.md`](docs/open-questions.md) |
 
 ---
 
-## 3. Décisions majeures
+## 3. Major decisions
 
-| Sujet | Décision |
+| Topic | Decision |
 |---|---|
-| Modèle joueur | **God view cartel** (plus de dealer incarné — pilier 5 redéfini) |
-| Inspiration | **OpenFront** (idées, pas de code : OpenFront est AGPL-3) |
-| Échelle | **992 quartiers** (Paris IRIS), **6 factions**, battle royale |
-| Boucle | **Économie ↔ conquête à égalité** |
-| Combat | **Influence abstraite** par quartier (pas d'unités individuelles) |
-| Ressources | Abstraites : Produit, Cash sale, Cash propre, Influence |
-| Bâtiments | 7 : Labo, Point de vente, Façade, Planque, Atelier, Contre-espionnage, Dépôt |
+| Player model | **God-view cartel** (no more embodied dealer — pillar 5 redefined) |
+| Inspiration | **OpenFront** (ideas, no code: OpenFront is AGPL-3) |
+| Scale | **992 quarters** (Paris IRIS), **6 factions**, battle royale |
+| Loop | **Economy ↔ conquest on equal footing** |
+| Combat | **Abstract Influence** per quarter (no individual units) |
+| Resources | Abstract: Product, Dirty cash, Clean cash, Influence |
+| Buildings | 7: Lab, Storefront, Front, Safehouse, Workshop, Counter-intel, Depot |
 | Police | **Anti-leader** + **corruption** |
-| Victoire | **Dernier cartel en jeu** |
-| Couleur | **Information de faction** (exception assumée au N&B strict) |
-| Architecture | **Solo**, core déterministe 10 Hz, style **intents → executions**, multi différé |
+| Victory | **Last cartel in play** |
+| Color | **Faction information** (deliberate exception to strict B&W) |
+| Architecture | **Solo**, deterministic 10 Hz core, **intents → executions** style, multiplayer deferred |
 
 ---
 
-## 4. Remplacements de specs (ancien mode)
+## 4. Spec replacements (old mode)
 
-- Ancien *orders.md* → **`command.md`** (ordres de faction).
-- Ancien *agents.md* → **fusionné dans `factions.md`**.
-- Ancien *resources-heat.md* → **remplacé** par `economy.md` + `police-ai.md` (Heat → **Pression police**).
+- Old *orders.md* → **`command.md`** (faction orders).
+- Old *agents.md* → **merged into `factions.md`**.
+- Old *resources-heat.md* → **replaced** by `economy.md` + `police-ai.md` (Heat → **police Pressure**).
 
 ---
 
-## 5. Comment lire
+## 5. How to read
 
 1. [`pillars.md`](docs/pillars.md) · 2. [`core-loop.md`](docs/core-loop.md) · 3. [`territory.md`](docs/territory.md) · 4. [`combat.md`](docs/combat.md) · 5. [`economy.md`](docs/economy.md) · 6. [`tech.md`](docs/tech.md) · 7. [`factions.md`](docs/factions.md) · 8. [`police-ai.md`](docs/police-ai.md) · 9. [`procgen.md`](docs/procgen.md) · 10. [`command.md`](docs/command.md) · 11. [`win-conditions.md`](docs/win-conditions.md) + [`scoring.md`](docs/scoring.md) · 12. [`ui-ux.md`](docs/ui-ux.md) + [`art-direction.md`](docs/art-direction.md) · 13. [`tech-stack.md`](docs/tech-stack.md).
 
-> Glossaire : [`docs/index.md`](docs/index.md).
+> Glossary: [`docs/index.md`](docs/index.md).
 
 ---
 
-## 6. Statut & gouvernance
+## 6. Status & governance
 
-- Toutes les specs sont en **v1 DealerFront** (ou v2/v3 pour les réécritures).
-- Les **TBD** sont centralisés dans [`docs/open-questions.md`](docs/open-questions.md).
-- Toute décision se consigne dans la spec concernée.
-- **Migration code en cours** : le code actuel implémente encore l'ancien mode « dealer piloté » ; la bascule se fait par phases (voir `open-questions.md` §Dette et le plan d'implémentation).
+- All specs are in **v1 DealerFront** (or v2/v3 for rewrites).
+- The **TBD**s are centralized in [`docs/open-questions.md`](docs/open-questions.md).
+- Every decision is recorded in the relevant spec.
+- **Code migration in progress**: the current code still implements the old "driven dealer" mode; the switch happens in phases (see `open-questions.md` §Debt and the implementation plan).
 
 ---
 
-*Document orchestrateur — pour modifier un système, éditez la spec correspondante dans `docs/`.*
+*Orchestrator document — to modify a system, edit the corresponding spec in `docs/`.*

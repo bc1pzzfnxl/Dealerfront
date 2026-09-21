@@ -1,19 +1,19 @@
 /**
- * Buildings — bâtiments de cartel convertis depuis les bâtiments de la ville.
- * Voir docs/economy.md.
+ * Buildings — cartel buildings converted from city buildings.
+ * See docs/economy.md.
  */
 
 import type { ZoneType } from "./types";
 
 export const BUILDING_TYPES = [
-	"logement",
-	"labo",
-	"vente",
-	"facade",
-	"planque",
+	"housing",
+	"lab",
+	"storefront",
+	"front",
+	"safehouse",
 	"depot",
-	"atelier",
-	"contre",
+	"workshop",
+	"counter",
 ] as const;
 
 export type BuildingType = (typeof BUILDING_TYPES)[number];
@@ -26,116 +26,115 @@ export const BUILDING_INDEX: Record<BuildingType, number> = Object.fromEntries(
 export interface BuildingSpec {
 	type: BuildingType;
 	label: string;
-	/** Coût (une seule monnaie selon le bâtiment). */
+	/** Cost (a single currency depending on the building). */
 	costMembers?: number;
 	costSale?: number;
 	costClean?: number;
-	/** Taille du marqueur (largeur, hauteur). */
+	/** Marker size (width, height). */
 	width: number;
 	height: number;
 }
 
 export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
-	logement: { type: "logement", label: "Recrutement", costMembers: 800, width: 1.6, height: 1.2 },
-	labo: { type: "labo", label: "Labo", costSale: 1500, width: 1.4, height: 1.6 },
-	vente: { type: "vente", label: "Point de vente", costSale: 1500, width: 1.8, height: 0.8 },
-	facade: { type: "facade", label: "Façade", costSale: 2200, width: 2.0, height: 1.0 },
-	planque: { type: "planque", label: "Planque", costSale: 1800, width: 1.6, height: 0.7 },
-	depot: { type: "depot", label: "Dépôt", costSale: 1800, width: 2.2, height: 1.4 },
-	atelier: { type: "atelier", label: "Atelier", costClean: 3500, width: 1.6, height: 1.1 },
-	contre: { type: "contre", label: "Guetteur", costClean: 3000, width: 1.2, height: 1.3 },
+	housing: { type: "housing", label: "Recruitment", costMembers: 800, width: 1.6, height: 1.2 },
+	lab: { type: "lab", label: "Lab", costSale: 1500, width: 1.4, height: 1.6 },
+	storefront: { type: "storefront", label: "Storefront", costSale: 1500, width: 1.8, height: 0.8 },
+	front: { type: "front", label: "Front", costSale: 2200, width: 2.0, height: 1.0 },
+	safehouse: { type: "safehouse", label: "Safehouse", costSale: 1800, width: 1.6, height: 0.7 },
+	depot: { type: "depot", label: "Depot", costSale: 1800, width: 2.2, height: 1.4 },
+	workshop: { type: "workshop", label: "Workshop", costClean: 3500, width: 1.6, height: 1.1 },
+	counter: { type: "counter", label: "Watcher", costClean: 3000, width: 1.2, height: 1.3 },
 };
 
-/** Effets chiffrés (par tick sauf mention). */
+/** Numeric effects (per tick unless noted). */
 export const BUILDING_EFFECTS = {
-	/** Membres produits par quartier possédé. */
+	/** Members produced per owned quarter. */
 	baseMembersPerQuarter: 8,
-	/** Membres produits par logement. */
-	membersPerLogement: 25,
-	/** Produit par labo. */
-	produitPerLabo: 1.5,
-	/** Produit converti par point de vente et par tick. */
-	produitPerVente: 2,
-	/** Cash sale par unité de produit vendue. */
-	pricePerProduit: 60,
-	/** Cash sale blanchi par façade et par tick. */
-	cashPerFacade: 60,
-	/** Commission de blanchiment. */
+	/** Members produced per Housing. */
+	membersPerHousing: 25,
+	/** Product per Lab. */
+	productPerLab: 1.5,
+	/** Product converted per Storefront and per tick. */
+	productPerStorefront: 2,
+	/** Dirty cash per unit of product sold. */
+	pricePerProduct: 60,
+	/** Dirty cash laundered per Front and per tick. */
+	cashPerFront: 60,
+	/** Laundering commission. */
 	commission: 0.25,
-	/** Membres max ajoutés par dépôt. */
+	/** Max members added per Depot. */
 	maxMembersPerDepot: 2000,
-	/** Multiplicateur de défense local d'une planque. */
-	planqueDefense: 1.5,
+	/** Local defense multiplier of a Safehouse. */
+	safehouseDefense: 1.5,
 } as const;
 
 /**
- * Entretien : **Cash sale par tick** et par bâtiment. Les gros empires coûtent
- * cher à faire tourner — s'il n'est pas payé, la production tourne au ralenti
- * (×0,5) et les **guetteurs aveuglent**. C'est le puits récurrent qui empêche
- * l'argent de dormir.
+ * Upkeep: **Dirty cash per tick** and per building. Big empires are expensive
+ * to run — if it isn't paid, production runs slow (×0.5) and **Watchers go
+ * blind**. It's the recurring sink that keeps money from sitting idle.
  */
 export const BUILDING_UPKEEP: Record<BuildingType, number> = {
-	logement: 0.5,
-	labo: 1,
-	vente: 1,
-	facade: 1.5,
-	planque: 1,
+	housing: 0.5,
+	lab: 1,
+	storefront: 1,
+	front: 1.5,
+	safehouse: 1,
 	depot: 1,
-	atelier: 2,
-	contre: 1.5,
+	workshop: 2,
+	counter: 1.5,
 };
 
-/** Multiplicateur de production quand l'entretien n'est pas payé. */
+/** Production multiplier when upkeep is unpaid. */
 export const UNPAID_UPKEEP_FACTOR = 0.5;
 
-/** Coût d'une **conversion** (bâti existant réutilisé) : 50 % du coût plein. */
+/** Cost of a **conversion** (existing building reused): 50% of the full cost. */
 export const CONVERSION_COST = 0.5;
 
 /**
- * Coût croissant : chaque bâtiment du même type renchérit le suivant.
- * Crée un vrai arbitrage (diversifier plutôt que spammer un type).
+ * Increasing cost: each building of the same type makes the next one more
+ * expensive. Creates a real trade-off (diversify rather than spam one type).
  */
 export const BUILDING_COST_GROWTH = 1.35;
 
-/** Facteur de coût du `count`-ième bâtiment d'un type (0 = premier). */
+/** Cost factor of the `count`-th building of a type (0 = first). */
 export function buildingCostGrowth(count: number): number {
 	return BUILDING_COST_GROWTH ** count;
 }
 
-/** Durée d'une **construction neuve** (terrain vague), en ticks. La conversion est instantanée. */
+/** Duration of a **new construction** (vacant lot), in ticks. Conversion is instant. */
 export const BUILD_TICKS: Record<BuildingType, number> = {
-	logement: 90,
-	labo: 120,
-	vente: 120,
-	facade: 180,
-	planque: 180,
+	housing: 90,
+	lab: 120,
+	storefront: 120,
+	front: 180,
+	safehouse: 180,
 	depot: 180,
-	atelier: 240,
-	contre: 240,
+	workshop: 240,
+	counter: 240,
 };
 
-/** La conversion (bâti existant) prend la moitié du temps d'une construction neuve. */
+/** Conversion (existing building) takes half the time of a new construction. */
 export const CONVERSION_TIME = 0.5;
 
-/** Description courte de l'effet (aide à la décision / infobulles). */
+/** Short effect description (decision aid / tooltips). */
 export const BUILDING_EFFECT_LABELS: Record<BuildingType, string> = {
-	logement: "recrute +25 membres/tick (immeuble récupéré)",
-	labo: "+1,5 produit/tick",
-	vente: "vend le produit (≈60 sale/unité)",
-	facade: "blanchit 60 cash sale/tick",
-	planque: "défense ×1,5",
-	depot: "+2000 membres max",
-	atelier: "+1 niveau de tech",
-	contre: "alerte les descentes · −15 % tueur · gêne descentes/sabotages",
+	housing: "recruits +25 members/tick (repurposed building)",
+	lab: "+1.5 product/tick",
+	storefront: "sells product (≈60 dirty/unit)",
+	front: "launders 60 dirty cash/tick",
+	safehouse: "defense ×1.5",
+	depot: "+2000 max members",
+	workshop: "+1 tech level",
+	counter: "alerts on busts · −15% hitman · hinders busts/sabotages",
 };
 
-/** Ordre d'amorçage de la chaîne économique (à construire en priorité). */
-export const ECONOMY_CHAIN: readonly BuildingType[] = ["labo", "vente", "facade"];
+/** Bootstrap order of the economy chain (build first). */
+export const ECONOMY_CHAIN: readonly BuildingType[] = ["lab", "storefront", "front"];
 
 /**
- * Prochaine étape manquante de la chaîne économique, si abordable.
- * Tant qu'elle existe, on ne construit **rien d'autre** : cela évite de
- * gaspiller le budget d'amorçage (ex. une Planque avant le Labo).
+ * Next missing step of the economy chain, if affordable.
+ * As long as it exists, **nothing else** is built: this avoids wasting the
+ * bootstrap budget (e.g. a Safehouse before the Lab).
  */
 export function missingEconomyStep(
 	counts: Record<BuildingType, number>,
@@ -148,30 +147,30 @@ export function missingEconomyStep(
 }
 
 /**
- * Compatibilité zone → bâtiment de cartel (conversion d'un bâti existant).
- * Voir docs/economy.md §4. La **chaîne économique** (logement, labo, vente,
- * façade, planque) est constructible **partout** : le zonage n'est plus un
- * blocage paralysant mais une **incitation** (bonus de rendement, §bonus de
- * zone). Seuls les bâtiments spécialisés (Dépôt, Atelier, Guetteur) restent
- * réservés à certaines zones.
+ * Zone → cartel building compatibility (conversion of an existing building).
+ * See docs/economy.md §4. The **economy chain** (Housing, Lab, Storefront,
+ * Front, Safehouse) is buildable **anywhere**: zoning is no longer a
+ * paralyzing blocker but an **incentive** (yield bonus, §zone bonus). Only
+ * specialized buildings (Depot, Workshop, Watcher) remain restricted to
+ * certain zones.
  */
 export const ZONE_BUILDINGS: Record<ZoneType, readonly BuildingType[]> = {
-	// Immeubles d'habitation : cœur économique + défense.
-	residential: ["logement", "labo", "vente", "facade", "planque", "contre"],
-	// Commerces : cœur économique + Atelier (arrière-boutique) + Guetteur.
-	commercial: ["logement", "labo", "vente", "facade", "planque", "atelier", "contre"],
-	// Vie nocturne : cœur économique + planque (arrière-salle).
-	nightlife: ["logement", "labo", "vente", "facade", "planque"],
-	// Friches industrielles : tout, plus Dépôt et Atelier.
-	industrial: ["logement", "labo", "vente", "facade", "planque", "depot", "atelier", "contre"],
-	// Laveries : cœur économique + contre-espionnage.
-	laundry: ["logement", "labo", "vente", "facade", "planque", "contre"],
-	// Postes détournés : cœur économique (planque, guetteur).
-	police: ["logement", "labo", "vente", "facade", "planque", "contre"],
-	// Parcs : cœur économique + planque dissimulée.
-	park: ["logement", "labo", "vente", "facade", "planque"],
-	// Terrains vagues : construction neuve (rien à réquisitionner pour recruter).
-	vacant: ["labo", "vente", "facade", "planque", "depot", "atelier"],
+	// Residential buildings: economic core + defense.
+	residential: ["housing", "lab", "storefront", "front", "safehouse", "counter"],
+	// Shops: economic core + Workshop (back room) + Watcher.
+	commercial: ["housing", "lab", "storefront", "front", "safehouse", "workshop", "counter"],
+	// Nightlife: economic core + Safehouse (back room).
+	nightlife: ["housing", "lab", "storefront", "front", "safehouse"],
+	// Industrial wasteland: everything, plus Depot and Workshop.
+	industrial: ["housing", "lab", "storefront", "front", "safehouse", "depot", "workshop", "counter"],
+	// Laundromats: economic core + Counter-intel.
+	laundry: ["housing", "lab", "storefront", "front", "safehouse", "counter"],
+	// Repurposed precincts: economic core (Safehouse, Watcher).
+	police: ["housing", "lab", "storefront", "front", "safehouse", "counter"],
+	// Parks: economic core + hidden Safehouse.
+	park: ["housing", "lab", "storefront", "front", "safehouse"],
+	// Vacant lots: new construction (nothing to repurpose for recruitment).
+	vacant: ["lab", "storefront", "front", "safehouse", "depot", "workshop"],
 };
 
 export function canBuildInZone(zone: ZoneType, type: BuildingType): boolean {
@@ -179,28 +178,28 @@ export function canBuildInZone(zone: ZoneType, type: BuildingType): boolean {
 }
 
 /**
- * Bonus de rendement d'un bâtiment selon la **zone** du quartier.
- * Un quartier résidentiel rend les logements plus productifs, un quartier
- * commerçant les points de vente, etc. Multiplicateur appliqué à la capacité
- * (production/vente/blanchiment) — jamais au coût. `1` = pas de bonus.
- * Spécialise le territoire : on ne bâtit plus « n'importe où ».
+ * Yield bonus of a building based on the quarter's **zone**.
+ * A residential quarter makes Housing more productive, a commercial quarter
+ * Storefronts, etc. Multiplier applied to capacity (production/sale/
+ * laundering) — never to cost. `1` = no bonus.
+ * Specializes territory: you no longer build "anywhere".
  */
 export const ZONE_BUILD_BONUS: Record<ZoneType, Partial<Record<BuildingType, number>>> = {
-	// Habitations : le recrutement y est le plus efficace.
-	residential: { logement: 1.5, planque: 1.15 },
-	// Commerces : la vente y est reine, la façade un peu aidée.
-	commercial: { vente: 1.5, facade: 1.15 },
-	// Vie nocturne : vente et blanchiment au coude à coude.
-	nightlife: { vente: 1.3, facade: 1.3 },
-	// Friches : production et outillage.
-	industrial: { labo: 1.5, atelier: 1.4, depot: 1.3 },
-	// Laveries : blanchiment maximal.
-	laundry: { facade: 1.6 },
-	// Postes détournés : renseignement.
-	police: { contre: 1.6 },
-	// Parcs : planque bien cachée.
-	park: { planque: 1.5 },
-	// Terrains vagues : rien à bonifier (construction neuve).
+	// Housing: recruitment is most effective here.
+	residential: { housing: 1.5, safehouse: 1.15 },
+	// Shops: sales rule here, the Front gets a small boost.
+	commercial: { storefront: 1.5, front: 1.15 },
+	// Nightlife: sales and laundering neck and neck.
+	nightlife: { storefront: 1.3, front: 1.3 },
+	// Wasteland: production and tooling.
+	industrial: { lab: 1.5, workshop: 1.4, depot: 1.3 },
+	// Laundromats: maximum laundering.
+	laundry: { front: 1.6 },
+	// Repurposed precincts: intel.
+	police: { counter: 1.6 },
+	// Parks: well-hidden Safehouse.
+	park: { safehouse: 1.5 },
+	// Vacant lots: nothing to boost (new construction).
 	vacant: {},
 };
 
@@ -209,24 +208,24 @@ export function zoneBuildBonus(zone: ZoneType, type: BuildingType): number {
 }
 
 /**
- * Heures de pointe : chaque zone a une **heure d'activité** pour son bâtiment
- * phare. Le rendement suit `1 + amplitude × cos(2π(h − pic)/24)` : maximum au
- * pic, minimum 12 h plus tard, moyenne **1** sur la journée (équilibre préservé).
- * Ajoute un rythme jour/nuit : on peut planifier ses ventes/raids.
+ * Rush hour: each zone has an **activity hour** for its flagship building.
+ * Yield follows `1 + amplitude × cos(2π(h − peak)/24)`: maximum at the peak,
+ * minimum 12h later, average **1** over the day (balance preserved).
+ * Adds a day/night rhythm: you can plan your sales/raids.
  */
 export const ZONE_RUSH: Partial<
 	Record<ZoneType, { type: BuildingType; peakHour: number; amplitude: number }>
 > = {
-	// Commerces : affluence en journée.
-	commercial: { type: "vente", peakHour: 13, amplitude: 0.4 },
-	// Vie nocturne : c'est la nuit que ça vend.
-	nightlife: { type: "vente", peakHour: 23, amplitude: 0.5 },
-	// Habitations : recrutement le soir, quand les gens rentrent.
-	residential: { type: "logement", peakHour: 19, amplitude: 0.3 },
-	// Friches : production clandestine de nuit.
-	industrial: { type: "labo", peakHour: 2, amplitude: 0.2 },
-	// Laveries : blanchiment aux heures ouvrables.
-	laundry: { type: "facade", peakHour: 11, amplitude: 0.15 },
+	// Shops: daytime crowds.
+	commercial: { type: "storefront", peakHour: 13, amplitude: 0.4 },
+	// Nightlife: sales happen at night.
+	nightlife: { type: "storefront", peakHour: 23, amplitude: 0.5 },
+	// Housing: recruitment in the evening, when people come home.
+	residential: { type: "housing", peakHour: 19, amplitude: 0.3 },
+	// Wasteland: clandestine production at night.
+	industrial: { type: "lab", peakHour: 2, amplitude: 0.2 },
+	// Laundromats: laundering during business hours.
+	laundry: { type: "front", peakHour: 11, amplitude: 0.15 },
 };
 
 export function zoneTimeFactor(zone: ZoneType, type: BuildingType, hour: number): number {
@@ -235,7 +234,7 @@ export function zoneTimeFactor(zone: ZoneType, type: BuildingType, hour: number)
 	return 1 + rush.amplitude * Math.cos((2 * Math.PI * (hour - rush.peakHour)) / 24);
 }
 
-/** Zones « bâties » : c'est là qu'on peut convertir un bâti existant. */
+/** "Built" zones: where an existing building can be converted. */
 export const BUILT_ZONES: readonly ZoneType[] = [
 	"residential",
 	"commercial",
@@ -245,19 +244,19 @@ export const BUILT_ZONES: readonly ZoneType[] = [
 ];
 
 /**
- * Composition cible d'un domaine (part des quartiers possédés par type).
- * Sert à l'IA et aux simulations : on comble le plus grand déficit, jamais
- * « le premier abordable » (qui remplissait tout de logements).
+ * Target composition of a domain (share of owned quarters per type).
+ * Used by the AI and simulations: fills the biggest deficit, never
+ * "the first affordable" (which filled everything with Housing).
  */
 export const BUILD_TARGETS: Record<BuildingType, number> = {
-	logement: 0.3, // recrutement
-	labo: 0.2,
-	vente: 0.15,
-	facade: 0.15,
+	housing: 0.3, // recruitment
+	lab: 0.2,
+	storefront: 0.15,
+	front: 0.15,
 	depot: 0.05,
-	atelier: 0.05,
-	contre: 0.05,
-	planque: 0.05,
+	workshop: 0.05,
+	counter: 0.05,
+	safehouse: 0.05,
 };
 
 export function chooseBuildType(

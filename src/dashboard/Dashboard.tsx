@@ -39,34 +39,34 @@ const mean = (pick: (run: Run) => number): number =>
 
 const kpis: { label: string; value: string; hint: string }[] = [
 	{
-		label: "Taux de victoire",
-		value: `${winRate.toFixed(0)} %`,
-		hint: `${wins} / ${runs.length} parties`,
+		label: "Win rate",
+		value: `${winRate.toFixed(0)}%`,
+		hint: `${wins} / ${runs.length} games`,
 	},
 	{
-		label: "Durée moyenne",
+		label: "Average duration",
 		value: `${(mean((r) => r.durationS) / 60).toFixed(1)} min`,
-		hint: `plafond ${(meta.maxTicks / 600).toFixed(0)} min`,
+		hint: `cap ${(meta.maxTicks / 600).toFixed(0)} min`,
 	},
 	{
-		label: "Contrôle final",
-		value: `${(mean((r) => r.control) * 100).toFixed(1)} %`,
-		hint: "objectif ≥ 60 %",
+		label: "Final control",
+		value: `${(mean((r) => r.control) * 100).toFixed(1)}%`,
+		hint: "target ≥ 60%",
 	},
 	{
-		label: "Cash propre",
+		label: "Clean cash",
 		value: `${(mean((r) => r.clean) / 1_000_000).toFixed(2)} M`,
-		hint: "objectif 0,5 M",
+		hint: "target 0.5M",
 	},
 	{
-		label: "Pression police",
+		label: "Police pressure",
 		value: mean((r) => r.pressure).toFixed(0),
-		hint: `${mean((r) => r.raids).toFixed(1)} raids / partie`,
+		hint: `${mean((r) => r.raids).toFixed(1)} raids / game`,
 	},
 	{
-		label: "Quartiers pris",
+		label: "Quarters taken",
 		value: mean((r) => r.captures).toFixed(0),
-		hint: `${mean((r) => r.buildings).toFixed(0)} bâtiments`,
+		hint: `${mean((r) => r.buildings).toFixed(0)} buildings`,
 	},
 ];
 
@@ -94,17 +94,17 @@ export function Dashboard() {
 		<main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
 			<header className="flex flex-wrap items-end justify-between gap-3">
 				<div className="flex flex-col gap-1">
-					<h1 className="font-semibold text-2xl tracking-tight">DealerFront — Équilibrage</h1>
+					<h1 className="font-semibold text-2xl tracking-tight">DealerFront — Balancing</h1>
 					<p className="text-muted-foreground text-sm">
-						{meta.seeds} parties simulées · bot toutes les {meta.cadence} ticks ·{" "}
+						{meta.seeds} simulated games · bot every {meta.cadence} ticks ·{" "}
 						{meta.maxTicks} ticks max
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
 					<Badge variant={winRate >= 60 ? "default" : "secondary"}>
-						{winRate.toFixed(0)} % de victoires
+						{winRate.toFixed(0)}% wins
 					</Badge>
-					<Badge variant="outline">{meta.computeSeconds} s de calcul</Badge>
+					<Badge variant="outline">{meta.computeSeconds}s compute</Badge>
 				</div>
 			</header>
 
@@ -124,8 +124,8 @@ export function Dashboard() {
 
 			<Card>
 				<CardHeader>
-					<CardTitle>Résultats par archétype de ville</CardTitle>
-					<CardDescription>Victoires et défaites selon le profil de ville</CardDescription>
+					<CardTitle>Results by city archetype</CardTitle>
+					<CardDescription>Wins and losses by city profile</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<ResponsiveContainer width="100%" height={320}>
@@ -144,9 +144,9 @@ export function Dashboard() {
 
 			<Card>
 				<CardHeader>
-					<CardTitle>Contrôle et blanchiment par partie</CardTitle>
+					<CardTitle>Control and laundering per game</CardTitle>
 					<CardDescription>
-						Barres = Cash propre (M) · ligne = contrôle final (%) · une entrée par seed
+						Bars = Clean cash (M) · line = final control (%) · one entry per seed
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -167,9 +167,9 @@ export function Dashboard() {
 
 			<Separator />
 			<p className="text-muted-foreground text-xs">
-				Données : <code>data/sim.sqlite</code> → export <code>src/dashboard/sim-data.json</code>.
-				Généré le {new Date(meta.generatedAt).toLocaleString("fr-FR")}. Relancer avec{" "}
-				<code>bun run sim:bench</code>. La carte jouable (Paris IRIS) est dans le jeu :{" "}
+				Data: <code>data/sim.sqlite</code> → export <code>src/dashboard/sim-data.json</code>.
+				Generated on {new Date(meta.generatedAt).toLocaleString("en-US")}. Rerun with{" "}
+				<code>bun run sim:bench</code>. The playable map (Paris IRIS) is in the game:{" "}
 				<code>?map=paris</code>.
 			</p>
 		</main>

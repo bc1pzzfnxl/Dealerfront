@@ -1,6 +1,6 @@
 /**
- * Création / liste d'arènes agent vs agent. Affiche les tokens et les URLs à
- * distribuer aux agents (HTTP). Voir docs/arena.md.
+ * Creating / listing agent-vs-agent arenas. Shows the tokens and URLs to
+ * hand out to agents (HTTP). See docs/arena.md.
  */
 
 import { useEffect, useState } from "react";
@@ -23,7 +23,7 @@ function Copy({ value }: { value: string }) {
 				setTimeout(() => setCopied(false), 1200);
 			}}
 		>
-			{copied ? "Copié" : "Copier"}
+			{copied ? "Copied" : "Copy"}
 		</button>
 	);
 }
@@ -41,7 +41,7 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 			const response = await fetch("/api/arena");
 			if (response.ok) setArenas((await response.json()) as ArenaView[]);
 		} catch {
-			// hors ligne : ignoré
+			// offline: ignored
 		}
 	};
 
@@ -74,15 +74,15 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 	return (
 		<div className="arena-screen">
 			<header className="arena-head">
-				<h1>Arène — agents IA</h1>
+				<h1>Arena — AI agents</h1>
 				<button type="button" className="toggle" onClick={onBack}>
-					Retour
+					Back
 				</button>
 			</header>
 
 			{!created ? (
 				<section className="card arena-card">
-					<h2>Nouvelle arène</h2>
+					<h2>New arena</h2>
 					<label className="slider-row">
 						<span>Agents</span>
 						<input
@@ -96,7 +96,7 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 						<code>{agents}</code>
 					</label>
 					<label className="slider-row">
-						<span>Ticks / tour</span>
+						<span>Ticks / turn</span>
 						<input
 							type="range"
 							min={10}
@@ -111,28 +111,28 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 						<span>Seed</span>
 						<input
 							type="text"
-							placeholder="aléatoire"
+							placeholder="random"
 							value={seed}
 							onChange={(event) => setSeed(event.target.value)}
 						/>
 						<code>—</code>
 					</label>
 					<button type="button" className="expand-btn" disabled={busy} onClick={() => void create()}>
-						{busy ? "Création…" : "Créer l'arène"}
+						{busy ? "Creating…" : "Create arena"}
 					</button>
 				</section>
 			) : (
 				<section className="card arena-card">
 					<h2>
-						Arène <em>{created.view.id}</em>
+						Arena <em>{created.view.id}</em>
 					</h2>
 					<p className="hint-inline">
-						Distribue un <strong>token</strong> par agent. Chaque agent interroge l'état, joue ses
-						actions (autant qu'il veut) puis termine son tour.
+						Hand out one <strong>token</strong> per agent. Each agent polls the state, plays its
+						actions (as many as it wants) then ends its turn.
 					</p>
 					<div className="arena-endpoints">
 						<div className="line">
-							<span>État (GET)</span>
+							<span>State (GET)</span>
 							<code>
 								{base}/api/arena/{created.view.id}/state?token=…
 							</code>
@@ -144,13 +144,13 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 							</code>
 						</div>
 						<div className="line">
-							<span>Fin de tour (POST)</span>
+							<span>End turn (POST)</span>
 							<code>
 								{base}/api/arena/{created.view.id}/endTurn
 							</code>
 						</div>
 						<div className="line">
-							<span>Carte (GET)</span>
+							<span>Map (GET)</span>
 							<code>{base}/api/map</code>
 						</div>
 					</div>
@@ -168,23 +168,23 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 						className="expand-btn"
 						onClick={() => onSpectate(created.view.id)}
 					>
-						Regarder en direct
+						Watch live
 					</button>
 				</section>
 			)}
 
 			<section className="card arena-card">
-				<h2>Arènes</h2>
+				<h2>Arenas</h2>
 				{arenas.length === 0 ? (
-					<p className="hint-inline">Aucune arène pour l'instant.</p>
+					<p className="hint-inline">No arenas yet.</p>
 				) : (
 					arenas.map((arena) => (
 						<div className="line" key={arena.id}>
 							<span>
-								{arena.id} · {arena.phase} · tour {arena.turn} · {arena.agents.length} agents
+								{arena.id} · {arena.phase} · turn {arena.turn} · {arena.agents.length} agents
 							</span>
 							<button type="button" className="tech-up" onClick={() => onSpectate(arena.id)}>
-								Voir
+								View
 							</button>
 						</div>
 					))

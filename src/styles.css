@@ -43,7 +43,7 @@ body {
 	inset: 0;
 }
 
-/* Carte réelle (mapcn/MapLibre) : occupe le viewport, contrôles style jeu. */
+/* Real map (mapcn/MapLibre): fills the viewport, game-style controls. */
 .world-map {
 	position: absolute;
 	inset: 0;
@@ -57,6 +57,53 @@ body {
 	display: flex;
 	flex-direction: column;
 	gap: 0.35rem;
+}
+
+/* Front labels: "attacker vs defender" pinned to contested quarters. */
+.front-labels {
+	position: absolute;
+	inset: 0;
+	z-index: 4;
+	pointer-events: none;
+	overflow: hidden;
+}
+
+.front-label {
+	position: absolute;
+	top: 0;
+	left: 0;
+	display: flex;
+	align-items: center;
+	padding: 1px 7px;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	background: rgba(11, 14, 18, 0.86);
+	font-size: 0.7rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	/* Smooths the 10 Hz tick into continuous motion (OpenFront-style lerp). */
+	transition: transform 130ms linear;
+}
+
+.front-label.in {
+	animation: front-pulse 1.1s ease-in-out infinite;
+}
+
+.front-vs {
+	margin: 0 4px;
+	font-size: 0.62rem;
+	opacity: 0.65;
+}
+
+@keyframes front-pulse {
+	0%,
+	100% {
+		opacity: 0.82;
+	}
+	50% {
+		opacity: 1;
+	}
 }
 
 .map-controls button {
@@ -411,7 +458,7 @@ kbd {
 	text-align: right;
 }
 
-/* Bloc quartier compact : en-tête + grille de stats + pied. */
+/* Compact quarter block: header + stats grid + footer. */
 .quarter-head {
 	display: flex;
 	justify-content: space-between;
@@ -488,7 +535,7 @@ kbd {
 	color: var(--muted);
 }
 
-/* ---------- Arène (agents IA) ---------- */
+/* ---------- Arena (AI agents) ---------- */
 .arena-screen {
 	display: flex;
 	flex-direction: column;
@@ -539,7 +586,7 @@ kbd {
 	padding-top: 0.15rem;
 }
 
-/* Heures de pointe : le rendement du bâtiment suit l'heure in-game. */
+/* Rush hour: building output follows the in-game clock. */
 .rush-tag {
 	float: right;
 	padding: 0 0.3rem;
@@ -561,7 +608,7 @@ kbd {
 	color: #9db4d8;
 }
 
-/* Lot : ligne unique coût + action (pas de bloc verbeux). */
+/* Batch: single cost + action line (no verbose block). */
 .batch-card {
 	padding-top: 0.4rem;
 	padding-bottom: 0.45rem;
@@ -689,7 +736,7 @@ code {
 	margin-left: auto;
 }
 
-/* Barre de commandement (quartier ennemi/neutre) : icônes + raccourci. */
+/* Command bar (enemy/neutral quarter): icons + shortcut. */
 .command-bar {
 	display: grid;
 	grid-template-columns: repeat(3, 1fr);
@@ -817,9 +864,9 @@ button:not(:disabled):active {
 	text-overflow: ellipsis;
 }
 
-/* ---------- Monde ---------- */
+/* ---------- World ---------- */
 
-/* Voile jour/nuit : assombrit légèrement la carte la nuit (opacité pilotée par l'heure). */
+/* Day/night veil: slightly darkens the map at night (opacity driven by the clock). */
 .night-overlay {
 	position: absolute;
 	inset: 0;
@@ -858,7 +905,7 @@ button:not(:disabled):active {
 	}
 }
 
-/* ---------- Fin de run ---------- */
+/* ---------- End of run ---------- */
 
 .end-banner {
 	position: absolute;
@@ -881,7 +928,7 @@ button:not(:disabled):active {
 	color: var(--ok);
 }
 
-/* ---------- Sélection : pitch et boucle ---------- */
+/* ---------- Selection: pitch and loop ---------- */
 .select-pitch {
 	max-width: 26rem;
 	text-align: center;
@@ -1023,7 +1070,7 @@ button:disabled {
 	background-color: var(--danger);
 }
 
-/* ---------- Sélection de ville ---------- */
+/* ---------- City selection ---------- */
 .select-screen {
 	position: absolute;
 	inset: 0;
@@ -1085,7 +1132,7 @@ button:disabled {
 	font-style: normal;
 }
 
-/* ---------- Légende de faction ---------- */
+/* ---------- Faction legend ---------- */
 .factions .swatch {
 	display: inline-flex;
 	align-items: center;
@@ -1117,13 +1164,13 @@ button:disabled {
 	border-color: var(--accent);
 }
 
-/* ---------- Diplomatie ---------- */
+/* ---------- Diplomacy ---------- */
 .offer-actions {
 	display: inline-flex;
 	gap: 0.25rem;
 }
 
-/* ---------- Guidage ---------- */
+/* ---------- Guidance ---------- */
 .advisor {
 	margin: 0 0 0.55rem;
 	padding: 0.4rem 0.5rem;
@@ -1135,7 +1182,7 @@ button:disabled {
 }
 
 
-/* Bâtiment favorisé par la zone : liseré vert + badge du multiplicateur. */
+/* Zone-favored building: green outline + multiplier badge. */
 .build-menu button.bonus {
 	border-color: rgba(143, 216, 165, 0.7);
 	box-shadow: inset 0 0 0 1px rgba(143, 216, 165, 0.3);
@@ -1155,7 +1202,7 @@ button:disabled {
 }
 
 
-/* ---------- Lisibilité boutons ---------- */
+/* ---------- Button legibility ---------- */
 button:disabled {
 	opacity: 1;
 	color: #8f979f;
@@ -1179,7 +1226,7 @@ button:disabled:hover {
 	color: var(--warn);
 }
 
-/* ---------- Boucle économique ---------- */
+/* ---------- Economic loop ---------- */
 .loop-card {
 	width: 17rem;
 }
@@ -1203,12 +1250,21 @@ button:disabled:hover {
 	color: var(--text);
 }
 
+/* Cargo on the road: amber, it is not in the bank yet. */
+.loop-row span .transit {
+	margin-left: 0.35rem;
+	font-size: 0.68rem;
+	font-weight: 600;
+	color: #e8b765;
+	white-space: nowrap;
+}
+
 .loop-row.next span {
 	color: var(--accent);
 	font-weight: 600;
 }
 
-/* ---------- Aide ---------- */
+/* ---------- Help ---------- */
 .help-overlay {
 	position: absolute;
 	inset: 0;
@@ -1285,7 +1341,7 @@ button:disabled:hover {
 	font-size: 0.7rem;
 }
 
-/* ---------- Animations & repliable (P13) ---------- */
+/* ---------- Animations & collapsible (P13) ---------- */
 
 @keyframes card-in {
 	from {
@@ -1402,7 +1458,7 @@ button:not(:disabled):active {
 	}
 }
 
-/* ---------- Infobulle au survol ---------- */
+/* ---------- Hover tooltip ---------- */
 .hover-card {
 	position: fixed;
 	top: 0;
@@ -1446,7 +1502,7 @@ button:not(:disabled):active {
 	letter-spacing: 0.03em;
 }
 
-/* Statistiques en grille : lisible d'un coup d'œil, sans retour à la ligne. */
+/* Grid stats: readable at a glance, no wrapping. */
 .hover-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -1485,13 +1541,13 @@ button:not(:disabled):active {
 	color: var(--text);
 }
 
-/* ---------- Renseignement ---------- */
+/* ---------- Intelligence ---------- */
 code.unknown {
 	color: var(--muted);
 	font-style: italic;
 }
 
-/* ---------- Message transitoire ---------- */
+/* ---------- Transient message ---------- */
 .notice {
 	margin: 0 0 0.55rem;
 	padding: 0.4rem 0.5rem;
@@ -1503,7 +1559,7 @@ code.unknown {
 	animation: card-in 160ms ease-out both;
 }
 
-/* ---------- Juice : textes flottants & secousse ---------- */
+/* ---------- Juice: floating text & shake ---------- */
 .floaters {
 	position: absolute;
 	inset: 0;
@@ -1579,7 +1635,7 @@ code.unknown {
 	}
 }
 
-/* ---------- Événement à choix ---------- */
+/* ---------- Choice event ---------- */
 .event-card {
 	position: absolute;
 	top: 4.6rem;

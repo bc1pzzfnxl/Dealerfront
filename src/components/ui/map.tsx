@@ -2034,7 +2034,7 @@ type MapArcProps<T extends MapArcDatum = MapArcDatum> = {
   /**
    * How far each arc bows away from a straight line. `0` renders straight
    * lines; higher values bend further. Negative values bend to the opposite
-   * side. Arcs are computed as a quadratic Bézier in lng/lat space; the
+   * side. Arcs are computed as a quadratic Bezier in lng/lat space; the
    * destination longitude is unwrapped relative to the origin so that arcs
    * cross the antimeridian via the shorter great-circle direction. (default: 0.2)
    */

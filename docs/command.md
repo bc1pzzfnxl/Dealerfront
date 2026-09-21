@@ -1,76 +1,76 @@
-# Command — Interface de commandement (god view)
+# Command — Command interface (god view)
 
-> Statut : **v1 (DealerFront)** — remplace `orders.md` (ordres d'un dealer unique). On commande un **cartel**, pas un personnage.
+> Status: **v1 (DealerFront)** — replaces `orders.md` (orders of a single dealer). You command a **cartel**, not a character.
 
-## Objectif
+## Objective
 
-Définir **comment le joueur commande de loin** : sélection de quartiers, ordres de faction, lots d'ordres, et abandon de la micro-gestion d'un personnage.
+Define **how the player commands from afar**: quarter selection, faction orders, order batches, and abandonment of single-character micro-management.
 
-## Règles
+## Rules
 
-### Principe
+### Principle
 
-- **God view** : on observe la ville en vue large (`ui-ux.md`) et on donne des **ordres de faction**.
-- **Plus de personnage** : pas de déplacement individuel, pas de file d'ordres de dealer, pas de caméra suiveuse serrée.
-- Les ordres s'appliquent à **un quartier**, une **sélection** ou une **frontière**.
+- **God view**: you observe the city in a wide view (`ui-ux.md`) and give **faction orders**.
+- **No more character**: no individual movement, no dealer order queue, no tight follow camera.
+- Orders apply to **one quarter**, a **selection** or a **border**.
 
-### Ordres disponibles
+### Available orders
 
-| Ordre | Cible | Effet |
+| Order | Target | Effect |
 |---|---|---|
-| **Attaquer** | Quartier neutre ou ennemi adjacent | Engage de l'Influence (voir `combat.md`) |
-| **Renforcer** | Quartier possédé | Transfère de l'Influence pour restaurer/augmenter le Contrôle |
-| **Construire** | Quartier possédé | Pose un bâtiment (Labo, Point de vente, Façade, Planque, Atelier, Contre-espionnage, Dépôt) — `economy.md` |
-| **Convertir** | Bâtiment existant | Transforme un bâtiment de la ville en bâtiment de cartel — `economy.md` |
-| **Rechercher (tech)** | Globale (via Atelier) | Monte une branche (Armement/Protection/Logistique) — `tech.md` |
-| **Corrompre** | Globale | Dépense pour réduire la Pression police — `police-ai.md` |
-| **Diplomatie** | Faction | Proposer un pacte, embargo — `factions.md` |
-| **Tueur à gage** | Quartier ennemi | Assassinat ciblé (si tech) — `combat.md` |
+| **Attack** | Adjacent neutral or enemy quarter | Commits Influence (see `combat.md`) |
+| **Reinforce** | Owned quarter | Transfers Influence to restore/increase Control |
+| **Build** | Owned quarter | Places a building (Lab, Storefront, Front, Safehouse, Workshop, Counter-intel, Depot) — `economy.md` |
+| **Convert** | Existing building | Turns a city building into a cartel building — `economy.md` |
+| **Research (tech)** | Global (via Workshop) | Upgrades a branch (Armament/Protection/Logistics) — `tech.md` |
+| **Corrupt** | Global | Spends to reduce police Pressure — `police-ai.md` |
+| **Diplomacy** | Faction | Propose a pact, embargo — `factions.md` |
+| **Hitman** | Enemy quarter | Targeted assassination (if tech) — `combat.md` |
 
-### Planification
+### Planning
 
-- **Ordres par lot** : sélection multiple (glisser-rectangle) pour attaquer/construire sur plusieurs quartiers.
-- **Prévisualisation** : avant validation, afficher l'Influence engagée, les pertes estimées et les quartiers concernés.
-- **Aucune micro** : le joueur planifie, la simulation exécute à pas fixe (10 Hz).
+- **Batch orders**: multi-select (drag-rectangle) to attack/build on several quarters.
+- **Preview**: before confirming, show the committed Influence, estimated losses and affected quarters.
+- **No micro**: the player plans, the simulation executes at a fixed step (10 Hz).
 
-### Abandonné (vs ancien mode)
+### Abandoned (vs old mode)
 
-- File d'ordres individuelle d'un dealer, actions engageantes personnelles, déplacement clavier ZQSD, inventaire d'un personnage. Voir `pillars.md` (P5 redéfini).
+- A dealer's individual order queue, personal committing actions, ZQSD keyboard movement, a character inventory. See `pillars.md` (P5 redefined).
 
-## Paramètres chiffrés
+## Numeric parameters
 
-| Paramètre | Valeur | Statut |
+| Parameter | Value | Status |
 |---|---|---|
-| Taille de sélection max | **TBD** | TBD |
-| Cooldown d'ordre (anti-spam) | **TBD** | TBD |
-| Nb d'ordres simultanés | **TBD** | TBD |
-| Prévisualisation (pertes/coût) | requis | fixé |
+| Max selection size | **TBD** | TBD |
+| Order cooldown (anti-spam) | **TBD** | TBD |
+| Number of simultaneous orders | **TBD** | TBD |
+| Preview (losses/cost) | required | fixed |
 
-## Cas limites
+## Edge cases
 
-- **Ordre impossible** (quartier non adjacent / plus possédé) : refusé avec feedback, pas de mise en file silencieuse.
-- **Attaque sans Influence suffisante** : refusée ou limitée à l'Influence disponible (à trancher → `TBD`).
-- **Replanification** : pas de coût (on est en god view) ; éviter le spam par cooldowns.
-- **Sélection mixte** (possédé + ennemi) : chaque quartier reçoit l'ordre pertinent, les invalides sont ignorés.
+- **Impossible order** (non-adjacent / no longer owned quarter): rejected with feedback, no silent queueing.
+- **Attack without enough Influence**: rejected or limited to available Influence (to decide → `TBD`).
+- **Replanning**: no cost (we are in god view); avoid spam via cooldowns.
+- **Mixed selection** (owned + enemy): each quarter receives the relevant order, invalid ones are ignored.
 
-## Dépendances
+## Dependencies
 
-- `pillars.md` — P5 (commandement), R1.
+- `pillars.md` — P5 (command), R1.
 - `territory.md`, `combat.md`, `economy.md`, `tech.md`, `factions.md`, `police-ai.md`.
-- `ui-ux.md` — présentation des ordres et de la prévisualisation.
+- `ui-ux.md` — presentation of orders and preview.
 
-## Critères de validation
+## Validation criteria
 
-- [ ] Tous les ordres de la boucle (`core-loop.md`) sont accessibles sans personnage.
-- [ ] Les ordres par lot fonctionnent (sélection multiple).
-- [ ] L'ordre impossible est refusé proprement.
-- [ ] Aucune action ne dépend d'un contrôle individuel de personnage.
+- [ ] All loop orders (`core-loop.md`) are accessible without a character.
+- [ ] Batch orders work (multi-select).
+- [ ] The impossible order is cleanly rejected.
+- [ ] No action depends on individual character control.
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Modèle | Ordres de faction par quartier/sélection |
-| 2 | Micro | Supprimée (god view) |
-| 3 | Planification | Lots + prévisualisation (coût/pertes) |
-| 4 | Ancien `orders.md` | Remplacé par ce fichier |
+| 1 | Model | Faction orders per quarter/selection |
+| 2 | Micro | Removed (god view) |
+| 3 | Planning | Batches + preview (cost/losses) |
+| 4 | Old `orders.md` | Replaced by this file |

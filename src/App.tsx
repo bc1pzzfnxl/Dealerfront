@@ -21,7 +21,7 @@ import { World, type GameEvent } from "./sim/world";
 import { ArenaSetup } from "./arena/ArenaSetup";
 import { Spectator } from "./arena/Spectator";
 
-/** Retour sonore par événement de jeu (cuelume). */
+/** Sound feedback per game event (cuelume). */
 const EVENT_SOUND: Record<GameEvent, SoundName> = {
 	attack: "pulse",
 	capture: "success",
@@ -34,7 +34,7 @@ const EVENT_SOUND: Record<GameEvent, SoundName> = {
 	embargo: "scan",
 	corrupt: "droplet",
 	build: "press",
-	descent: "scan",
+	bust: "scan",
 	sabotage: "whisper",
 	intercept: "sparkle",
 	event: "bloom",
@@ -45,13 +45,13 @@ const EVENT_SOUND: Record<GameEvent, SoundName> = {
 
 function formatCost(type: BuildingType, factor = 1): string {
 	const spec = BUILDINGS[type];
-	if (spec.costMembers) return `${Math.round(spec.costMembers * factor)} membres`;
-	if (spec.costSale) return `${Math.round(spec.costSale * factor)} sale`;
-	if (spec.costClean) return `${Math.round(spec.costClean * factor)} propre`;
+	if (spec.costMembers) return `${Math.round(spec.costMembers * factor)} Members`;
+	if (spec.costSale) return `${Math.round(spec.costSale * factor)} dirty`;
+	if (spec.costClean) return `${Math.round(spec.costClean * factor)} clean`;
 	return "—";
 }
 
-/** Carte repliable — allège l'IHM en masquant les panneaux secondaires. */
+/** Collapsible card — lightens the UI by hiding secondary panels. */
 function Section({
 	title,
 	aside,
@@ -94,7 +94,7 @@ function App() {
 			return false;
 		}
 	});
-	/** Aide affichée à la première partie (rappel « but du jeu »). */
+	/** Help shown on the first game (reminder of the "goal"). */
 	const [sound, setSound] = useState(() => {
 		try {
 			return localStorage.getItem("df-sound") !== "0";
@@ -123,18 +123,18 @@ function App() {
 		try {
 			localStorage.setItem("df-colorblind", colorblind ? "1" : "0");
 		} catch {
-			// stockage indisponible : mode non persisté
+			// storage unavailable: mode not persisted
 		}
 	}, [colorblind]);
 
-	// Message transitoire (retour d'action refusée).
+	// Transient message (rejected action feedback).
 	useEffect(() => {
 		if (!notice) return;
 		const timer = setTimeout(() => setNotice(null), 3200);
 		return () => clearTimeout(timer);
 	}, [notice]);
 
-	// Infobulle : suit le curseur sans re-render (transform impératif).
+	// Tooltip: follows the cursor without re-render (imperative transform).
 	useEffect(() => {
 		const onMove = (event: MouseEvent) => {
 			const element = hoverRef.current;
@@ -146,18 +146,18 @@ function App() {
 		return () => window.removeEventListener("mousemove", onMove);
 	}, []);
 
-	// Volume + activation des sons (préférence locale).
+	// Volume + sound toggle (local preference).
 	useEffect(() => {
 		setVolume(0.5);
 		setEnabled(sound);
 		try {
 			localStorage.setItem("df-sound", sound ? "1" : "0");
 		} catch {
-			// stockage indisponible : préférence non persistée
+			// storage unavailable: preference not persisted
 		}
 	}, [sound]);
 
-	// Sons des événements de jeu + secousse d'écran quand on est frappé.
+	// Game event sounds + screen shake when hit.
 	useEffect(() => {
 		const events = world.drainEvents();
 		if (events.length === 0) return;
@@ -172,7 +172,7 @@ function App() {
 		}
 	}, [version, world, sound]);
 
-	// Clic sur n'importe quel bouton → feedback « press ».
+	// Click on any button → "press" feedback.
 	useEffect(() => {
 		if (!sound) return;
 		const onClick = (event: MouseEvent) => {
@@ -182,12 +182,12 @@ function App() {
 		return () => document.removeEventListener("click", onClick);
 	}, [sound]);
 
-	// L'aide est marquée « vue » dès le premier affichage (rouvrable via le bouton Aide).
+	// Help is marked "seen" on first display (reopenable via the Help button).
 	useEffect(() => {
 		try {
 			localStorage.setItem("df-help", "1");
 		} catch {
-			// stockage indisponible : aide re-affichée
+			// storage unavailable: help shown again
 		}
 	}, []);
 
@@ -199,14 +199,14 @@ function App() {
 				if (!cancelled) setApi(`${data.service} · ${data.status}`);
 			})
 			.catch(() => {
-				if (!cancelled) setApi("indisponible");
+				if (!cancelled) setApi("unavailable");
 			});
 		return () => {
 			cancelled = true;
 		};
 	}, []);
 
-	// Sélectionne le quartier de départ du joueur (ouvre le menu de construction).
+	// Selects the player's starting quarter (opens the build menu).
 	useEffect(() => {
 		for (let i = 0; i < world.territory.count; i += 1) {
 			if (world.territory.owner[i] === world.player.id) {
@@ -243,7 +243,7 @@ function App() {
 	const selectedBuilding = selected !== null ? world.buildingAt(selected) : null;
 	const canAttack = selected !== null && world.playerCanAttack(selected);
 	const selectedOwnerName =
-		selectedOwner === NEUTRAL ? "Neutre" : (world.factions[selectedOwner]?.name ?? "—");
+		selectedOwner === NEUTRAL ? "Neutral" : (world.factions[selectedOwner]?.name ?? "—");
 
 	const build = useCallback(
 		(type: BuildingType) => {
@@ -253,7 +253,7 @@ function App() {
 		[selected, world],
 	);
 
-	/** Action contextuelle (Q/A) : bâtir le type conseillé, sinon attaquer. */
+	/** Contextual action (Q/A): build the advised type, otherwise attack. */
 	const act = useCallback(() => {
 		if (selected === null) return;
 		if (world.ownerAt(selected) === world.player.id) {
@@ -262,7 +262,7 @@ function App() {
 					world.buildingCounts(world.player.id),
 					world.modulesOwned(world.player.id),
 					(candidate) => world.playerCanBuild(selected, candidate),
-					{ atelier: TECH.maxLevel },
+					{ workshop: TECH.maxLevel },
 				);
 				if (type !== null && world.playerBuild(selected, type)) {
 					setVersion((value) => value + 1);
@@ -274,68 +274,68 @@ function App() {
 	}, [selected, world]);
 
 	const hitmanReason = useCallback((): string | null => {
-		if (selected === null) return "aucune cible";
+		if (selected === null) return "no target";
 		const owner = world.ownerAt(selected);
-		if (owner === player.id) return "déjà à vous";
-		if (owner === NEUTRAL) return "cible neutre";
-		if (player.tech.armement < HITMAN.requiredArmement) {
-			return `Armement ≥ ${HITMAN.requiredArmement} requis`;
+		if (owner === player.id) return "already yours";
+		if (owner === NEUTRAL) return "neutral target";
+		if (player.tech.armament < HITMAN.requiredArmament) {
+			return `Armament ≥ ${HITMAN.requiredArmament} required`;
 		}
-		if (player.hitmanCooldown > 0) return `recharge ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
-		if (player.cashPropre < HITMAN.costClean) return `${HITMAN.costClean} Cash propre requis`;
-		if (player.members < HITMAN.costMembers) return `${HITMAN.costMembers} membres requis`;
+		if (player.hitmanCooldown > 0) return `cooldown ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
+		if (player.cleanCash < HITMAN.costClean) return `${HITMAN.costClean} Clean cash required`;
+		if (player.members < HITMAN.costMembers) return `${HITMAN.costMembers} Members required`;
 		return null;
 	}, [selected, world, player]);
 
-	const descentReason = useCallback((): string | null => {
-		if (selected === null) return "aucune cible";
-		if (world.ownerAt(selected) === player.id) return "déjà à vous";
-		if (world.ownerAt(selected) === NEUTRAL) return "cible neutre";
-		if (!world.canAttack(player.id, selected)) return "non adjacent";
-		if (!world.buildingAt(selected)) return "pas de bâtiment";
-		if (player.tech.armement < 1) return "Armement ≥ 1 requis";
-		if (player.descentCooldown > 0) return `recharge ${Math.ceil(player.descentCooldown / SIM_HZ)} s`;
-		const cost = world.descentCost();
-		if (player.cashSale < cost.sale) return `${cost.sale} sale requis`;
-		if (player.members < cost.members) return `${cost.members} membres requis`;
+	const bustReason = useCallback((): string | null => {
+		if (selected === null) return "no target";
+		if (world.ownerAt(selected) === player.id) return "already yours";
+		if (world.ownerAt(selected) === NEUTRAL) return "neutral target";
+		if (!world.canAttack(player.id, selected)) return "not adjacent";
+		if (!world.buildingAt(selected)) return "no building";
+		if (player.tech.armament < 1) return "Armament ≥ 1 required";
+		if (player.bustCooldown > 0) return `cooldown ${Math.ceil(player.bustCooldown / SIM_HZ)} s`;
+		const cost = world.bustCost();
+		if (player.dirtyCash < cost.sale) return `${cost.sale} dirty required`;
+		if (player.members < cost.members) return `${cost.members} Members required`;
 		return null;
 	}, [selected, world, player]);
 
 	const sabotageReason = useCallback((): string | null => {
-		if (selected === null) return "aucune cible";
-		if (world.ownerAt(selected) === player.id) return "déjà à vous";
-		if (world.ownerAt(selected) === NEUTRAL) return "cible neutre";
-		if (!world.canAttack(player.id, selected)) return "non adjacent";
-		if (!world.buildingAt(selected)) return "pas de bâtiment";
-		if (player.tech.armement < 2) return "Armement ≥ 2 requis";
-		if (player.sabotageCooldown > 0) return `recharge ${Math.ceil(player.sabotageCooldown / SIM_HZ)} s`;
-		if (player.cashSale < world.sabotageCost()) return `${world.sabotageCost()} sale requis`;
+		if (selected === null) return "no target";
+		if (world.ownerAt(selected) === player.id) return "already yours";
+		if (world.ownerAt(selected) === NEUTRAL) return "neutral target";
+		if (!world.canAttack(player.id, selected)) return "not adjacent";
+		if (!world.buildingAt(selected)) return "no building";
+		if (player.tech.armament < 2) return "Armament ≥ 2 required";
+		if (player.sabotageCooldown > 0) return `cooldown ${Math.ceil(player.sabotageCooldown / SIM_HZ)} s`;
+		if (player.dirtyCash < world.sabotageCost()) return `${world.sabotageCost()} dirty required`;
 		return null;
 	}, [selected, world, player]);
 
 	const interceptReason = useCallback((): string | null => {
-		if (selected === null) return "aucune cible";
-		if (world.ownerAt(selected) === player.id) return "déjà à vous";
-		if (world.ownerAt(selected) === NEUTRAL) return "cible neutre";
-		if (!world.canAttack(player.id, selected)) return "non adjacent";
-		if (!world.convoyRoutes().some((route) => route.to === selected)) return "aucun convoi";
-		if (player.tech.armement < 1) return "Armement ≥ 1 requis";
-		if (player.interceptCooldown > 0) return `recharge ${Math.ceil(player.interceptCooldown / SIM_HZ)} s`;
-		if (player.members < world.interceptCost()) return `${world.interceptCost()} membres requis`;
+		if (selected === null) return "no target";
+		if (world.ownerAt(selected) === player.id) return "already yours";
+		if (world.ownerAt(selected) === NEUTRAL) return "neutral target";
+		if (!world.canAttack(player.id, selected)) return "not adjacent";
+		if (!world.convoyRoutes().some((route) => route.to === selected)) return "no convoy";
+		if (player.tech.armament < 1) return "Armament ≥ 1 required";
+		if (player.interceptCooldown > 0) return `cooldown ${Math.ceil(player.interceptCooldown / SIM_HZ)} s`;
+		if (player.members < world.interceptCost()) return `${world.interceptCost()} Members required`;
 		return null;
 	}, [selected, world, player]);
 
 	const batch = world.playerBatchPreview();
 
 	const raidReason = useCallback((): string | null => {
-		if (selected === null) return "aucune cible";
-		if (world.ownerAt(selected) === NEUTRAL) return "cible neutre";
-		if (world.ownerAt(selected) === player.id) return "déjà à vous";
-		if (!world.canAttack(player.id, selected)) return "non adjacent";
+		if (selected === null) return "no target";
+		if (world.ownerAt(selected) === NEUTRAL) return "neutral target";
+		if (world.ownerAt(selected) === player.id) return "already yours";
+		if (!world.canAttack(player.id, selected)) return "not adjacent";
 		const cost = world.raidCost();
-		if (player.cashSale < cost.sale) return `${cost.sale} sale requis`;
-		if (player.members < cost.members) return `${cost.members} membres requis`;
-		if (player.raidCooldown > 0) return `recharge ${Math.ceil(player.raidCooldown / SIM_HZ)} s`;
+		if (player.dirtyCash < cost.sale) return `${cost.sale} dirty required`;
+		if (player.members < cost.members) return `${cost.members} Members required`;
+		if (player.raidCooldown > 0) return `cooldown ${Math.ceil(player.raidCooldown / SIM_HZ)} s`;
 		return null;
 	}, [selected, world, player]);
 
@@ -353,24 +353,24 @@ function App() {
 			if (event.code === "KeyE") {
 				event.preventDefault();
 				if (world.playerAttackBest()) setVersion((value) => value + 1);
-				else setNotice("Expansion : aucune cible adjacente attaquable.");
+				else setNotice("Expand: no attackable adjacent target.");
 				return;
 			}
 			if (event.code === "KeyT") {
 				event.preventDefault();
 				if (selected === null) {
-					setNotice("Tueur à gage : sélectionnez d'abord un quartier ennemi.");
+					setNotice("Hitman: select an enemy quarter first.");
 					return;
 				}
 				if (world.playerHitman(selected)) setVersion((value) => value + 1);
-				else setNotice(`Tueur à gage : ${hitmanReason() ?? "impossible"}.`);
+				else setNotice(`Hitman: ${hitmanReason() ?? "impossible"}.`);
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [act, selected, world, hitmanReason]);
 
-	/** Lance une partie sur la carte réelle (Paris IRIS). */
+	/** Starts a game on the real map (Paris IRIS). */
 	const startParis = () => {
 		setSelected(null);
 		setVersion(0);
@@ -390,7 +390,7 @@ function App() {
 	};
 
 	const totalModules = world.city.modules.length;
-	const cityLabel = "Paris · 992 quartiers IRIS";
+	const cityLabel = "Paris · 992 IRIS quarters";
 	const playerPct = Math.round(world.controlRatio(player.id) * 100);
 	const perSecond = Math.round(world.productionPerTick(player.id) * SIM_HZ * 10) / 10;
 	const afford = (type: BuildingType) => selected !== null && world.playerCanBuild(selected, type);
@@ -410,82 +410,93 @@ function App() {
 	const mm = Math.floor((hour - hh) * 60);
 	const gameTime = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 	const isNight = hour < 6 || hour >= 21;
-	/** Profondeur de la nuit (0 en plein jour, 1 vers 2 h) — voile visuel. */
+	/** Night depth (0 at midday, 1 around 2 am) — visual veil. */
 	const nightOpacity = ((1 + Math.cos((2 * Math.PI * (hour - 2)) / 24)) / 2) * 0.45;
 
-	/** Priorité stratégique d'amorçage : Labo → Point de vente → Façade. */
+	/** Bootstrapping strategic priority: Lab → Storefront → Front. */
 	const advisedType: BuildingType | null =
-		world.buildingCount(player.id, "labo") === 0
-			? "labo"
-			: world.buildingCount(player.id, "vente") === 0
-				? "vente"
-				: world.buildingCount(player.id, "facade") === 0 && player.cashSale > 1500
-					? "facade"
+		world.buildingCount(player.id, "lab") === 0
+			? "lab"
+			: world.buildingCount(player.id, "storefront") === 0
+				? "storefront"
+				: world.buildingCount(player.id, "front") === 0 && player.dirtyCash > 1500
+					? "front"
 					: null;
 
 	const ownedQuarters = world.modulesOwned(player.id);
 	const idleQuarters = Math.max(0, ownedQuarters - player.buildings);
 	const advisor = (() => {
 		if (ownedQuarters < 2) {
-			return "Capturez un quartier adjacent (sélectionnez-le puis Q) : 1 bâtiment par quartier.";
+			return "Capture an adjacent quarter (select it then Q): 1 building per quarter.";
 		}
-		// Chaîne économique : on signale d'abord ce qui manque, dans l'ordre.
+		// Economic chain: report what's missing first, in order.
 		const counts = world.buildingCounts(player.id);
-		if (counts.vente > 0 && counts.labo === 0) {
-			return "Vos points de vente achètent le Produit à l'extérieur (marge réduite). Bâtissez un Labo pour produire le vôtre.";
+		if (counts.storefront > 0 && counts.lab === 0) {
+			return "Your Storefronts buy Product from outside (reduced margin). Build a Lab to produce your own.";
 		}
-		if (counts.labo > 0 && counts.vente === 0) {
-			return "Votre Produit dort au labo. Bâtissez un Point de vente pour le convertir en Cash sale.";
+		if (counts.lab > 0 && counts.storefront === 0) {
+			return "Your Product sits idle in the lab. Build a Storefront to turn it into Dirty cash.";
 		}
-		if (counts.vente > 0 && counts.facade === 0) {
-			return "Sans Façade, le Cash sale s'accumule sans devenir propre (tech, corruption). Bâtissez une Façade.";
+		if (counts.storefront > 0 && counts.front === 0) {
+			return "Without a Front, Dirty cash piles up without becoming clean (tech, corruption). Build a Front.";
 		}
 		if (advisedType !== null) {
 			const spec = BUILDINGS[advisedType];
-			if (spec.costSale && player.cashSale < spec.costSale) {
-				return `${BUILDINGS[advisedType].label} : ${spec.costSale} Cash sale requis — vendez du Produit ou agrandissez.`;
+			if (spec.costSale && player.dirtyCash < spec.costSale) {
+				return `${BUILDINGS[advisedType].label}: ${spec.costSale} Dirty cash required — sell Product or expand.`;
 			}
 			if (spec.costMembers && player.members < spec.costMembers) {
-				return `${BUILDINGS[advisedType].label} : ${spec.costMembers} Membres requis.`;
+				return `${BUILDINGS[advisedType].label}: ${spec.costMembers} Members required.`;
 			}
-			return `${BUILDINGS[advisedType].label} — ${BUILDING_EFFECT_LABELS[advisedType]} (à construire en priorité).`;
+			return `${BUILDINGS[advisedType].label} — ${BUILDING_EFFECT_LABELS[advisedType]} (build as a priority).`;
 		}
 		if (idleQuarters > 0) {
-			return `${idleQuarters} quartier(s) vide(s) : aménagez-les (Q sur un quartier possédé).`;
+			return `${idleQuarters} empty quarter(s): develop them (Q on an owned quarter).`;
 		}
-		return "Étendez le territoire : éliminez les cartels rivaux pour rester le dernier.";
+		return "Expand your territory: eliminate rival cartels to remain the last.";
 	})();
 
-	/** Chaîne économique : bâtiment → ressource, pour rendre la boucle lisible. */
-	const chain: { type: BuildingType; label: string; count: number; value: string }[] = [
+	/** Economic chain: building → resource, to make the loop readable. */
+	const chain: {
+		type: BuildingType;
+		label: string;
+		count: number;
+		value: string;
+		/** Cargo still on the road (delivered when the convoy arrives). */
+		transit: number;
+	}[] = [
 		{
-			type: "logement",
-			label: "Recrutement",
-			count: world.buildingCount(player.id, "logement"),
-			value: `${Math.round(player.members).toLocaleString("fr-FR")} membres`,
+			type: "housing",
+			label: "Recruitment",
+			count: world.buildingCount(player.id, "housing"),
+			value: `${Math.round(player.members).toLocaleString("en-US")} Members`,
+			transit: 0,
 		},
 		{
-			type: "labo",
-			label: "Labo",
-			count: world.buildingCount(player.id, "labo"),
-			value: `${Math.round(player.produit)} produit`,
+			type: "lab",
+			label: "Lab",
+			count: world.buildingCount(player.id, "lab"),
+			value: `${Math.round(player.product)} Product`,
+			transit: player.productInTransit,
 		},
 		{
-			type: "vente",
-			label: "Point de vente",
-			count: world.buildingCount(player.id, "vente"),
-			value: `${Math.round(player.cashSale).toLocaleString("fr-FR")} sale`,
+			type: "storefront",
+			label: "Storefront",
+			count: world.buildingCount(player.id, "storefront"),
+			value: `${Math.round(player.dirtyCash).toLocaleString("en-US")} dirty`,
+			transit: player.dirtyInTransit,
 		},
 		{
-			type: "facade",
-			label: "Façade",
-			count: world.buildingCount(player.id, "facade"),
-			value: `${Math.round(player.cashPropre).toLocaleString("fr-FR")} propre`,
+			type: "front",
+			label: "Front",
+			count: world.buildingCount(player.id, "front"),
+			value: `${Math.round(player.cleanCash).toLocaleString("en-US")} clean`,
+			transit: 0,
 		},
 	];
 	const hoverOwner = hovered !== null ? world.ownerAt(hovered) : NEUTRAL;
 	const hoverOwnerName =
-		hoverOwner === NEUTRAL ? "Neutre" : (world.factions[hoverOwner]?.name ?? "—");
+		hoverOwner === NEUTRAL ? "Neutral" : (world.factions[hoverOwner]?.name ?? "—");
 	const hoverZone = hovered !== null ? world.city.modules[hovered]! : null;
 	const hoverBuilding = hovered !== null ? world.buildingAt(hovered) : null;
 	const hoverControl = hovered !== null ? Math.round(world.controlAt(hovered)) : 0;
@@ -493,7 +504,7 @@ function App() {
 	const hoverConstruction = hovered !== null ? world.constructionLeft(hovered) : 0;
 
 	const chainNext =
-		chain.find((step) => step.type !== "logement" && step.count === 0)?.type ?? null;
+		chain.find((step) => step.type !== "housing" && step.count === 0)?.type ?? null;
 
 	const adjacentTarget = selected !== null && world.canAttack(player.id, selected);
 	const engaged = Math.floor(player.members * world.commitRatio());
@@ -502,20 +513,20 @@ function App() {
 	const selectedZoneLabel =
 		selected !== null ? (ZONE_LABELS[world.city.modules[selected]!] ?? "—") : "—";
 	const allowedHere = selected !== null ? world.allowedBuildings(selected) : [];
-	/** Raison d'indisponibilité d'un bâtiment sur le quartier sélectionné. */
+	/** Reason a building is unavailable on the selected quarter. */
 	const blockReason = (type: BuildingType): string | null => {
 		if (selected === null) return null;
-		if (world.buildingAt(selected) !== null) return "quartier occupé";
-		if (world.constructionLeft(selected) > 0) return "chantier en cours";
-		if (!world.canBuildInZone(selected, type)) return "zone incompatible";
+		if (world.buildingAt(selected) !== null) return "quarter occupied";
+		if (world.constructionLeft(selected) > 0) return "build site in progress";
+		if (!world.canBuildInZone(selected, type)) return "incompatible zone";
 		if (world.activeConstructions(player.id) >= world.buildCrews()) {
-			return `équipes occupées (${world.activeConstructions(player.id)}/${world.buildCrews()})`;
+			return `crews busy (${world.activeConstructions(player.id)}/${world.buildCrews()})`;
 		}
 		return null;
 	};
 	const attackReason = !adjacentTarget
-		? "Non adjacent — choisissez un quartier voisin de votre territoire."
-		: `Membres insuffisants (minimum ${world.minCommit()} engagés).`;
+		? "Not adjacent — pick a quarter neighboring your territory."
+		: `Insufficient Members (minimum ${world.minCommit()} committed).`;
 	const pressure = world.police.pressure;
 	const raidFlash = world.police.lastRaidTick >= 0 && world.tick - world.police.lastRaidTick <= 10;
 	const alert = policeTargeted && (raidFlash || pressure >= 70);
@@ -541,24 +552,24 @@ function App() {
 			<div className="select-screen">
 				<h1>DealerFront</h1>
 				<p className="select-pitch">
-					Le cartel sur la vraie carte de Paris. Contrôlez le terrain, produisez, vendez,
-					blanchissez — avant la police et les rivaux.
+					The cartel on the real map of Paris. Control the territory, produce, sell,
+					launder — ahead of the police and rivals.
 				</p>
 				<div className="select-loop" aria-hidden="true">
-					<span>Produire</span>
-					<span>Vendre</span>
-					<span>Blanchir</span>
+					<span>Produce</span>
+					<span>Sell</span>
+					<span>Launder</span>
 				</div>
 				<div className="city-choices">
 					<button type="button" className="city-card" onClick={startParis}>
-						<strong>Jouer à Paris</strong>
-						<em>992 quartiers IRIS · 6 cartels · battle royale</em>
-						<span>Objectif : rester le dernier cartel en jeu. Votre économie finance la guerre.</span>
+						<strong>Play in Paris</strong>
+						<em>992 IRIS quarters · 6 cartels · battle royale</em>
+						<span>Goal: remain the last cartel standing. Your economy funds the war.</span>
 					</button>
 					<button type="button" className="city-card" onClick={() => setScreen("arena")}>
-						<strong>Arène — agents IA</strong>
-						<em>2 à 4 agents · tour par tour · spectateur live</em>
-						<span>Branche tes agents (HTTP/MCP) et regarde-les s'affronter sur Paris.</span>
+						<strong>Arena — AI agents</strong>
+						<em>2 to 4 agents · turn by turn · live spectator</em>
+						<span>Connect your agents (HTTP/MCP) and watch them fight over Paris.</span>
 					</button>
 				</div>
 			</div>
@@ -577,6 +588,8 @@ function App() {
 					selected={selected}
 					colorblind={colorblind}
 					version={version}
+					playerId={world.player.id}
+					defenseAt={(module) => world.garrisonAt(module)}
 					onModuleClick={(module) => setSelected(module)}
 					onModuleHover={setHovered}
 					onEmptyClick={() => setSelected(null)}
@@ -618,13 +631,13 @@ function App() {
 						</div>
 						<div className="hover-grid">
 							<span>
-								Contrôle <strong>{hoverControl}</strong>
+								Control <strong>{hoverControl}</strong>
 							</span>
 							<span>
-								Demande <strong>×{world.demandAt(hovered).toFixed(1)}</strong>
+								Demand <strong>×{world.demandAt(hovered).toFixed(1)}</strong>
 							</span>
 							<span>
-								Richesse <strong>×{world.wealthAt(hovered).toFixed(1)}</strong>
+								Wealth <strong>×{world.wealthAt(hovered).toFixed(1)}</strong>
 							</span>
 							<span>
 								Heat <strong>{Math.round(world.heatAt(hovered))}</strong>
@@ -632,20 +645,20 @@ function App() {
 						</div>
 						<div className="hover-building">
 							{hoverConstruction > 0
-								? `Chantier : ${hoverPending ? BUILDINGS[hoverPending].label : "—"} (${Math.ceil(hoverConstruction / SIM_HZ)} s)`
+								? `Build site: ${hoverPending ? BUILDINGS[hoverPending].label : "—"} (${Math.ceil(hoverConstruction / SIM_HZ)} s)`
 								: hoverBuilding
 									? `${BUILDINGS[hoverBuilding].label} — ${BUILDING_EFFECT_LABELS[hoverBuilding]}${
 											hoverOwner !== player.id && hoverOwner !== NEUTRAL
-												? ` · butin ${Math.round(
+												? ` · loot ${Math.round(
 														((BUILDINGS[hoverBuilding].costSale ??
 															BUILDINGS[hoverBuilding].costClean ??
 															BUILDINGS[hoverBuilding].costMembers ??
 															0) *
 															0.4),
-													).toLocaleString("fr-FR")}`
+													).toLocaleString("en-US")}`
 												: ""
 										}`
-									: "Aucun bâtiment"}
+									: "No building"}
 						</div>
 					</>
 				) : null}
@@ -658,48 +671,48 @@ function App() {
 						<span className="brand-sub">{cityLabel}</span>
 					</div>
 					<div className="top-stats">
-						<div className="stat" title="Membres (troupes)">
+						<div className="stat" title="Members (troops)">
 							<RESOURCE_ICONS.members className="stat-icon" aria-hidden="true" />
-							<strong>{Math.round(player.members).toLocaleString("fr-FR")}</strong>
+							<strong>{Math.round(player.members).toLocaleString("en-US")}</strong>
 						</div>
-						<div className="stat" title="Produit (stock des labos)">
-							<RESOURCE_ICONS.produit className="stat-icon" aria-hidden="true" />
-							<strong>{Math.round(player.produit)}</strong>
+						<div className="stat" title="Product (lab stock)">
+							<RESOURCE_ICONS.product className="stat-icon" aria-hidden="true" />
+							<strong>{Math.round(player.product)}</strong>
 						</div>
-						<div className="stat" title="Cash sale (à blanchir)">
+						<div className="stat" title="Dirty cash (to launder)">
 							<RESOURCE_ICONS.sale className="stat-icon" aria-hidden="true" />
-							<strong>{Math.round(player.cashSale).toLocaleString("fr-FR")}</strong>
+							<strong>{Math.round(player.dirtyCash).toLocaleString("en-US")}</strong>
 						</div>
-						<div className="stat" title="Cash propre (blanchi)">
+						<div className="stat" title="Clean cash (laundered)">
 							<RESOURCE_ICONS.clean className="stat-icon clean" aria-hidden="true" />
 							<strong className="clean">
-								{Math.round(player.cashPropre).toLocaleString("fr-FR")}
+								{Math.round(player.cleanCash).toLocaleString("en-US")}
 							</strong>
 						</div>
-						<div className="stat" title="Part de la carte contrôlée">
-							<span className="stat-label">Contrôle</span>
+						<div className="stat" title="Share of the map controlled">
+							<span className="stat-label">Control</span>
 							<strong>{playerPct}%</strong>
 						</div>
-						<div className="stat" title="Quartiers possédés">
-							<span className="stat-label">Quartiers</span>
+						<div className="stat" title="Quarters owned">
+							<span className="stat-label">Quarters</span>
 							<strong>
 								{world.modulesOwned(player.id)}
 								<em>/{totalModules}</em>
 							</strong>
 						</div>
-						<div className="stat" title="Membres produits par seconde">
+						<div className="stat" title="Members produced per second">
 							<span className="stat-label">Prod.</span>
 							<strong>+{perSecond}/s</strong>
 						</div>
 					</div>
 					<div className="top-right">
-						<span className="objective" title="Votre rang (1 = leader)">
+						<span className="objective" title="Your rank (1 = leader)">
 							<strong>
-								Rang {world.playerRank()} · {alive} cartel{alive > 1 ? "s" : ""} en jeu
+								Rank {world.playerRank()} · {alive} cartel{alive > 1 ? "s" : ""} in play
 							</strong>
-							<span className="objective-sub">Dernier survivant</span>
+							<span className="objective-sub">Last survivor</span>
 						</span>
-						<span className="timer" title="Temps de survie">
+						<span className="timer" title="Survival time">
 							{gameTime}
 						</span>
 					</div>
@@ -733,25 +746,25 @@ function App() {
 					{notice ? <p className="notice">{notice}</p> : null}
 					{!player.upkeepPaid && world.upkeepPerTick(player.id) > 0 ? (
 						<p className="notice danger">
-							<strong>Entretien impayé</strong> — production ÷2 et guetteurs aveugles. Vendez
-							du Produit ({world.upkeepPerTick(player.id).toFixed(0)} sale/s requis).
+							<strong>Upkeep unpaid</strong> — production ÷2 and watchers blind. Sell
+							Product ({world.upkeepPerTick(player.id).toFixed(0)} dirty/s required).
 						</p>
 					) : null}
-					{world.buildingCount(player.id, "contre") > 0 && !world.playerGuardsPaid() ? (
+					{world.buildingCount(player.id, "counter") > 0 && !world.playerGuardsPaid() ? (
 						<p className="notice danger">
-							<strong>Guetteurs impayés</strong> — renseignement aveugle (plus d'alerte de
-							descente). Vendez du Produit pour les payer.
+							<strong>Watchers unpaid</strong> — intel blinded (no more bust
+							alerts). Sell Product to pay them.
 						</p>
 					) : null}
 					{world.bankruptcyTicksLeft() > 0 ? (
 						<p className="notice danger">
-							<strong>Faillite dans {Math.ceil(world.bankruptcyTicksLeft() / SIM_HZ)} s</strong> —
-							relancez la chaîne Produit → Cash sale (labo + point de vente).
+							<strong>Bankruptcy in {Math.ceil(world.bankruptcyTicksLeft() / SIM_HZ)} s</strong> —
+							restart the Product → Dirty cash chain (lab + storefront).
 						</p>
 					) : null}
 					<div className="quarter-head">
 						<h2>
-							Quartier <em>{selected !== null ? `#${selected}` : "—"}</em>
+							Quarter <em>{selected !== null ? `#${selected}` : "—"}</em>
 						</h2>
 						<code
 							className="quarter-owner"
@@ -764,37 +777,37 @@ function App() {
 						</code>
 					</div>
 					<div className="quarter-stats">
-						<span title="Contrôle du quartier (0–100)">
+						<span title="Quarter control (0–100)">
 							<strong>{selected !== null ? Math.round(world.controlAt(selected)) : "—"}</strong>
-							Contrôle
+							Control
 						</span>
-						<span title="Clientele locale (vente, recrutement)">
+						<span title="Local clientele (sales, recruitment)">
 							<strong>
 								×{selected !== null ? world.demandAt(selected).toFixed(1) : "—"}
 							</strong>
-							Demande
+							Demand
 						</span>
-						<span title="Prix et blanchiment locaux">
+						<span title="Local price and laundering">
 							<strong>
 								×{selected !== null ? world.wealthAt(selected).toFixed(1) : "—"}
 							</strong>
-							Richesse
+							Wealth
 						</span>
-						<span title="Pression policière locale">
+						<span title="Local police pressure">
 							<strong>{selected !== null ? Math.round(world.heatAt(selected)) : "—"}</strong>
 							Heat
 						</span>
-						<span title="Part de la vente reliée à un labo">
+						<span title="Share of sales connected to a lab">
 							<strong>{Math.round(world.retailSupplyRatio(player.id) * 100)}%</strong>
-							Logistique
+							Logistics
 						</span>
 						{selectedBuilding ? (
 							<span title={BUILDING_EFFECT_LABELS[selectedBuilding]}>
 								<strong>{BUILDINGS[selectedBuilding].label}</strong>
-								Bâtiment
+								Building
 							</span>
 						) : (
-							<span title="Profil de zonage du quartier (pas un bâtiment)">
+							<span title="Quarter zoning profile (not a building)">
 								<strong>{selectedZoneLabel}</strong>
 								Zone
 							</span>
@@ -802,7 +815,7 @@ function App() {
 					</div>
 					<div className="quarter-foot">
 						<span>
-							Chantiers {world.activeConstructions(player.id)}/{world.buildCrews()}
+							Build sites {world.activeConstructions(player.id)}/{world.buildCrews()}
 						</span>
 						{selected !== null && selectedBuilding
 							? (() => {
@@ -811,7 +824,7 @@ function App() {
 									const peak = factor > 1;
 									return (
 										<span className={`rush-tag ${peak ? "peak" : "off"}`}>
-											{peak ? "Pointe" : "Creux"} ×{factor.toFixed(2)}
+											{peak ? "Peak" : "Off-peak"} ×{factor.toFixed(2)}
 										</span>
 									);
 								})()
@@ -822,45 +835,45 @@ function App() {
 					<button
 						type="button"
 						className="action-btn"
-						title="Attaque automatiquement le quartier voisin le plus faible (neutre ou ennemi hors pacte)."
+						title="Automatically attacks the weakest neighboring quarter (neutral or enemy outside a pact)."
 						onClick={() => {
 							if (world.playerAttackBest()) setVersion((value) => value + 1);
-							else setNotice("Expansion : aucune cible adjacente attaquable.");
+							else setNotice("Expand: no attackable adjacent target.");
 						}}
 					>
-						Étendre <em><kbd>E</kbd></em>
+						Expand <em><kbd>E</kbd></em>
 					</button>
 
 					<button
 						type="button"
 						className="action-btn"
-						disabled={!world.playerCanBuyArmement()}
-						title={`Trésorerie de guerre : +25 % d'attaque pendant 40 s (cumulable ×3). Coût croissant en Cash propre.`}
+						disabled={!world.playerCanBuyArmament()}
+						title={`War chest: +25% attack for 40 s (stacks ×3). Rising Clean cash cost.`}
 						onClick={() => {
-							if (world.playerBuyArmement()) setVersion((value) => value + 1);
+							if (world.playerBuyArmament()) setVersion((value) => value + 1);
 						}}
 					>
-						Armement <em>{world.armamentCost().toLocaleString("fr-FR")}</em>
+						Armament <em>{world.armamentCost().toLocaleString("en-US")}</em>
 					</button>
 
 					<button
 						type="button"
 						className="action-btn"
 						disabled={!world.playerCanHireMercenaries()}
-						title={`Mercenaires : +${world.mercMembers()} Membres immédiats. Coût croissant en Cash sale.`}
+						title={`Mercenaries: +${world.mercMembers()} immediate Members. Rising Dirty cash cost.`}
 						onClick={() => {
 							if (world.playerHireMercenaries()) setVersion((value) => value + 1);
 						}}
 					>
-						Mercenaires <em>{world.mercCost().toLocaleString("fr-FR")}</em>
+						Mercenaries <em>{world.mercCost().toLocaleString("en-US")}</em>
 					</button>
 					</div>
 
 					<label
 						className="slider-row"
-						title="Part de vos Membres engagée à chaque assaut. Le reste défend vos quartiers : engager trop vous affaiblit."
+						title="Share of your Members committed to each assault. The rest defends your quarters: over-committing weakens you."
 					>
-						<span>Engagement</span>
+						<span>Commitment</span>
 						<input
 							type="range"
 							min={10}
@@ -872,11 +885,11 @@ function App() {
 								setVersion((value) => value + 1);
 							}}
 						/>
-						<code title={`Assaut ${engaged.toLocaleString("fr-FR")} · Défense ${Math.max(0, Math.round(player.members - engaged)).toLocaleString("fr-FR")}`}>
+						<code title={`Assault ${engaged.toLocaleString("en-US")} · Defense ${Math.max(0, Math.round(player.members - engaged)).toLocaleString("en-US")}`}>
 							{Math.round(world.playerAttackRatio() * 100)}% ·{" "}
-							{engaged.toLocaleString("fr-FR")}
+							{engaged.toLocaleString("en-US")}
 							<em className="def-part">
-								/{Math.max(0, Math.round(player.members - engaged)).toLocaleString("fr-FR")}
+								/{Math.max(0, Math.round(player.members - engaged)).toLocaleString("en-US")}
 							</em>
 						</code>
 					</label>
@@ -884,12 +897,12 @@ function App() {
 					{isOwned ? (
 						constructionLeft > 0 ? (
 							<p className="hint-inline">
-								<strong>Chantier :</strong> {pendingType ? BUILDINGS[pendingType].label : "—"} —
-								encore {Math.ceil(constructionLeft / SIM_HZ)} s
+								<strong>Build site:</strong> {pendingType ? BUILDINGS[pendingType].label : "—"} —
+								{Math.ceil(constructionLeft / SIM_HZ)} s left
 							</p>
 						) : selectedBuilding ? (
 							<p className="hint-inline">
-								<strong>Occupé :</strong> {BUILDINGS[selectedBuilding].label} —{" "}
+								<strong>Occupied:</strong> {BUILDINGS[selectedBuilding].label} —{" "}
 								{BUILDING_EFFECT_LABELS[selectedBuilding]}.
 							</p>
 						) : (
@@ -910,12 +923,12 @@ function App() {
 												type="button"
 												className={bonus > 1 ? "bonus" : undefined}
 												disabled={!afford(type)}
-												title={`${BUILDINGS[type].label} : ${BUILDING_EFFECT_LABELS[type]}${bonus > 1 ? ` · zone ×${bonus.toFixed(2).replace(".", ",")}` : ""}${owned > 0 ? ` · ${owned} déjà bâtis (coût +35 %/unité)` : ""}${reason ? ` — ${reason}` : ""}`}
+												title={`${BUILDINGS[type].label}: ${BUILDING_EFFECT_LABELS[type]}${bonus > 1 ? ` · zone ×${bonus.toFixed(2)}` : ""}${owned > 0 ? ` · ${owned} already built (cost +35%/unit)` : ""}${reason ? ` — ${reason}` : ""}`}
 												onClick={() => build(type)}
 											>
 												<Icon className="build-icon" aria-hidden="true" />
 												{bonus > 1 ? (
-													<span className="bonus-tag">×{bonus.toFixed(2).replace(".", ",")}</span>
+													<span className="bonus-tag">×{bonus.toFixed(2)}</span>
 												) : null}
 												<em className={zoneBlocked ? "zone" : reason ? "lack" : undefined}>
 													{zoneBlocked ? "zone" : formatCost(type, costFactor(type))}
@@ -929,7 +942,7 @@ function App() {
 									title={allowedHere.map((type) => BUILDINGS[type].label).join(", ")}
 								>
 									Zone <strong>{selectedZoneLabel}</strong> —{" "}
-									{isConversion ? "conversion −50 %" : "chantier"}.
+									{isConversion ? "conversion −50%" : "build site"}.
 								</p>
 							</>
 						)
@@ -949,10 +962,10 @@ function App() {
 									{
 										key: "attack",
 										icon: AttackIcon,
-										label: canAttack ? `${engaged} engagés` : "Assaut",
+										label: canAttack ? `${engaged} committed` : "Assault",
 										hotkey: "Q",
 										title: canAttack
-											? `Assaut : ${engaged} engagés · contrôle ${targetControl} · défense ×${targetDefense.toFixed(1)}${world.buildingAt(selected!) === "planque" ? " (planque)" : ""}`
+											? `Assault: ${engaged} committed · control ${targetControl} · defense ×${targetDefense.toFixed(1)}${world.buildingAt(selected!) === "safehouse" ? " (safehouse)" : ""}`
 											: attackReason,
 										disabled: !canAttack,
 										run: act,
@@ -964,14 +977,14 @@ function App() {
 									actions.push({
 										key: "buy",
 										icon: BuyIcon,
-										label: cost.toLocaleString("fr-FR"),
-										title: `Racheter ce quartier au prix fort (Cash propre) — coût croissant avec votre empire.`,
+										label: cost.toLocaleString("en-US"),
+										title: `Buy this quarter at a premium (Clean cash) — rising cost with your empire.`,
 										disabled: !world.playerCanBuy(selected!),
 										run: () => {
 											if (selected !== null && world.playerBuy(selected)) {
 												setVersion((value) => value + 1);
 											} else {
-												setNotice("Rachat : Cash propre insuffisant ou recharge en cours.");
+												setNotice("Buyout: insufficient Clean cash or on cooldown.");
 											}
 										},
 									});
@@ -982,32 +995,32 @@ function App() {
 										key: "raid",
 										icon: RaidIcon,
 										label: `${world.raidCost().sale}`,
-										title: raidReason() ?? "Raid : détruit contrôle et bâtiments, sans capturer",
+										title: raidReason() ?? "Raid: destroys control and buildings, without capturing",
 										disabled: raidReason() !== null,
 										run: () => {
 											if (selected !== null && world.playerRaid(selected)) {
 												setVersion((value) => value + 1);
 											} else {
-												setNotice(`Raid : ${raidReason() ?? "impossible"}.`);
+												setNotice(`Raid: ${raidReason() ?? "impossible"}.`);
 											}
 										},
 									});
 								}
 								if (selectedOwner !== player.id && selectedBuilding) {
-									const DescentIcon = ACTION_ICONS.descent;
+									const BustIcon = ACTION_ICONS.bust;
 									actions.push({
-										key: "descent",
-										icon: DescentIcon,
-										label: "butin",
+										key: "bust",
+										icon: BustIcon,
+										label: "loot",
 										title:
-											descentReason() ??
-											`Descente : vole le butin sans détruire le bâtiment${selected !== null && world.guardsAt(selected) >= 1 ? ` · ${world.guardsAt(selected)} guetteur(s) — ${world.guardsAt(selected) >= 2 ? "butin NUL" : "butin réduit de moitié"}` : ""}`,
-										disabled: descentReason() !== null,
+											bustReason() ??
+											`Bust: steals loot without destroying the building${selected !== null && world.guardsAt(selected) >= 1 ? ` · ${world.guardsAt(selected)} watcher(s) — ${world.guardsAt(selected) >= 2 ? "loot ZERO" : "loot halved"}` : ""}`,
+										disabled: bustReason() !== null,
 										run: () => {
-											if (selected !== null && world.playerDescent(selected)) {
+											if (selected !== null && world.playerBust(selected)) {
 												setVersion((value) => value + 1);
 											} else {
-												setNotice(`Descente : ${descentReason() ?? "impossible"}.`);
+												setNotice(`Bust: ${bustReason() ?? "impossible"}.`);
 											}
 										},
 									});
@@ -1018,13 +1031,13 @@ function App() {
 										label: `${world.sabotageCost()}`,
 										title:
 											sabotageReason() ??
-											`Sabotage : production ÷2 pendant 30 s${selected !== null && world.guardsAt(selected) >= 1 ? ` · ${world.guardsAt(selected)} guetteur(s) — sabotage DÉJOUÉ` : ""}`,
+											`Sabotage: production ÷2 for 30 s${selected !== null && world.guardsAt(selected) >= 1 ? ` · ${world.guardsAt(selected)} watcher(s) — sabotage FOILED` : ""}`,
 										disabled: sabotageReason() !== null,
 										run: () => {
 											if (selected !== null && world.playerSabotage(selected)) {
 												setVersion((value) => value + 1);
 											} else {
-												setNotice(`Sabotage : ${sabotageReason() ?? "impossible"}.`);
+												setNotice(`Sabotage: ${sabotageReason() ?? "impossible"}.`);
 											}
 										},
 									});
@@ -1035,13 +1048,13 @@ function App() {
 										label: `${world.interceptCost()}`,
 										title:
 											interceptReason() ??
-											"Interception : détourne un convoi et coupe la ligne",
+											"Interception: diverts a convoy and cuts the line",
 										disabled: interceptReason() !== null,
 										run: () => {
 											if (selected !== null && world.playerIntercept(selected)) {
 												setVersion((value) => value + 1);
 											} else {
-												setNotice(`Interception : ${interceptReason() ?? "impossible"}.`);
+												setNotice(`Interception: ${interceptReason() ?? "impossible"}.`);
 											}
 										},
 									});
@@ -1053,13 +1066,13 @@ function App() {
 										icon: HitmanIcon,
 										label: "T",
 										hotkey: "T",
-										title: hitmanReason() ?? "Tueur à gage : affaiblit un quartier (Armement ≥ 2)",
+										title: hitmanReason() ?? "Hitman: weakens a quarter (Armament ≥ 2)",
 										disabled: hitmanReason() !== null,
 										run: () => {
 											if (selected !== null && world.playerHitman(selected)) {
 												setVersion((value) => value + 1);
 											} else {
-												setNotice(`Tueur à gage : ${hitmanReason() ?? "impossible"}.`);
+												setNotice(`Hitman: ${hitmanReason() ?? "impossible"}.`);
 											}
 										},
 									});
@@ -1087,13 +1100,13 @@ function App() {
 					{batch.count > 0 ? (
 						<section className="card batch-card">
 							<h2>
-								Lot <em>{batch.count} quartier(s)</em>
+								Batch <em>{batch.count} quarter(s)</em>
 							</h2>
 							<div className="batch-row">
 								<code>
-									{batch.sale > 0 ? `${batch.sale.toLocaleString("fr-FR")} sale ` : ""}
-									{batch.members > 0 ? `${batch.members.toLocaleString("fr-FR")} membres ` : ""}
-									{batch.clean > 0 ? `${batch.clean.toLocaleString("fr-FR")} propre` : ""}
+									{batch.sale > 0 ? `${batch.sale.toLocaleString("en-US")} dirty ` : ""}
+									{batch.members > 0 ? `${batch.members.toLocaleString("en-US")} Members ` : ""}
+									{batch.clean > 0 ? `${batch.clean.toLocaleString("en-US")} clean` : ""}
 								</code>
 								<button
 									type="button"
@@ -1102,7 +1115,7 @@ function App() {
 										setVersion((value) => value + 1);
 									}}
 								>
-									Aménager
+									Develop
 								</button>
 							</div>
 						</section>
@@ -1115,14 +1128,14 @@ function App() {
 							Police <em>{policeTierLabel}</em>
 						</h2>
 						<div className="line">
-							<span>Pression</span>
+							<span>Pressure</span>
 							<div className="gauge" aria-hidden="true">
 								<div className="gauge-fill" style={{ width: `${pressure}%` }} />
 							</div>
 							<code>{Math.round(pressure)}</code>
 						</div>
 						<div className="line">
-							<span>Vise</span>
+							<span>Targeting</span>
 							<code
 								style={{
 									color:
@@ -1132,7 +1145,7 @@ function App() {
 								}}
 							>
 								{policeTargetName}
-								{policeTargeted ? " (vous)" : ""}
+								{policeTargeted ? " (you)" : ""}
 							</code>
 						</div>
 						<div className="line">
@@ -1150,13 +1163,13 @@ function App() {
 								if (world.playerCorrupt()) setVersion((value) => value + 1);
 							}}
 						>
-							Corrompre ({world.playerCorruptionCost().toLocaleString("fr-FR")})
+							Bribe ({world.playerCorruptionCost().toLocaleString("en-US")})
 						</button>
 					</section>
 
 					<Section
 						title="Tech"
-						aside={`${world.buildingCount(player.id, "atelier")} atelier(s)`}
+						aside={`${world.buildingCount(player.id, "workshop")} workshop(s)`}
 					>
 						{TECH_BRANCHES.map((branch) => {
 							const level = player.tech[branch];
@@ -1186,13 +1199,13 @@ function App() {
 					</Section>
 
 					<Section
-						title="Diplomatie"
-						aside={`${world.pacts.length} pacte(s)`}
+						title="Diplomacy"
+						aside={`${world.pacts.length} pact(s)`}
 						defaultOpen={false}
 					>
 						{world.playerOffers().map((offer) => (
 							<div className="dip-row" key={`offer-${offer.from}`}>
-								<span>{world.factions[offer.from]?.name} propose un pacte</span>
+								<span>{world.factions[offer.from]?.name} proposes a pact</span>
 								<span className="offer-actions">
 									<button
 										type="button"
@@ -1202,7 +1215,7 @@ function App() {
 											setVersion((value) => value + 1);
 										}}
 									>
-										Accepter
+										Accept
 									</button>
 									<button
 										type="button"
@@ -1212,7 +1225,7 @@ function App() {
 											setVersion((value) => value + 1);
 										}}
 									>
-										Refuser
+										Decline
 									</button>
 								</span>
 							</div>
@@ -1230,7 +1243,7 @@ function App() {
 										{faction.name}
 										{world.police.target === faction.id ? <span className="tag">leader</span> : null}
 										{!isSelf && world.isTraitor(faction.id) ? (
-											<span className="tag">traître</span>
+											<span className="tag">traitor</span>
 										) : null}
 										{!isSelf && world.playerHasEmbargo(faction.id) ? (
 											<span className="tag">embargo</span>
@@ -1250,7 +1263,7 @@ function App() {
 												if (world.playerBreakPact(faction.id)) setVersion((value) => value + 1);
 											}}
 										>
-											Trahir
+											Betray
 										</button>
 									) : (
 										<span className="offer-actions">
@@ -1262,7 +1275,7 @@ function App() {
 													if (world.playerProposePact(faction.id)) setVersion((value) => value + 1);
 												}}
 											>
-												Pacte
+												Pact
 											</button>
 											<button
 												type="button"
@@ -1282,7 +1295,7 @@ function App() {
 													world.police.target < 0 ||
 													world.police.target === faction.id
 												}
-												title={`Payer ${faction.name} pour frapper le leader. Coût ${world.contractCost().toLocaleString("fr-FR")} Cash propre (croissant).`}
+												title={`Pay ${faction.name} to strike the leader. Cost ${world.contractCost().toLocaleString("en-US")} Clean cash (rising).`}
 												onClick={() => {
 													const leader = world.police.target;
 													if (leader >= 0 && world.playerFundContract(faction.id, leader)) {
@@ -1290,7 +1303,7 @@ function App() {
 													}
 												}}
 											>
-												Contrat
+												Contract
 											</button>
 										</span>
 									)}
@@ -1302,7 +1315,7 @@ function App() {
 
 				<footer className="panel-bottom">
 					<section className="card loop-card">
-						<h2>Boucle</h2>
+						<h2>Loop</h2>
 						{chain.map((step) => (
 							<div
 								className={`loop-row${step.type === chainNext ? " next" : ""}`}
@@ -1310,22 +1323,30 @@ function App() {
 							>
 								<span>
 									{step.label} <em>×{step.count}</em>
+									{step.transit >= 1 ? (
+										<b
+											className="transit"
+											title="On the road — only lands when the convoy arrives (and can be intercepted)"
+										>
+											+{Math.round(step.transit).toLocaleString("en-US")} in transit
+										</b>
+									) : null}
 								</span>
-								<code className={step.type === "facade" ? "clean" : undefined}>
+								<code className={step.type === "front" ? "clean" : undefined}>
 									{step.value}
 								</code>
 							</div>
 						))}
-						<div className="loop-row" title="Coût d'entretien de tous vos bâtiments (Cash sale/s)">
+						<div className="loop-row" title="Upkeep cost of all your buildings (Dirty cash/s)">
 							<span>
-								Entretien <em>{world.buildingCount(player.id, "labo") + world.buildingCount(player.id, "vente") + world.buildingCount(player.id, "facade")} bât.</em>
+								Upkeep <em>{world.buildingCount(player.id, "lab") + world.buildingCount(player.id, "storefront") + world.buildingCount(player.id, "front")} bldgs.</em>
 							</span>
 							<code className={player.upkeepPaid ? undefined : "lack"}>
 								−{(world.upkeepPerTick(player.id) * SIM_HZ).toFixed(0)}/s
 							</code>
 						</div>
-						<label className="slider-row" title="Part de la capacité des façades blanchie">
-							<span>Blanchiment</span>
+						<label className="slider-row" title="Share of Front capacity laundered">
+							<span>Laundering</span>
 							<input
 								type="range"
 								min={0}
@@ -1340,20 +1361,20 @@ function App() {
 							<code>{Math.round(world.playerLaunderRatio() * 100)}%</code>
 						</label>
 						<p className="hint-inline">
-							Part de la capacité des façades affectée au blanchiment. Baissez pour garder du Cash sale (achats).
+							Share of Front capacity allocated to laundering. Lower it to keep Dirty cash (purchases).
 						</p>
 					</section>
 				<section className="card journal-card">
-						<h2>Journal</h2>
+						<h2>Log</h2>
 						<ul className="journal">
 							{world.log.length === 0 ? (
 								<li className="empty">—</li>
 							) : (
 								world.log.slice(-6).map((line, index) => {
 									const lower = line.toLowerCase();
-									const kind = /perd|raid|saisi|grill|liquid|élimin|trait/.test(lower)
+									const kind = /lost|raid|seiz|burn|liquid|dismantl|betray/.test(lower)
 										? "loss"
-										: /prend|tech|pacte|corrupt|baisse|aménage|descente|sabot|intercept/.test(
+										: /captur|takes|tech|pact|corrupt|lowers|build|upgraded|bust|sabot|intercept/.test(
 												lower,
 											)
 											? "gain"
@@ -1369,39 +1390,39 @@ function App() {
 					</section>
 					<div className="bottom-controls">
 						<p className="hud-keys">
-							<kbd>clic</kbd> sélectionner · <kbd>Q</kbd> attaquer / bâtir · <kbd>T</kbd> tueur ·
-							glisser = caméra
+							<kbd>click</kbd> select · <kbd>Q</kbd> attack / build · <kbd>T</kbd> hitman ·
+							drag = camera
 						</p>
 						<div className="hud-actions">
-							<button type="button" title="Pause / reprendre" onClick={() => setRunning((value) => !value)}>
-								{running ? "Pause" : "Démarrer"}
+							<button type="button" title="Pause / resume" onClick={() => setRunning((value) => !value)}>
+								{running ? "Pause" : "Start"}
 							</button>
-							<button type="button" title="Relancer sur une nouvelle disposition" onClick={regenerate}>
-								Nouvelle seed
+							<button type="button" title="Restart on a new layout" onClick={regenerate}>
+								New seed
 							</button>
 							<button
 								type="button"
 								className={`toggle${colorblind ? " active" : ""}`}
-								title="Mode daltonien (gris + symboles)"
+								title="Colorblind mode (gray + symbols)"
 								onClick={() => setColorblind((value) => !value)}
 							>
-								Daltonien
+								Colorblind
 							</button>
 							<button
 								type="button"
 								className={`toggle${sound ? " active" : ""}`}
-								title="Activer / couper le son"
+								title="Turn sound on / off"
 								onClick={() => setSound((value) => !value)}
 							>
-								{sound ? "Son" : "Muet"}
+								{sound ? "Sound" : "Muted"}
 							</button>
-							<button type="button" className="toggle" title="Aide" onClick={() => setShowHelp(true)}>
-								Aide
+							<button type="button" className="toggle" title="Help" onClick={() => setShowHelp(true)}>
+								Help
 							</button>
 						</div>
 						<p className="hud-foot" title={`API ${api}`}>
 							<span className={`clock${isNight ? " night" : ""}`}>
-								{isNight ? "Nuit" : "Jour"} {gameTime}
+								{isNight ? "Night" : "Day"} {gameTime}
 							</span>{" "}
 							· tick {world.tick}
 						</p>
@@ -1412,61 +1433,60 @@ function App() {
 			{showHelp ? (
 				<div className="help-overlay">
 					<div className="help-card card">
-						<h2>Comment jouer</h2>
+						<h2>How to play</h2>
 						<p>
-							<strong>But :</strong> rester <strong>le dernier cartel en jeu</strong>. Éliminez les
-							rivaux (0 quartier) — la police peut aussi vous liquider.
+							<strong>Goal:</strong> remain <strong>the last cartel in play</strong>. Eliminate
+							rivals (0 quarters) — the police can also liquidate you.
 						</p>
-						<h3>La boucle économique</h3>
+						<h3>The economic loop</h3>
 						<ol>
 							<li>
-								<strong>Logement</strong> → +Membres (vos troupes, pour attaquer).
+								<strong>Housing</strong> → +Members (your troops, for attacking).
 							</li>
 							<li>
-								<strong>Labo</strong> → Produit.
+								<strong>Lab</strong> → Product.
 							</li>
 							<li>
-								<strong>Point de vente</strong> → Produit devient Cash sale.
+								<strong>Storefront</strong> → Product becomes Dirty cash.
 							</li>
 							<li>
-								<strong>Façade</strong> → Cash sale devient <strong>Cash propre</strong>.
+								<strong>Front</strong> → Dirty cash becomes <strong>Clean cash</strong>.
 							</li>
 						</ol>
 						<p>
-							<strong>Atelier</strong> débloque la tech · <strong>Planque</strong> défend un quartier ·
-							un seul bâtiment par quartier.
+							<strong>Workshop</strong> unlocks tech · <strong>Safehouse</strong> defends a quarter ·
+							one building per quarter.
 						</p>
 						<p>
-							<strong>Coût croissant :</strong> chaque bâtiment du même type renchérit le suivant
-							(+35 %). Diversifier est plus rentable que spammer un seul type.
+							<strong>Rising cost:</strong> each building of the same type makes the next one
+							more expensive (+35%). Diversifying is more profitable than spamming a single type.
 						</p>
 						<p>
-							<strong>Zones :</strong> chaque quartier n'accepte que certains bâtiments (parc →
-							planque, police → contre-espionnage…). Le détail est affiché sous le menu de
-							construction.
+							<strong>Zones:</strong> each quarter accepts only certain buildings (park →
+							safehouse, police → counter-intel…). Details are shown under the build
+							menu.
 						</p>
 						<p>
-							<strong>Bonus de zone :</strong> un bâtiment produit plus dans une zone faite pour
-							lui — <strong>résidentiel</strong> bonifie le recrutement, <strong>commercial</strong> la
-							vente, <strong>laverie</strong> le blanchiment, <strong>friche industrielle</strong> les
-							labos/ateliers, <strong>police</strong> le contre-espionnage, <strong>parc</strong> la
-							planque. Les boutons favorisés sont marqués <strong>×1,5</strong>.
+							<strong>Zone bonus:</strong> a building produces more in a zone made for
+							it — <strong>residential</strong> boosts recruitment, <strong>commercial</strong> sales,
+							<strong>laundromat</strong> laundering, <strong>industrial wasteland</strong> labs/workshops,
+							<strong>police</strong> counter-intel, <strong>park</strong> the safehouse. Favored
+							buttons are marked <strong>×1.5</strong>.
 						</p>
 						<p>
-							<strong>Heures de pointe :</strong> le rendement suit l'heure (horloge en bas à
-							droite). Le <strong>commercial</strong> vend le jour (pic 13 h), la{" "}
-							<strong>nightlife</strong> la nuit (pic 23 h), le <strong>résidentiel</strong> recrute
-							le soir, les <strong>labos</strong> tournent la nuit. La pastille « Pointe / Creux »
-							affiche le multiplicateur du quartier sélectionné.
+							<strong>Rush hour:</strong> output follows the clock (bottom right). The{" "}
+							<strong>commercial</strong> zone sells by day (peak 1 pm), <strong>nightlife</strong> at
+							night (peak 11 pm), <strong>residential</strong> recruits in the evening, <strong>labs</strong>{" "}
+							run at night. The "Peak / Off-peak" tag shows the selected quarter's multiplier.
 						</p>
-						<h3>Guerre de quartiers</h3>
+						<h3>Quarter war</h3>
 						<p>
-							Les bâtiments sont des <strong>objectifs à valeur</strong> : capturer un quartier bâti
-							rapporte du <strong>butin</strong> (40 % de la valeur du bâtiment, prélevé sur le
-							défenseur). Un <strong>Contre-espionnage</strong> adjacent te <strong>prévient</strong>{" "}
-							d'une descente ennemie (alerte + son).
+							Buildings are <strong>value targets</strong>: capturing a built quarter
+							yields <strong>loot</strong> (40% of the building's value, taken from the
+							defender). An adjacent <strong>Counter-intel</strong> <strong>warns</strong> you{" "}
+							of an enemy bust (alert + sound).
 						</p>
-						<h3>Bâtiments (survol sur la carte)</h3>
+						<h3>Buildings (hover on the map)</h3>
 						<ul className="help-buildings">
 							{BUILDING_TYPES.map((type) => (
 								<li key={type}>
@@ -1474,61 +1494,61 @@ function App() {
 								</li>
 							))}
 						</ul>
-						<h3>Conquête</h3>
+						<h3>Conquest</h3>
 						<p>
-							Sélectionnez un quartier <strong>adjacent</strong> puis <kbd>Q</kbd> pour l'attaquer.
-							L'<strong>Engagement</strong> (curseur) = part de vos Membres envoyée à l'assaut :
-							plus il est haut, plus le siège est rapide, mais moins il reste de défenseurs chez
-							vous.
+							Select an <strong>adjacent</strong> quarter then <kbd>Q</kbd> to attack it.
+							<strong>Commitment</strong> (slider) = share of your Members sent to the assault:
+							the higher it is, the faster the siege, but the fewer defenders remain at
+							home.
 						</p>
 						<p>
-							Le siège fait baisser le <strong>Contrôle</strong> de la cible (il régénère seul) ;
-							à zéro, le quartier est pris. Le quartier se <strong>remplit de blanc</strong> à mesure
-							que le Contrôle baisse.
+							The siege lowers the target's <strong>Control</strong> (it regenerates on its own);
+							at zero, the quarter is taken. The quarter <strong>fills with white</strong> as
+							Control drops.
 						</p>
-						<h3>Marché &amp; logistique</h3>
+						<h3>Market &amp; logistics</h3>
 						<p>
-							Chaque quartier a un <strong>profil</strong> (demande, richesse) : un point de vente
-							rapporte plus dans un quartier riche. Une vente doit être <strong>reliée à un labo</strong>{" "}
-							par un chemin de quartiers possédés (sinon −65 % de capacité) : les{" "}
-							<strong>convois</strong> sont visibles et <strong>interceptables</strong>.
+							Each quarter has a <strong>profile</strong> (demand, wealth): a storefront
+							yields more in a wealthy quarter. A sale must be <strong>connected to a lab</strong>{" "}
+							by a path of owned quarters (otherwise −65% capacity): <strong>convoys</strong>{" "}
+							are visible and <strong>interceptable</strong>.
 						</p>
-						<h3>L'argent est roi de la guerre</h3>
+						<h3>Money is king of war</h3>
 						<p>
-							<strong>Entretien :</strong> chaque bâtiment coûte du Cash sale/s. S'il n'est pas
-							payé, la <strong>production ÷2</strong> et les <strong>guetteurs aveuglent</strong>.
-							Un gros empire coûte cher à faire tourner.
+							<strong>Upkeep:</strong> each building costs Dirty cash/s. If it isn't
+							paid, <strong>production ÷2</strong> and <strong>watchers go blind</strong>.
+							A large empire is expensive to run.
 						</p>
 						<ul className="help-buildings">
 							<li>
-								<strong>Armement</strong> — Cash propre → <strong>+20 % d'attaque</strong> pendant
-								40 s (répétable, coût croissant).
+								<strong>Armament</strong> — Clean cash → <strong>+20% attack</strong> for
+								40 s (repeatable, rising cost).
 							</li>
 							<li>
-								<strong>Mercenaires</strong> — Cash sale → <strong>+400 Membres</strong> immédiats
-								(coût croissant).
+								<strong>Mercenaries</strong> — Dirty cash → <strong>+400 Members</strong> immediately
+								(rising cost).
 							</li>
 							<li>
-								<strong>Racheter</strong> — Cash propre → un <strong>quartier neutre adjacent</strong>{" "}
-								sans combattre (coût croissant avec votre empire).
+								<strong>Buyout</strong> — Clean cash → an <strong>adjacent neutral quarter</strong>{" "}
+								without fighting (rising cost with your empire).
 							</li>
 							<li>
-								<strong>Contrat</strong> — Cash propre → payer un gang pour qu'il{" "}
-								<strong>attaque le leader</strong>.
+								<strong>Contract</strong> — Clean cash → pay a gang to{" "}
+								<strong>attack the leader</strong>.
 							</li>
 						</ul>
-						<h3>Police locale</h3>
+						<h3>Local police</h3>
 						<p>
-							Le crime <strong>chauffe</strong> les quartiers : les raids visent les plus chauds, et
-							les postes de police refroidissent leur zone. <strong>Corrompre</strong> réduit la
-							Pression et refroidit vos quartiers.
+							Crime <strong>heats up</strong> quarters: raids target the hottest, and
+							police stations cool their zone. <strong>Bribing</strong> lowers
+							Pressure and cools your quarters.
 						</p>
 						<p className="help-keys">
-							<kbd>clic</kbd> sélectionner · <kbd>Q</kbd> attaquer / bâtir · <kbd>T</kbd> tueur ·
-							glisser = caméra
+							<kbd>click</kbd> select · <kbd>Q</kbd> attack / build · <kbd>T</kbd> hitman ·
+							drag = camera
 						</p>
 						<button type="button" onClick={() => setShowHelp(false)}>
-							Compris, jouer
+							Got it, play
 						</button>
 					</div>
 				</div>
@@ -1536,46 +1556,46 @@ function App() {
 
 			{world.outcome !== null ? (
 				<div className={`end-banner ${world.outcome === "victory" ? "win" : "loss"}`}>
-					<h2>{world.outcome === "victory" ? "Victoire" : "Défaite"}</h2>
+					<h2>{world.outcome === "victory" ? "Victory" : "Defeat"}</h2>
 					<p className="end-cause">{world.endReason}</p>
 					<div className="end-score">
-						<strong>{Math.round(summary.cashPropre).toLocaleString("fr-FR")}</strong>
-						<span>cash propre</span>
+						<strong>{Math.round(summary.cleanCash).toLocaleString("en-US")}</strong>
+						<span>clean cash</span>
 					</div>
 					<ul className="end-lines">
 						<li>
-							<span>Contrôle</span>
+							<span>Control</span>
 							<code>
-								{playerPct}% · {summary.quarters}/{totalModules} quartiers
+								{playerPct}% · {summary.quarters}/{totalModules} quarters
 							</code>
 						</li>
 						<li>
 							<span>Score</span>
 							<code>
-								{Math.round(summary.score).toLocaleString("fr-FR")} · rang {summary.rank}
+								{Math.round(summary.score).toLocaleString("en-US")} · rank {summary.rank}
 							</code>
 						</li>
 						<li>
-							<span>Quartiers pris</span>
+							<span>Quarters taken</span>
 							<code>{summary.captures}</code>
 						</li>
 						<li>
-							<span>Gangs éliminés</span>
+							<span>Gangs eliminated</span>
 							<code>{summary.eliminations}</code>
 						</li>
 						<li>
-							<span>Raids subis</span>
+							<span>Raids suffered</span>
 							<code>
-								{summary.raidsSuffered} · {summary.seizures} saisie(s)
+								{summary.raidsSuffered} · {summary.seizures} seizure(s)
 							</code>
 						</li>
 						<li>
-							<span>Temps</span>
+							<span>Time</span>
 							<code>{Math.floor(world.tick / SIM_HZ / 60)} min</code>
 						</li>
 					</ul>
 					<button type="button" onClick={backToSelect}>
-						Nouvelle partie
+						New game
 					</button>
 				</div>
 			) : null}

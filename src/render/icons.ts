@@ -19,23 +19,23 @@ import {
 import type { BuildingType } from "../sim/buildings";
 
 /**
- * Icônes par type de bâtiment (une action = un logo, lisible sans lire le libellé).
- * `currentColor` : la couleur vient de la faction / de l'état, jamais d'un décor.
+ * Icons per building type (one action = one logo, readable without reading the label).
+ * `currentColor`: the color comes from the faction / state, never from decoration.
  */
 export const BUILDING_ICONS: Record<BuildingType, typeof FlaskConical> = {
-	logement: Users,
-	labo: FlaskConical,
-	vente: Store,
-	facade: Landmark,
-	planque: Shield,
+	housing: Users,
+	lab: FlaskConical,
+	storefront: Store,
+	front: Landmark,
+	safehouse: Shield,
 	depot: Warehouse,
-	atelier: Factory,
-	contre: Eye,
+	workshop: Factory,
+	counter: Eye,
 };
 
 /**
- * Image MapLibre (pixels RGBA) d'une icône de bâtiment : badge circulaire coloré
- * + glyphe blanc. `glyphMarkup` = SVG Lucide déjà rendu (async : rasterisation canvas).
+ * MapLibre image (RGBA pixels) of a building icon: colored circular badge
+ * + white glyph. `glyphMarkup` = already-rendered Lucide SVG (async: canvas rasterization).
  */
 export async function buildingIconImage(
 	glyphMarkup: string,
@@ -69,19 +69,19 @@ ${glyph}
 	return ctx.getImageData(0, 0, size, size);
 }
 
-/** Icônes des ressources du cartel (barre haute). */
+/** Cartel resource icons (top bar). */
 export const RESOURCE_ICONS = {
 	members: Users,
-	produit: Droplets,
+	product: Droplets,
 	sale: HandCoins,
 	clean: Coins,
 } as const;
 
-/** Icônes des opérations de guerre (barre de commandement). */
+/** War operation icons (command bar). */
 export const ACTION_ICONS = {
 	attack: Zap,
 	raid: Skull,
-	descent: HandCoins,
+	bust: HandCoins,
 	sabotage: Paintbrush,
 	intercept: Truck,
 	hitman: Skull,

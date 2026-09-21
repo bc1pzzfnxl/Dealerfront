@@ -1,108 +1,108 @@
-# Scoring — Score final (DealerFront)
+# Scoring — Final score (DealerFront)
 
-> Statut : **v2 (battle royale)** — le score composite est remplacé par un **classement de puissance** (quartiers, Membres, cash). Le récap affiche la **survie + stats**.
+> Status: **v2 (battle royale)** — the composite score is replaced by a **power standings** (quarters, Members, cash). The recap shows **survival + stats**.
 
-## Objectif
+## Objective
 
-Calculer un **score final réaliste et transparent** à partir d'événements réellement survenus, et un **récap causal** de fin de partie.
+Compute a **realistic and transparent final score** from events that actually occurred, and a **causal recap** of the endgame.
 
-## Règles
+## Rules
 
-### Modèle de calcul
+### Computation model
 
 ```
-Score = Cash_propre × (1 + b_contrôle + b_diversité + b_discrétion)
-        − pénalités (police subie, quartiers perdus)
+Score = Clean_cash × (1 + b_control + b_diversity + b_discretion)
+        − penalties (police suffered, quarters lost)
 ```
 
-- **Base = Cash propre blanchi** (seul l'argent effectivement blanchi compte).
-- **`b_contrôle`** : bonus lié à la part de quartiers contrôlés en fin de partie (jusqu'à +30 %).
-- **`b_diversité`** : bonus pour la variété des quartiers/façades exploités (jusqu'à +10 %).
-- **`b_discrétion`** : bonus pour avoir maintenu la **Pression police** basse (jusqu'à +20 %).
-- **Pénalités** : saisies policières (Cash propre perdu), quartiers perdus en fin de partie.
+- **Base = laundered Clean cash** (only actually laundered money counts).
+- **`b_control`**: bonus tied to the share of controlled quarters at endgame (up to +30%).
+- **`b_diversity`**: bonus for the variety of quarters/fronts exploited (up to +10%).
+- **`b_discretion`**: bonus for keeping **police Pressure** low (up to +20%).
+- **Penalties**: police seizures (Clean cash lost), quarters lost at endgame.
 
-### Composantes
+### Components
 
-| Composante | Rôle | Détail |
+| Component | Role | Detail |
 |---|---|---|
-| **Cash propre** | Base du score | Argent blanchi effectivement. |
-| **Contrôle final** | Bonus principal | Part des 992 quartiers contrôlés (objectif de victoire). |
-| **Diversité** | Bonus modéré | Nb de quartiers/façades distincts exploités. |
-| **Discrétion** | Bonus | Temps passé sous les seuils de Pression police. |
-| **Pénalités** | Malus | Saisies, quartiers perdus. |
-| **Violence** | Malus | Éliminations de gangs (voir ci-dessous). |
+| **Clean cash** | Score base | Actually laundered money. |
+| **Final control** | Main bonus | Share of the 992 controlled quarters (victory objective). |
+| **Diversity** | Moderate bonus | Number of distinct quarters/fronts exploited. |
+| **Discretion** | Bonus | Time spent below police Pressure thresholds. |
+| **Penalties** | Malus | Seizures, quarters lost. |
+| **Violence** | Malus | Gang eliminations (see below). |
 
 ### Violence
 
-- Dans le mode DealerFront, la violence passe par les **bagarres** et les **tueurs à gage**.
-- Les **éliminations de gangs** (factions réduites à 0) pèsent négativement (multiplicateur), de façon **traçable**.
-- Un run « propre » (aucune élimination) doit pouvoir **surclasser** un run plus riche mais violent.
+- In DealerFront mode, violence goes through **brawls** and **hitmen**.
+- **Gang eliminations** (factions reduced to 0) weigh negatively (multiplier), in a **traceable** way.
+- A "clean" run (no elimination) must be able to **outrank** a richer but violent run.
 
-### Backend traçable
+### Traceable backend
 
-- Chaque événement (capture, construction, blanchiment, raid, corruption, élimination) est **loggé** avec sa **cause systémique**.
-- Le **récap** détaille la **chaîne causale** (pourquoi la Pression a monté, quel quartier a basculé), cohérent avec R6.
-- **Aucun arrondi « gamifié »**.
+- Each event (capture, construction, laundering, raid, corruption, elimination) is **logged** with its **systemic cause**.
+- The **recap** details the **causal chain** (why Pressure rose, which quarter flipped), consistent with R6.
+- **No "gamified" rounding**.
 
-## Paramètres chiffrés
+## Numeric parameters
 
-| Paramètre | Valeur | Statut |
+| Parameter | Value | Status |
 |---|---|---|
-| Base | Cash propre | fixé |
-| `b_contrôle` | 0 → +30 % | à équilibrer |
-| `b_diversité` | 0 → +10 % | à équilibrer |
-| `b_discrétion` | 0 → +20 % | à équilibrer |
-| Multiplicateur éliminations | négatif fort (coefficients TBD) | TBD |
-| Pénalité de saisie police | **TBD** | TBD |
-| Seuils de Pression basse (discrétion) | **TBD** (`police-ai.md`) | TBD |
+| Base | Clean cash | fixed |
+| `b_control` | 0 → +30% | to balance |
+| `b_diversity` | 0 → +10% | to balance |
+| `b_discretion` | 0 → +20% | to balance |
+| Elimination multiplier | strongly negative (coefficients TBD) | TBD |
+| Police seizure penalty | **TBD** | TBD |
+| Low Pressure thresholds (discretion) | **TBD** (`police-ai.md`) | TBD |
 
-## Cas limites
+## Edge cases
 
-- **Match nul / fin simultanée** : départage déterministe (ex. contrôle, puis Cash propre, puis ordre de faction) — `win-conditions.md`.
-- **Éliminé tôt** : score figé à l'état d'élimination, récap affiché.
-- **Cash propre énorme mais 0 contrôle** : le bonus de contrôle ne peut pas compenser la défaite (la victoire exige les deux).
-- **Aucune composante ne dépend de la difficulté de base** (équité).
+- **Draw / simultaneous end**: deterministic tiebreak (e.g. control, then Clean cash, then faction order) — `win-conditions.md`.
+- **Eliminated early**: score frozen at the elimination state, recap shown.
+- **Huge Clean cash but 0 control**: the control bonus cannot compensate for the defeat (victory requires both).
+- **No component depends on base difficulty** (fairness).
 
-## Dépendances
+## Dependencies
 
 - `pillars.md` — R1/R2/R3/R6.
 - `core-loop.md`, `territory.md`, `economy.md`, `combat.md`, `police-ai.md`, `win-conditions.md`.
-- `ui-ux.md` — présentation du récap.
+- `ui-ux.md` — recap presentation.
 
-## Critères de validation
+## Validation criteria
 
-- [ ] Le score est intégralement dérivable du log d'événements.
-- [ ] Un run sans élimination surclasse un run violent plus riche (test de scénario).
-- [ ] Le récap explique la cause de la fin en une phrase compréhensible.
-- [ ] Aucune composante ne dépend de la difficulté de base.
+- [ ] The score is entirely derivable from the event log.
+- [ ] A run without elimination outranks a richer violent run (scenario test).
+- [ ] The recap explains the end cause in one understandable sentence.
+- [ ] No component depends on base difficulty.
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Base | Cash propre |
-| 2 | Bonus | Contrôle (+30 %), diversité (+10 %), discrétion (+20 %) |
-| 3 | Violence | Éliminations = malus traçable |
-| 4 | Backend | Log causal individuel, récap sans arrondi |
+| 1 | Base | Clean cash |
+| 2 | Bonus | Control (+30%), diversity (+10%), discretion (+20%) |
+| 3 | Violence | Eliminations = traceable malus |
+| 4 | Backend | Individual causal log, recap without rounding |
 
 ---
 
-## Implémentation (P6) — formule en vigueur
+## Implementation (P6) — formula in force
 
-> Section **faisant foi** pour `World.score` / `World.rankings` (`src/sim/world.ts`).
+> **Authoritative** section for `World.score` / `World.rankings` (`src/sim/world.ts`).
 
 ```
-score = max(0, Cash_propre × (1 + b_contrôle + b_diversité + b_discrétion) × violence − pénalités)
+score = max(0, Clean_cash × (1 + b_control + b_diversity + b_discretion) × violence − penalties)
 ```
 
-| Terme | Valeur |
+| Term | Value |
 |---|---|
-| `b_contrôle` | `0,30 × min(1 ; contrôle / 0,60)` |
-| `b_diversité` | `0,10 × (types de bâtiments présents / 8)` |
-| `b_discrétion` | `0,20 × (1 − Pression police / 100)` |
-| `violence` | `1 − min(0,5 ; 0,15 × éliminations)` |
-| `pénalités` | `saisies × 50 000 + quartiers perdus × 5 000` |
+| `b_control` | `0.30 × min(1; control / 0.60)` |
+| `b_diversity` | `0.10 × (building types present / 8)` |
+| `b_discretion` | `0.20 × (1 − police Pressure / 100)` |
+| `violence` | `1 − min(0.5; 0.15 × eliminations)` |
+| `penalties` | `seizures × 50,000 + quarters lost × 5,000` |
 
-- Faction **éliminée** → score **0**.
-- **Classement** (départages déterministes) : score → Cash propre → contrôle → id.
-- Le récap expose score et rang (`World.summary()`), affichés par `App.tsx`.
+- **Eliminated** faction → score **0**.
+- **Standings** (deterministic tiebreaks): score → Clean cash → control → id.
+- The recap exposes score and rank (`World.summary()`), displayed by `App.tsx`.

@@ -1,4 +1,4 @@
-import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Geometry, Point } from "geojson";
 import type { GeoJSONSource, MapMouseEvent } from "maplibre-gl";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -21,18 +21,30 @@ import { factionDisplayColor } from "./palette";
 import { useReducedMotion } from "./useReducedMotion";
 
 const SOURCE = "iris";
-/** mapcn préfixe l'id source/layer par `geojson-source-` / `geojson-fill-`. */
+/** mapcn prefixes the source/layer id with `geojson-source-` / `geojson-fill-`. */
 const SOURCE_ID = `geojson-source-${SOURCE}`;
 const BUILDING_SOURCE = "buildings";
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
 const NEUTRAL_COLOR = "#2A3140";
 const PARIS_CENTER: [number, number] = [2.3522, 48.8566];
 const CONVOY_SOURCE = "convoys";
-const CONVOY_SPEED = 0.045;
-/** Durée du flash de capture (ticks, 10 Hz). */
+/** Capture flash duration (ticks, 10 Hz). */
 const CAPTURE_FLASH_TICKS = 16;
-/** Durée de la pulsation de construction (ticks, 10 Hz). */
+/** Build pulse duration (ticks, 10 Hz). */
 const BUILD_FLASH_TICKS = 14;
+/** Outgoing / incoming front label colors (OpenFront convention). */
+const OUTGOING_COLOR = "#3fa9f5";
+const INCOMING_COLOR = "#f87171";
+
+/** One "X vs Y" troop label pinned to a contested quarter. */
+interface FrontLabel {
+	key: string;
+	x: number;
+	y: number;
+	attacker: number;
+	defender: number;
+	mine: boolean;
+}
 
 interface IrisProps {
 	i: number;
@@ -56,16 +68,19 @@ interface WorldMapProps {
 	selected: number | null;
 	colorblind: boolean;
 	version: number;
+	playerId: number;
+	/** Troop-equivalent defending a quarter (front labels). */
+	defenseAt: (module: number) => number;
 	onModuleClick: (module: number) => void;
 	onModuleHover: (module: number | null) => void;
 	onEmptyClick: () => void;
 	onProjector: (project: (module: number) => { x: number; y: number } | null) => void;
 }
 
-/** Icône de bâtiment : id d'image MapLibre par type (0 = aucun bâtiment). */
+/** Building icon: MapLibre image id per type (0 = no building). */
 const BUILDING_ICON_ID = (type: BuildingType) => `bld-${type}`;
 
-/** Couleur de remplissage pilotée par `feature-state` (faction + contrôle). */
+/** Fill color driven by `feature-state` (faction + control). */
 function factionMatch(colorblind: boolean): unknown[] {
 	const match: unknown[] = ["match", ["coalesce", ["feature-state", "faction"], -1]];
 	FACTION_COLORS.forEach((color, index) => {
@@ -76,8 +91,8 @@ function factionMatch(colorblind: boolean): unknown[] {
 }
 
 /**
- * Carte « vraie ville » (Paris IRIS) — rendue via mapcn (Map / MapGeoJSON / MapArc).
- * Chaque quartier IRIS est un quartier jouable : possession + Contrôle, sans grille.
+ * "Real city" map (Paris IRIS) — rendered via mapcn (Map / MapGeoJSON / MapArc).
+ * Each IRIS quarter is a playable quarter: ownership + Control, no grid.
  */
 export function WorldMap({
 	territory,
@@ -88,6 +103,8 @@ export function WorldMap({
 	selected,
 	colorblind,
 	version,
+	playerId,
+	defenseAt,
 	onModuleClick,
 	onModuleHover,
 	onEmptyClick,
@@ -156,7 +173,7 @@ export function WorldMap({
 					colorblind,
 				),
 			})),
-		// `attacks` est muté en place : on suit aussi le tick.
+		// `attacks` is mutated in place: we track the tick too.
 		[attacks, tick, colorblind],
 	);
 
@@ -186,6 +203,7 @@ export function WorldMap({
 						tick={tick}
 						version={version}
 						selected={selected}
+						reduced={reduced}
 					/>
 					<ProjectorBridge onProjector={onProjector} />
 					<DeselectOnEmpty onEmptyClick={onEmptyClick} />
@@ -203,14 +221,21 @@ export function WorldMap({
 				interactive={false}
 			/>
 			<Convoys convoys={convoys} tick={tick} colorblind={colorblind} reduced={reduced} />
+			<AttackLabels
+				attacks={attacks}
+				playerId={playerId}
+				defenseAt={defenseAt}
+				tick={tick}
+				territory={territory}
+			/>
 			<MapControls className="map-controls" />
 		</Map>
 	);
 }
 
 /**
- * Possession, Contrôle, heat, flash de capture et pulse de siège — tout par
- * `feature-state`, sans recharger les 992 géométries (une action = un retour visuel).
+ * Ownership, Control, heat, capture flash and siege pulse — all via
+ * `feature-state`, without reloading the 992 geometries (one action = one visual feedback).
  */
 function EffectStates({
 	territory,
@@ -219,6 +244,7 @@ function EffectStates({
 	tick,
 	version,
 	selected,
+	reduced,
 }: {
 	territory: Territory;
 	attacks: readonly Attack[];
@@ -226,6 +252,7 @@ function EffectStates({
 	tick: number;
 	version: number;
 	selected: number | null;
+	reduced: boolean;
 }) {
 	const { map, isLoaded } = useMap();
 	const prevOwner = useRef<Int16Array | null>(null);
@@ -238,8 +265,34 @@ function EffectStates({
 	const prevBuilt = useRef<Uint8Array | null>(null);
 	const prevBuilding = useRef<Int8Array | null>(null);
 	const prevSiege = useRef<string>("");
+	/** Changed quarters waiting to be painted (tick drip). */
+	const drip = useRef<{ i: number; state: Record<string, unknown> }[]>([]);
+	const raf = useRef<number | null>(null);
 
-	// La source est recréée quand la carte/le style change : on repart du cache.
+	/**
+	 * Tick drip: a capture paints over ~9 render frames (~150 ms) instead of
+	 * popping all at once (OpenFront idea). Keeps the 10 Hz sim readable at 60 fps.
+	 */
+	const drain = useCallback(() => {
+		raf.current = null;
+		if (!map || !isLoaded) return;
+		const pending = drip.current;
+		if (pending.length === 0) return;
+		const take = Math.max(1, Math.ceil(pending.length / 9));
+		for (const item of pending.splice(0, take)) {
+			map.setFeatureState({ source: SOURCE_ID, id: item.i }, item.state);
+		}
+		if (pending.length > 0) raf.current = requestAnimationFrame(drain);
+	}, [map, isLoaded]);
+
+	useEffect(
+		() => () => {
+			if (raf.current !== null) cancelAnimationFrame(raf.current);
+		},
+		[],
+	);
+
+	// The source is recreated when the map/style changes: reset the cache.
 	useEffect(() => {
 		prevOwner.current = null;
 		prevControl.current = null;
@@ -250,9 +303,10 @@ function EffectStates({
 		prevBuildings.current = "";
 		prevAttacked.current = new Set();
 		prevSiege.current = "";
+		drip.current.length = 0;
 	}, [map, isLoaded]);
 
-	// Couches d'effet (une seule fois) : heat, flash de capture, siège.
+	// Effect layers (once): heat, capture flash, siege.
 	useEffect(() => {
 		if (!map || !isLoaded || !map.getSource(SOURCE_ID)) return;
 		if (!map.getLayer("iris-heat")) {
@@ -347,9 +401,9 @@ function EffectStates({
 				},
 			});
 		}
-		// Jauge de conquête : le quartier se remplit de blanc à mesure que son
-		// Contrôle baisse. Un `fill` reste **contenu dans le polygone** (un trait
-		// épais déborderait aux angles).
+		// Conquest gauge: the quarter fills with white as its
+		// Control drops. A `fill` stays **contained within the polygon** (a thick
+		// stroke would spill over the corners).
 		if (!map.getLayer("iris-conquest")) {
 			map.addLayer({
 				id: "iris-conquest",
@@ -371,7 +425,7 @@ function EffectStates({
 				},
 			});
 		}
-		// Animation de construction : pulsation verte à la livraison du chantier.
+		// Build animation: green pulse when the build site is delivered.
 		if (!map.getLayer("iris-built")) {
 			map.addLayer({
 				id: "iris-built",
@@ -411,7 +465,7 @@ function EffectStates({
 				},
 			});
 		}
-		// QG du joueur : anneau blanc pulsant (repère « vous êtes ici »).
+		// Player HQ: pulsing white ring ("you are here" marker).
 		if (!map.getLayer("iris-hq")) {
 			map.addLayer({
 				id: "iris-hq",
@@ -437,9 +491,9 @@ function EffectStates({
 				},
 			});
 		}
-		// Icônes de bâtiment : MapLibre n'autorise `feature-state` qu'en *paint*,
-		// pas en layout (icon-image) ni en filter. On passe donc par une source
-		// GeoJSON de points portant le type de bâtiment en propriété.
+		// Building icons: MapLibre only allows `feature-state` in *paint*,
+		// not in layout (icon-image) or filter. So we use a GeoJSON
+		// point source carrying the building type as a property.
 		const color = "#e8eaee";
 		if (!map.getSource(BUILDING_SOURCE)) {
 			map.addSource(BUILDING_SOURCE, { type: "geojson", data: EMPTY_FC });
@@ -482,7 +536,7 @@ function EffectStates({
 		});
 	}, [map, isLoaded]);
 
-	// Points des bâtiments : recalculés seulement quand un bâtiment change.
+	// Building points: recomputed only when a building changes.
 	useEffect(() => {
 		if (!map || !isLoaded || !map.getSource(BUILDING_SOURCE)) return;
 		const features: Feature<Point, { type: string }>[] = [];
@@ -506,8 +560,8 @@ function EffectStates({
 		});
 	}, [map, isLoaded, territory, version]);
 
-	// Siège (couleur) quand le front change ; conquête (remplissage bord→centre)
-	// recalculée à chaque tick pour les quartiers assiégés.
+	// Siege (color) when the front changes; conquest (edge→center fill)
+	// recomputed every tick for besieged quarters.
 	useEffect(() => {
 		if (!map || !isLoaded || !map.getSource(SOURCE_ID)) return;
 		const next = attacks
@@ -545,7 +599,7 @@ function EffectStates({
 		prevAttacked.current = besieged;
 	}, [map, isLoaded, attacks, territory, version, tick]);
 
-	// Possession + contrôle + heat + flash + bâtiment (incrémental).
+	// Ownership + control + heat + flash + building (incremental).
 	useEffect(() => {
 		if (!map || !isLoaded || !map.getSource(SOURCE_ID)) return;
 		const count = territory.count;
@@ -578,19 +632,24 @@ function EffectStates({
 				flash[i] = nextFlash;
 				built[i] = nextBuilt;
 				building[i] = nextBuilding;
-				map.setFeatureState({ source: SOURCE_ID, id: i }, {
+				const state = {
 					faction: nextOwner,
 					control: nextControl,
 					heat: nextHeat,
 					flash: nextFlash,
 					built: nextBuilt,
 					building: BUILDING_TYPES[nextBuilding] ?? "",
-				});
+				};
+				if (reduced) map.setFeatureState({ source: SOURCE_ID, id: i }, state);
+				else {
+					drip.current.push({ i, state });
+					if (raf.current === null) raf.current = requestAnimationFrame(drain);
+				}
 			}
 		}
-	}, [map, isLoaded, version, territory, heat, tick]);
+	}, [map, isLoaded, version, territory, heat, tick, reduced, drain]);
 
-	// QG : premier quartier possédé par le joueur (repère visuel).
+	// HQ: first quarter owned by the player (visual marker).
 	useEffect(() => {
 		if (!map || !isLoaded || !map.getSource(SOURCE_ID)) return;
 		let anchor = -1;
@@ -608,7 +667,7 @@ function EffectStates({
 		if (anchor >= 0) map.setFeatureState({ source: SOURCE_ID, id: anchor }, { hq: true });
 	}, [map, isLoaded, territory, version]);
 
-	// Pulsation du QG (recalculée à chaque tick).
+	// HQ pulse (recomputed every tick).
 	useEffect(() => {
 		if (!map || !isLoaded || !map.getSource(SOURCE_ID) || hqRef.current < 0) return;
 		map.setFeatureState(
@@ -630,7 +689,7 @@ function EffectStates({
 	return null;
 }
 
-/** Expose la projection quartier → écran (textes flottants). */
+/** Exposes the quarter → screen projection (floating text). */
 function ProjectorBridge({
 	onProjector,
 }: {
@@ -653,7 +712,7 @@ function ProjectorBridge({
 	return null;
 }
 
-/** Désélectionne quand on clique sur la carte hors de tout quartier. */
+/** Deselects when clicking the map outside any quarter. */
 function DeselectOnEmpty({ onEmptyClick }: { onEmptyClick: () => void }) {
 	const { map, isLoaded } = useMap();
 	const latest = useRef(onEmptyClick);
@@ -673,7 +732,7 @@ function DeselectOnEmpty({ onEmptyClick }: { onEmptyClick: () => void }) {
 	return null;
 }
 
-/** Centre la vue sur le premier quartier du joueur. */
+/** Centers the view on the player's first quarter. */
 function CenterOnPlayer({ territory }: { territory: Territory }) {
 	const { map, isLoaded } = useMap();
 
@@ -690,7 +749,7 @@ function CenterOnPlayer({ territory }: { territory: Territory }) {
 	return null;
 }
 
-/** Couleur d'un convoi selon sa faction. */
+/** Convoy color by faction. */
 function convoyColor(colorblind: boolean): unknown[] {
 	const match: unknown[] = ["match", ["get", "f"]];
 	FACTION_COLORS.forEach((color, index) => {
@@ -700,7 +759,79 @@ function convoyColor(colorblind: boolean): unknown[] {
 	return match;
 }
 
-/** Convois logistiques : route + point animé (une action = un retour visuel). */
+/**
+ * Front labels: "attacker ⚔ defender" pinned to every contested quarter that
+ * involves the player. Blue = your push, red = a push against you. Rendered as
+ * an HTML overlay (the blank basemap has no glyphs) so it can ease between
+ * ticks instead of snapping.
+ */
+function AttackLabels({
+	attacks,
+	playerId,
+	defenseAt,
+	tick,
+	territory,
+}: {
+	attacks: readonly Attack[];
+	playerId: number;
+	defenseAt: (module: number) => number;
+	tick: number;
+	territory: Territory;
+}) {
+	const { map, isLoaded } = useMap();
+	const [labels, setLabels] = useState<FrontLabel[]>([]);
+
+	useEffect(() => {
+		if (!map || !isLoaded) return;
+		const project = (): void => {
+			const next: FrontLabel[] = [];
+			attacks.forEach((attack, index) => {
+				const mine = attack.factionId === playerId;
+				if (!mine && territory.owner[attack.target] !== playerId) return;
+				const center = PARIS_CENTROIDS[attack.target] ?? PARIS_CENTER;
+				const point = map.project([center[0], center[1]]);
+				next.push({
+					key: `${attack.factionId}-${attack.target}-${index}`,
+					x: point.x,
+					y: point.y,
+					attacker: Math.round(attack.troops),
+					defender: Math.round(defenseAt(attack.target)),
+					mine,
+				});
+			});
+			setLabels(next);
+		};
+		project();
+		map.on("move", project);
+		map.on("zoom", project);
+		return () => {
+			map.off("move", project);
+			map.off("zoom", project);
+		};
+	}, [map, isLoaded, attacks, tick, playerId, defenseAt, territory]);
+
+	if (labels.length === 0) return null;
+	return (
+		<div className="front-labels">
+			{labels.map((label) => (
+				<div
+					key={label.key}
+					className={`front-label${label.mine ? " out" : " in"}`}
+					style={{
+						color: label.mine ? OUTGOING_COLOR : INCOMING_COLOR,
+						transform: `translate(-50%, -50%) translate(${label.x}px, ${label.y}px)`,
+					}}
+				>
+					{label.attacker.toLocaleString("en-US")}
+					<span className="front-vs">⚔</span>
+					{label.defender.toLocaleString("en-US")}
+				</div>
+			))}
+		</div>
+	);
+}
+
+/** Logistics convoys: route + animated dot (one action = one visual feedback). */
 function Convoys({
 	convoys,
 	tick,
@@ -740,7 +871,7 @@ function Convoys({
 				type: "circle",
 				source: CONVOY_SOURCE,
 				paint: {
-					"circle-radius": 4,
+					"circle-radius": ["get", "r"] as never,
 					"circle-color": convoyColor(colorblind) as never,
 					"circle-stroke-color": "#0b0e12",
 					"circle-stroke-width": 1,
@@ -756,20 +887,23 @@ function Convoys({
 		if (!map || !isLoaded) return;
 		const source = map.getSource(CONVOY_SOURCE) as GeoJSONSource | undefined;
 		if (!source) return;
-		const step = reduced ? 0.5 : (tick * CONVOY_SPEED) % 1;
 		const features: GeoJSON.Feature[] = [];
-		convoys.forEach((route, index) => {
+		convoys.forEach((route) => {
 			const from: [number, number] = [...(PARIS_CENTROIDS[route.from] ?? PARIS_CENTER)];
 			const to: [number, number] = [...(PARIS_CENTROIDS[route.to] ?? PARIS_CENTER)];
-			const progress = (step + index * 0.17) % 1;
+			// Real position: the dot only reaches the destination when the cargo
+			// lands (no fake loop) — the delay is visible.
+			const progress = reduced ? route.progress : Math.min(1, route.progress);
+			// A fatter dot carries more money: the cargo is readable at a glance.
+			const radius = 3.5 + Math.min(7, route.cargo / 400);
 			features.push({
 				type: "Feature",
-				properties: { f: route.factionId },
+				properties: { f: route.factionId, r: radius },
 				geometry: { type: "LineString", coordinates: [from, to] },
 			});
 			features.push({
 				type: "Feature",
-				properties: { f: route.factionId },
+				properties: { f: route.factionId, r: radius },
 				geometry: {
 					type: "Point",
 					coordinates: [

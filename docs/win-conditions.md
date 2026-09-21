@@ -1,84 +1,84 @@
-# Win Conditions — Victoire, défaite et fin de partie
+# Win Conditions — Victory, defeat and endgame
 
-> Statut : **v2 (battle royale)** — plus de seuil de contrôle, de cash ni de temps : **dernier cartel en jeu**.
-> Solo vs IA, **6 factions**, partie sans limite de durée.
+> Status: **v2 (battle royale)** — no more control, cash or time threshold: **last cartel in play**.
+> Solo vs AI, **6 factions**, game with no time limit.
 
-## Objectif
+## Objective
 
-Définir les conditions de **victoire**, de **défaite** et la **fin de partie** de DealerFront, ainsi que le **récap de fin**. Le jeu est un **battle royale** : on gagne en restant le **dernier cartel en jeu**. L'économie n'est plus une condition de victoire mais le **moteur** de la guerre (Membres, tech, bâtiments).
+Define DealerFront's **victory**, **defeat** and **endgame** conditions, as well as the **end recap**. The game is a **battle royale**: you win by staying the **last cartel in play**. The economy is no longer a victory condition but the **engine** of war (Members, tech, buildings).
 
-## Règles
+## Rules
 
-### Victoire
+### Victory
 
-Victoire **unique** : être le **dernier cartel en jeu**.
+**Single** victory: be the **last cartel in play**.
 
-- Une faction est **éliminée** quand elle ne possède plus aucun quartier.
-- La partie se termine dès que le joueur est le seul survivant (`aliveCount() === 1`).
-- **Aucun seuil de contrôle, aucun seuil de Cash propre, aucune horloge.** La domination totale est le moyen, pas la condition : tenir une part écrasante déclenche la police (anti-snowball), donc gagner trop lentement ou trop brutalement se paie.
+- A faction is **eliminated** when it owns no more quarters.
+- The game ends as soon as the player is the only survivor (`aliveCount() === 1`).
+- **No control threshold, no Clean cash threshold, no clock.** Total domination is the means, not the condition: holding an overwhelming share triggers the police (anti-snowball), so winning too slowly or too brutally costs you.
 
-### Défaites
+### Defeats
 
-Trois causes de défaite, toutes **traçables** :
+Three causes of defeat, all **traceable**:
 
-1. **Élimination** : le joueur tombe à **0 quartier** → défaite immédiate.
-2. **Faillite** : **Cash propre ET Cash sale à 0** pendant **300 ticks (30 s)** → défaite. Une trésorerie qui repasse > 0 **réarme** la fenêtre.
-3. **Liquidation policière** : la **Pression** atteint le seuil de liquidation (`docs/police-ai.md`) → défaite immédiate.
+1. **Elimination**: the player drops to **0 quarters** → immediate defeat.
+2. **Bankruptcy**: **Clean cash AND Dirty cash at 0** for **300 ticks (30 s)** → defeat. A treasury that goes back > 0 **rearms** the window.
+3. **Police liquidation**: **Pressure** reaches the liquidation threshold (`docs/police-ai.md`) → immediate defeat.
 
-- Un joueur **éliminé** ne peut plus agir ; la partie est terminée pour lui (récap figé).
-- Si **plusieurs factions s'éliminent au même tick**, le départage est déterministe (quartiers, Membres, Cash, id).
+- An **eliminated** player can no longer act; the game is over for them (frozen recap).
+- If **several factions are eliminated on the same tick**, the tiebreak is deterministic (quarters, Members, Cash, id).
 
-### Fin de partie
+### Endgame
 
-- **Aucune limite de temps** : la partie se joue jusqu'à ce qu'il ne reste qu'un cartel (ou jusqu'à la défaite du joueur).
-- L'IA **achève les faibles** (priorité d'élimination) pour garantir une résolution — sinon les parties stagneraient à plusieurs survivants.
+- **No time limit**: the game is played until only one cartel remains (or until the player's defeat).
+- The AI **finishes off the weak** (elimination priority) to guarantee a resolution — otherwise games would stall with several survivors.
 
-### Récap de fin
+### End recap
 
-Le récap (voir `docs/ui-ux.md`) affiche : **rang final**, **quartiers possédés / 992**, **Cash propre blanchi**, **quartiers pris**, **gangs éliminés**, **raids/saisies subis**, **durée de survie**, cause de fin explicite (`Victoire (dernier survivant)`, `Élimination`, `Faillite`, `Liquidation policière`).
+The recap (see `docs/ui-ux.md`) shows: **final rank**, **owned quarters / 992**, **laundered Clean cash**, **quarters taken**, **gangs eliminated**, **raids/seizures suffered**, **survival time**, explicit end cause (`Victory (last survivor)`, `Elimination`, `Bankruptcy`, `Police liquidation`).
 
-## Paramètres chiffrés
+## Numeric parameters
 
-| Paramètre | Valeur | Statut |
+| Parameter | Value | Status |
 |---|---|---|
-| Carte | Paris IRIS — 992 quartiers | fixé |
-| Factions | **6** (joueur + 5 gangs IA) | fixé |
-| Condition de victoire | dernier cartel en jeu | fixé |
-| Limite de temps | **aucune** | fixé |
-| Seuil de contrôle / cash | **supprimés** | fixé |
-| Fenêtre de faillite | 300 ticks (30 s) | fixé |
-| Encirclement | cluster fermé ≥ 8 quartiers **et** ≥ 35 % de la faction **et** plus petit que l'encercleur | fixé |
+| Map | Paris IRIS — 992 quarters | fixed |
+| Factions | **6** (player + 5 AI gangs) | fixed |
+| Victory condition | last cartel in play | fixed |
+| Time limit | **none** | fixed |
+| Control / cash threshold | **removed** | fixed |
+| Bankruptcy window | 300 ticks (30 s) | fixed |
+| Encirclement | closed cluster ≥ 8 quarters **and** ≥ 35% of the faction **and** smaller than the encircler | fixed |
 
-## Cas limites
+## Edge cases
 
-- **Dernier survivant au forceps** : si le joueur atteint ~80 % de la carte, la police peut le liquider avant la fin (anti-snowball assumé).
-- **Stagnation** : l'IA priorise l'élimination des faibles → pas de partie infinie à 4 survivants.
-- **Cluster minuscule** : un cluster < 8 quartiers ou < 35 % de la faction ne capitule pas (pas de grignotage gratuit).
-- **Empire quasi complet** : un cluster plus gros que l'encercleur ne capitule jamais.
+- **Last survivor by force**: if the player reaches ~80% of the map, the police can liquidate them before the end (deliberate anti-snowball).
+- **Stagnation**: the AI prioritizes eliminating the weak → no infinite game with 4 survivors.
+- **Tiny cluster**: a cluster < 8 quarters or < 35% of the faction does not capitulate (no free nibbling).
+- **Near-complete empire**: a cluster larger than the encircler never capitulates.
 
-## Dépendances
+## Dependencies
 
-- `pillars.md` — R1/R3/R8 (fin causale).
+- `pillars.md` — R1/R3/R8 (causal ending).
 - `combat.md` — capture, encirclement.
 - `police-ai.md` — liquidation, anti-snowball.
-- `factions.md` — 6 factions, IA d'élimination.
-- `npc-events.md` — événements à choix intra-run.
-- `scoring.md` — classement (puissance).
+- `factions.md` — 6 factions, elimination AI.
+- `npc-events.md` — in-run choice events.
+- `scoring.md` — standings (power).
 
-## Critères de validation
+## Validation criteria
 
-- [x] Aucune victoire tant qu'un rival est en jeu.
-- [x] Une partie finit par se conclure (élimination d'un camp).
-- [x] Toute fin est causale et traçable.
-- [x] Simulation massive : 94 victoires / 6 défaites (100 seeds), 0 sans-fin.
+- [x] No victory while a rival is in play.
+- [x] A game eventually concludes (elimination of a camp).
+- [x] Every ending is causal and traceable.
+- [x] Massive simulation: 94 wins / 6 losses (100 seeds), 0 no-end.
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Condition de victoire | **Dernier survivant** (battle royale) |
-| 2 | Temps | Illimité (plus de session) |
-| 3 | Seuils contrôle/cash | **Supprimés** |
+| 1 | Victory condition | **Last survivor** (battle royale) |
+| 2 | Time | Unlimited (no more session) |
+| 3 | Control/cash thresholds | **Removed** |
 | 4 | Factions | **6** |
-| 5 | Police | Conservée, létale au-delà de 80 % de domination |
-| 6 | Récap | Survie + stats, pas de score composite |
+| 5 | Police | Kept, lethal beyond 80% domination |
+| 6 | Recap | Survival + stats, no composite score |

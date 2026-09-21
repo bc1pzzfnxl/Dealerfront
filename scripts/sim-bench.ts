@@ -1,7 +1,7 @@
 /**
- * Banc de simulation — 100 parties headless, résultats en SQLite (`bun:sqlite`)
- * + export JSON pour le dashboard.
- * Usage : bun run sim:bench   (env : SEEDS, CADENCE, TICKS)
+ * Simulation bench — 100 headless games, results in SQLite (`bun:sqlite`)
+ * + JSON export for the dashboard.
+ * Usage: bun run sim:bench   (env: SEEDS, CADENCE, TICKS)
  */
 
 import { Database } from "bun:sqlite";
@@ -38,7 +38,7 @@ function runSeed(seed: number): Run {
 	const rng = createRng((seed * 7919 + 13) >>> 0);
 	const ticks = playOut(world, rng, MAX_TICKS, CADENCE);
 	let totalClean = 0;
-	for (const faction of world.factions) totalClean += faction.cashPropre;
+	for (const faction of world.factions) totalClean += faction.cleanCash;
 	return {
 		seed,
 		outcome: world.outcome ?? "none",
@@ -46,7 +46,7 @@ function runSeed(seed: number): Run {
 		ticks,
 		durationS: ticks / 10,
 		control: world.controlRatio(world.player.id),
-		clean: Math.round(world.player.cashPropre),
+		clean: Math.round(world.player.cleanCash),
 		totalClean: Math.round(totalClean),
 		buildings: world.player.buildings,
 		pressure: Math.round(world.police.pressure * 10) / 10,
@@ -123,9 +123,9 @@ writeFileSync(
 );
 
 const wins = runs.filter((run) => run.outcome === "victory").length;
-console.log(`=== Bench ${SEEDS} parties · bot toutes les ${CADENCE} ticks ===`);
-console.log(`SQLite : ${DB_PATH} (${total.n} lignes) · JSON : ${JSON_PATH}`);
-console.log(`Victoires ${wins} · Défaites ${runs.length - wins} · calcul ${elapsed.toFixed(1)} s`);
-console.log(`Butin : avg ${Math.round(runs.reduce((s, r) => s + r.captures, 0) / runs.length)} captures, ` +
-	`pression ${Math.round(runs.reduce((s, r) => s + r.pressure, 0) / runs.length)}, ` +
-	`durée ${Math.round(runs.reduce((s, r) => s + r.durationS, 0) / runs.length / 60)} min`);
+console.log(`=== Bench ${SEEDS} games · bot every ${CADENCE} ticks ===`);
+console.log(`SQLite: ${DB_PATH} (${total.n} rows) · JSON: ${JSON_PATH}`);
+console.log(`Wins ${wins} · Losses ${runs.length - wins} · compute ${elapsed.toFixed(1)} s`);
+console.log(`Loot: avg ${Math.round(runs.reduce((s, r) => s + r.captures, 0) / runs.length)} captures, ` +
+	`pressure ${Math.round(runs.reduce((s, r) => s + r.pressure, 0) / runs.length)}, ` +
+	`duration ${Math.round(runs.reduce((s, r) => s + r.durationS, 0) / runs.length / 60)} min`);

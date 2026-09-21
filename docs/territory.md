@@ -1,97 +1,97 @@
-# Territory — Quartiers, Membres et Contrôle
+# Territory — Quarters, Members and Control
 
-> Statut : **v1 (DealerFront)** — cœur du mode god-view, inspiré d'OpenFront (idées, pas de code ; OpenFront est AGPL-3).
+> Status: **v1 (DealerFront)** — heart of the god-view mode, inspired by OpenFront (ideas, no code; OpenFront is AGPL-3).
 
-## Objectif
+## Objective
 
-Définir la **prise de contrôle de la ville** : qui possède quoi, comment on étend son territoire, comment on le défend, et comment il se perd. C'est le socle du mode : conquête ↔ économie. Toutes les autres specs s'y rattachent.
+Define **taking control of the city**: who owns what, how you expand your territory, how you defend it, and how it is lost. It is the foundation of the mode: conquest ↔ economy. All other specs hang off it.
 
-## Règles
+## Rules
 
-### Quartier = zone réelle
+### Quarter = real area
 
-- Unité de territoire = **quartier IRIS** de la carte réelle (Paris, **992 quartiers**, voir `procgen.md`).
-- Chaque quartier a : un **propriétaire** (faction ou **neutre**), un **Contrôle ∈ [0, 100]** et un **profil** de marché (`economy.md`).
-- **Adjacence** : deux quartiers sont voisins s'ils **partagent une frontière** (arêtes communes ; un simple coin ne compte pas). L'expansion et les attaques se propagent par adjacence (BFS).
+- Territory unit = **IRIS quarter** of the real map (Paris, **992 quarters**, see `procgen.md`).
+- Each quarter has: an **owner** (faction or **neutral**), a **Control ∈ [0, 100]** and a market **profile** (`economy.md`).
+- **Adjacency**: two quarters are neighbors if they **share a border** (common edges; a mere corner does not count). Expansion and attacks propagate by adjacency (BFS).
 
-### Membres (ressource-troupe)
+### Members (troop resource)
 
-- Chaque faction possède un **pool de Membres**, équivalent des « troupes » d'OpenFront.
-- **Production** par tick : `(8 × Σdemande des quartiers possédés + 25 × Σdemande des logements) × (1 − membres / maxMembres)` (la **demande locale** pondère, voir `economy.md`).
-- **`maxMembres = 2000 + quartiers × 1500 + logements × 2000 + dépôts × 2000`**.
-- Les Membres servent à **étendre** (neutre), **attaquer** (faction) et **défendre** (renfort). Voir `combat.md`.
+- Each faction has a **Members pool**, equivalent to OpenFront's "troops".
+- **Production** per tick: `(8 × Σdemand of owned quarters + 25 × Σdemand of housing) × (1 − members / maxMembers)` (the **local demand** weights it, see `economy.md`).
+- **`maxMembers = 2000 + quarters × 1500 + housing × 2000 + depots × 2000`**.
+- Members are used to **expand** (neutral), **attack** (faction) and **defend** (reinforcement). See `combat.md`.
 
-### Contrôle d'un quartier
+### Control of a quarter
 
-- Un quartier possédé a un Contrôle qui **régénère** vers 100 (∝ Membres disponibles, ralenti par les dégâts récents).
-- Une **Planque** augmente la résistance (défense) ; le type de zone module la défense (voir `combat.md`).
-- À **Contrôle = 0**, le quartier est **capturé** par l'attaquant (bâtiments transférés).
+- An owned quarter has Control that **regenerates** toward 100 (∝ available Members, slowed by recent damage).
+- A **Safehouse** increases resistance (defense); the zone type modulates defense (see `combat.md`).
+- At **Control = 0**, the quarter is **captured** by the attacker (buildings transferred).
 
-### Expansion sur le neutre
+### Expansion onto neutrals
 
-- Attaquer un quartier **neutre** coûte des Membres (garnison neutre) et suit la branche « neutre » de `combat.md`.
-- Les quartiers neutres peuvent être **défendus** (garnison) : ils ne tombent pas gratuitement.
+- Attacking a **neutral** quarter costs Members (neutral garrison) and follows the "neutral" branch of `combat.md`.
+- Neutral quarters can be **defended** (garrison): they do not fall for free.
 
-### Anti-snowball — clusters isolés
+### Anti-snowball — isolated clusters
 
-- Reprise d'OpenFront : un **cluster** de quartiers possédés, **entièrement encerclé** par une seule faction ennemie (ou la police), est **perdu** (capturé par l'encercleur).
-- Empêche les excroissances absurdes et récompense l'encerclement.
+- From OpenFront: a **cluster** of owned quarters, **fully encircled** by a single enemy faction (or the police), is **lost** (captured by the encircler).
+- Prevents absurd growth and rewards encirclement.
 
-### Spawn et immunité
+### Spawn and immunity
 
-- **6 factions** (joueur + 5 IA, voir `factions.md`).
-- Spawn : **4 quartiers bâtis les plus éloignés** (échantillonnage glouton), 1 quartier de départ + Membres initiaux.
+- **6 factions** (player + 5 AI, see `factions.md`).
+- Spawn: **4 farthest built quarters** (greedy sampling), 1 starting quarter + initial Members.
 
-## Paramètres chiffrés
+## Numeric parameters
 
-| Paramètre | Valeur de départ | Statut |
+| Parameter | Starting value | Status |
 |---|---|---|
-| Carte | Paris IRIS — 992 quartiers réels | fixé |
-| Factions | 6 (joueur + 5 IA) | fixé |
-| Contrôle max | 100 | fixé |
-| Contrôle initial (quartier capturé) | ~30 | à équilibrer |
-| `maxMembres` | `2000 + quartiers × 1500 + logements × 2000 + dépôts × 2000` | à équilibrer |
-| Production de Membres | `(8 × quartiers + 25 × logements) × (1 − membres/max)` /tick | à équilibrer |
-| Coût d'aménagement d'un logement | 800 membres | à équilibrer |
-| Recrutement aménagé | +25 Membres/tick (perdu si le quartier est capturé) | à équilibrer |
-| Membres de départ (faction) | 3 000 | à équilibrer |
-| Garnison neutre (par quartier) | 60 Contrôle | fixé |
-| Spawns | 4 quartiers bâtis espacés (glouton) | fixé |
-| Régénération de Contrôle | +X/tick après Y s sans dégât | TBD |
+| Map | Paris IRIS — 992 real quarters | fixed |
+| Factions | 6 (player + 5 AI) | fixed |
+| Max Control | 100 | fixed |
+| Initial Control (captured quarter) | ~30 | to balance |
+| `maxMembers` | `2000 + quarters × 1500 + housing × 2000 + depots × 2000` | to balance |
+| Member production | `(8 × quarters + 25 × housing) × (1 − members/max)` /tick | to balance |
+| Housing development cost | 800 members | to balance |
+| Developed recruitment | +25 Members/tick (lost if the quarter is captured) | to balance |
+| Starting Members (faction) | 3,000 | to balance |
+| Neutral garrison (per quarter) | 60 Control | fixed |
+| Spawns | 4 spaced built quarters (greedy) | fixed |
+| Control regeneration | +X/tick after Y s without damage | TBD |
 
-## Cas limites
+## Edge cases
 
-- **Quartier encerclé** : cluster isolé → perdu (anti-snowball) ; tracer la cause.
-- **Faction éliminée** (0 quartier) : ses bâtiments sont détruits ou transférés (à trancher → `TBD`).
-- **Quartier neutre sans garnison** : expansion gratuite ? Non — garnison minimale garantie à la génération.
-- **Contrôle contesté** : si deux attaques visent le même quartier le même tick, résolution déterministe (ordre stable des factions).
-- **Spawn écrasé** : si aucune position valide (distance min), relâchement progressif puis repli (façon OpenFront).
+- **Encircled quarter**: isolated cluster → lost (anti-snowball); trace the cause.
+- **Eliminated faction** (0 quarters): its buildings are destroyed or transferred (to decide → `TBD`).
+- **Neutral quarter without a garrison**: free expansion? No — a minimum garrison is guaranteed at generation.
+- **Contested Control**: if two attacks target the same quarter on the same tick, deterministic resolution (stable faction order).
+- **Crowded spawn**: if no valid position (min distance), progressive relaxation then fallback (OpenFront style).
 
-## Dépendances
+## Dependencies
 
-- `pillars.md` — R1–R4 (causalité, pas de rubber-banding).
-- `combat.md` — formules d'attaque/défense, capture.
-- `economy.md` — Membres, bâtiments (Dépôt, Planque).
-- `factions.md` — IA, diplomatie, clusters.
-- `police-ai.md` — la police comme faction adverse.
-- `win-conditions.md` — seuil de contrôle.
-- `procgen.md` — ville préexistante, spawns, neutres.
+- `pillars.md` — R1–R4 (causality, no rubber-banding).
+- `combat.md` — attack/defense formulas, capture.
+- `economy.md` — Members, buildings (Depot, Safehouse).
+- `factions.md` — AI, diplomacy, clusters.
+- `police-ai.md` — the police as an opposing faction.
+- `win-conditions.md` — control threshold.
+- `procgen.md` — pre-existing city, spawns, neutrals.
 
-## Critères de validation
+## Validation criteria
 
-- [ ] Une faction peut étendre son territoire sur le neutre et sur une faction ennemie.
-- [ ] Le Contrôle régénère, monte et tombe de façon traçable (audit causal).
-- [ ] Un quartier capturé transfère ses bâtiments.
-- [x] Un quartier capturé transfère ses bâtiments.
-- [x] Carte reproductible (fichier généré et versionné).
+- [ ] A faction can expand its territory onto neutrals and onto an enemy faction.
+- [ ] Control regenerates, rises and falls in a traceable way (causal audit).
+- [ ] A captured quarter transfers its buildings.
+- [x] A captured quarter transfers its buildings.
+- [x] Reproducible map (generated and versioned file).
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Unité de territoire | Quartier IRIS (992 quartiers réels) |
-| 2 | Modèle | Propriétaire + Contrôle 0–100 + pool de Membres |
-| 3 | Expansion | Par adjacence (BFS), coût en Membres |
-| 4 | Anti-snowball | Clusters isolés perdus (façon OpenFront) |
-| 5 | Factions | 4, spawns espacés (échantillonnage glouton) |
-| 6 | Adjacence | Frontières partagées (arêtes), calculées dans `scripts/build-paris-map.ts` |
+| 1 | Territory unit | IRIS quarter (992 real quarters) |
+| 2 | Model | Owner + Control 0–100 + Members pool |
+| 3 | Expansion | By adjacency (BFS), cost in Members |
+| 4 | Anti-snowball | Isolated clusters lost (OpenFront style) |
+| 5 | Factions | 4, spaced spawns (greedy sampling) |
+| 6 | Adjacency | Shared borders (edges), computed in `scripts/build-paris-map.ts` |

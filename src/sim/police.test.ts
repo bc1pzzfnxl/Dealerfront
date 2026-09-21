@@ -1,5 +1,5 @@
 /**
- * Police — anti-leader, raids, liquidation, corruption. Voir docs/police-ai.md.
+ * Police — anti-leader, raids, liquidation, corruption. See docs/police-ai.md.
  */
 
 import { describe, expect, it } from "vitest";
@@ -19,15 +19,15 @@ function giveNeutral(world: World, factionId: number, count: number): void {
 	}
 }
 
-/** Premier quartier neutre. */
+/** First neutral quarter. */
 function firstNeutral(world: World): number {
 	for (let i = 0; i < world.territory.count; i += 1) {
 		if (world.territory.owner[i] === NEUTRAL) return i;
 	}
-	throw new Error("aucun quartier neutre");
+	throw new Error("no neutral quarter");
 }
 
-describe("police", () => {	it("cible le leader (à égalité, l'id le plus faible)", () => {
+describe("police", () => {	it("targets the leader (on a tie, the lowest id)", () => {
 		const world = new World(1);
 		world.step();
 		expect(world.police.target).toBe(0);
@@ -38,7 +38,7 @@ describe("police", () => {	it("cible le leader (à égalité, l'id le plus faibl
 		expect(world.findLeader()).toBe(1);
 	});
 
-	it("la Pression monte quand un cartel domine écrasamment et retombe sinon", () => {
+	it("Pressure rises when a cartel crushes and falls back otherwise", () => {
 		const world = new World(1);
 		giveNeutral(world, 0, Math.ceil(world.territory.count * 0.85));
 		world.step();
@@ -52,25 +52,25 @@ describe("police", () => {	it("cible le leader (à égalité, l'id le plus faibl
 		expect(calm.police.pressure).toBeLessThan(50);
 	});
 
-	it("la corruption fait baisser la Pression (sans immunité sous domination écrasante)", () => {
+	it("corruption lowers Pressure (no immunity under crushing domination)", () => {
 		const world = new World(1);
 		const player = world.player;
-		player.cashPropre = 100000;
+		player.cleanCash = 100000;
 		world.police.pressure = 60;
 		expect(world.playerCorrupt()).toBe(true);
 		world.step();
 		expect(world.police.pressure).toBeLessThan(60);
 	});
 
-	it("un raid retire du Contrôle et détruit un bâtiment du leader", () => {
+	it("a raid removes Control and destroys a leader's building", () => {
 		const world = new World(1);
 		const player = world.player;
 		giveNeutral(world, player.id, 5);
 		const target = 0;
 		expect(world.territory.owner[target]).toBe(player.id);
 		player.members = 100000;
-		player.cashSale = 100000;
-		player.cashPropre = 100000;
+		player.dirtyCash = 100000;
+		player.cleanCash = 100000;
 		const type = world.allowedBuildings(target)[0]!;
 		expect(world.playerBuild(target, type)).toBe(true);
 
@@ -85,15 +85,15 @@ describe("police", () => {	it("cible le leader (à égalité, l'id le plus faibl
 		expect(world.buildingAt(target)).toBeNull();
 	});
 
-	it("la liquidation policière échoue le joueur", () => {
+	it("police liquidation defeats the player", () => {
 		const world = new World(1);
 		world.police.pressure = 99;
 		world.step();
 		expect(world.outcome).toBe("defeat");
-		expect(world.endReason).toContain("Liquidation");
+		expect(world.endReason).toContain("liquidation");
 	});
 
-	it("la police peut démanteler un gang IA dominant", () => {
+	it("the police can dismantle a dominant AI gang", () => {
 		const world = new World(1);
 		giveNeutral(world, 1, 10);
 		world.step();
@@ -104,7 +104,7 @@ describe("police", () => {	it("cible le leader (à égalité, l'id le plus faibl
 		expect(world.outcome).toBeNull();
 	});
 
-	it("le raid policier vise le quartier le plus chaud", () => {
+	it("the police raid targets the hottest quarter", () => {
 		const world = new World(1);
 		const player = world.player;
 		giveNeutral(world, player.id, 5);
@@ -117,12 +117,12 @@ describe("police", () => {	it("cible le leader (à égalité, l'id le plus faibl
 		expect(world.controlAt(hot)).toBeLessThan(before);
 	});
 
-	it("l'activité d'un point de vente chauffe le quartier, puis retombe", () => {
+	it("a Storefront's activity heats the quarter, then falls back", () => {
 		const world = new World(1);
 		const module = firstNeutral(world);
 		world.territory.owner[module] = 1;
 		world.territory.control[module] = 100;
-		world.territory.building[module] = BUILDING_INDEX.vente;
+		world.territory.building[module] = BUILDING_INDEX.storefront;
 		world.step();
 		const hot = world.heatAt(module);
 		expect(hot).toBeGreaterThan(0);
@@ -132,10 +132,10 @@ describe("police", () => {	it("cible le leader (à égalité, l'id le plus faibl
 		expect(world.heatAt(module)).toBeLessThan(hot);
 	});
 
-	it("la corruption refroidit les quartiers du cartel", () => {
+	it("corruption cools the cartel's quarters", () => {
 		const world = new World(1);
 		const player = world.player;
-		player.cashPropre = 100000;
+		player.cleanCash = 100000;
 		const spawn = world.city.spawns[0]!;
 		world.heat[spawn] = 80;
 		world.police.pressure = 60;
@@ -143,38 +143,38 @@ describe("police", () => {	it("cible le leader (à égalité, l'id le plus faibl
 		expect(world.heatAt(spawn)).toBeCloseTo(40);
 	});
 
-	it("corrompre la police coûte cher (coût croissant) et fait varier la Pression", () => {
+	it("corrupting the police is expensive (increasing cost) and varies Pressure", () => {
 		const world = new World(1);
 		const player = world.player;
-		player.cashPropre = 100000;
+		player.cleanCash = 100000;
 		world.police.pressure = 80;
 
 		const cost = world.playerCorruptionCost();
 		expect(world.playerCorrupt()).toBe(true);
 		expect(player.corruptionUses).toBe(1);
-		expect(player.cashPropre).toBe(100000 - cost);
+		expect(player.cleanCash).toBe(100000 - cost);
 		expect([80 - POLICE.corruptionReduction, 80 + POLICE.corruptionBurnBacklash]).toContain(
 			world.police.pressure,
 		);
 		expect(world.playerCorruptionCost()).toBeGreaterThan(cost);
 
-		player.cashPropre = 0;
+		player.cleanCash = 0;
 		expect(world.playerCanCorrupt()).toBe(false);
 	});
 });
 
-describe("heat & blanchiment (anti-blocage)", () => {
-	it("le blanchiment par défaut laisse du Cash sale pour bâtir", () => {
+describe("heat & laundering (anti-lock)", () => {
+	it("default laundering leaves Dirty cash to build", () => {
 		const world = new World(1);
 		expect(world.playerLaunderRatio()).toBeLessThan(1);
 	});
 
-	it("le heat d'un point de vente se stabilise sous 100 (demande normale)", () => {
+	it("a Storefront's heat stabilizes below 100 (normal demand)", () => {
 		const world = new World(1);
 		const module = firstNeutral(world);
 		world.territory.owner[module] = world.player.id;
 		world.territory.control[module] = 100;
-		world.territory.building[module] = BUILDING_INDEX.vente;
+		world.territory.building[module] = BUILDING_INDEX.storefront;
 		world.city.demand[module] = 1;
 		for (let t = 0; t < 3000; t += 1) world.step();
 		expect(world.heatAt(module)).toBeGreaterThan(10);
@@ -182,21 +182,21 @@ describe("heat & blanchiment (anti-blocage)", () => {
 	});
 });
 
-describe("renseignement payant (guetteurs)", () => {
-	it("des guetteurs impayés aveuglent le renseignement", () => {
+describe("paid intel (watchers)", () => {
+	it("unpaid watchers blind the intel", () => {
 		const world = new World(1);
 		const player = world.player;
 		const module = firstNeutral(world);
 		world.territory.owner[module] = player.id;
 		world.territory.control[module] = 100;
-		world.territory.building[module] = BUILDING_INDEX.contre;
-		player.cashSale = 1000;
+		world.territory.building[module] = BUILDING_INDEX.counter;
+		player.dirtyCash = 1000;
 		world.step();
 		expect(player.guardsPaid).toBe(true);
 		expect(world.guardsAt(module)).toBeGreaterThan(0);
 
-		// Plus un sou : les guetteurs ne sont plus payés → aveugles.
-		player.cashSale = 0;
+		// Not a penny left: watchers are no longer paid → blind.
+		player.dirtyCash = 0;
 		for (let i = 0; i < 5; i += 1) world.step();
 		expect(player.guardsPaid).toBe(false);
 		expect(world.guardsAt(module)).toBe(0);

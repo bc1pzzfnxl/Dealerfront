@@ -1,9 +1,9 @@
 /**
- * Arena — un Durable Object **par partie**. Détient le `World` autoritaire,
- * reçoit les intents des agents (HTTP), avance la simulation **au rythme des
- * agents** (un tour = `turnTicks` ticks, déclenché quand tous ont fini) et
- * diffuse l'état aux spectateurs (WebSocket).
- * Voir docs/arena.md.
+ * Arena — one Durable Object **per game**. Holds the authoritative `World`,
+ * receives agent intents (HTTP), advances the simulation **at the agents'
+ * pace** (one turn = `turnTicks` ticks, triggered when everyone is done), and
+ * broadcasts state to spectators (WebSocket).
+ * See docs/arena.md.
  */
 
 import { DurableObject } from "cloudflare:workers";
@@ -36,11 +36,11 @@ export class Arena extends DurableObject<Env> {
 	private world: World | null = null;
 	private result: ArenaResult | null = null;
 
-	/** Charge (ou crée) l'état depuis le stockage du DO. */
+	/** Loads (or creates) state from the DO storage. */
 	private async load(): Promise<void> {
 		if (this.arena) return;
 		const stored = await this.ctx.storage.get<ArenaState>("arena");
-		if (!stored) throw new Error("arène inexistante");
+		if (!stored) throw new Error("arena does not exist");
 		this.arena = stored;
 		const snapshot = await this.ctx.storage.get<WorldSnapshot>("world");
 		const world = new World(stored.seed, {
@@ -90,7 +90,7 @@ export class Arena extends DurableObject<Env> {
 			try {
 				socket.send(payload);
 			} catch {
-				// socket fermé : ignoré
+				// closed socket: ignored
 			}
 		}
 	}
@@ -99,11 +99,11 @@ export class Arena extends DurableObject<Env> {
 		return (this.ctx.id.name ?? this.ctx.id.toString()) as string;
 	}
 
-	/** Crée l'arène (appelé par le Worker). */
+	/** Creates the arena (called by the Worker). */
 	private async create(id: string, config: ArenaConfig): Promise<CreateResponse> {
 		const count = Math.max(MIN_AGENTS, Math.min(MAX_AGENTS, Math.floor(config.agents)));
 		const seed = config.seed ?? Math.floor(Math.random() * 2 ** 31);
-		const names = ["Cartel", "Gang Nord", "Gang Est", "Gang Sud"];
+		const names = ["Cartel", "Northside Gang", "Eastside Gang", "Southside Gang"];
 		const agents: AgentInfo[] = Array.from({ length: count }, (_, index) => ({
 			factionId: index,
 			name: names[index] ?? `Gang ${index}`,
@@ -136,20 +136,20 @@ export class Arena extends DurableObject<Env> {
 		};
 	}
 
-	/** Applique un intent d'agent. */
+	/** Applies an agent intent. */
 	private async act(token: string, intent: Intent): Promise<{ ok: boolean; error?: string; turn: number }> {
 		await this.load();
 		const arena = this.arena!;
 		const agent = arena.agents.find((candidate) => candidate.token === token);
-		if (!agent) return { ok: false, error: "token inconnu", turn: arena.turn };
-		if (arena.phase !== "playing") return { ok: false, error: "partie non active", turn: arena.turn };
-		if (agent.ready) return { ok: false, error: "tour déjà terminé", turn: arena.turn };
+		if (!agent) return { ok: false, error: "unknown token", turn: arena.turn };
+		if (arena.phase !== "playing") return { ok: false, error: "game not active", turn: arena.turn };
+		if (agent.ready) return { ok: false, error: "turn already ended", turn: arena.turn };
 		const result = applyIntent(this.world!, agent.factionId, intent);
 		if (result.ok) agent.actions += 1;
 		return { ok: result.ok, error: result.error, turn: arena.turn };
 	}
 
-	/** Marque l'agent prêt ; quand tous le sont, avance d'un tour. */
+	/** Marks the agent ready; when everyone is, advances one turn. */
 	private async endTurn(token: string): Promise<{ advanced: boolean; turn: number }> {
 		await this.load();
 		const arena = this.arena!;
@@ -159,7 +159,7 @@ export class Arena extends DurableObject<Env> {
 		if (!arena.agents.every((candidate) => candidate.ready)) {
 			return { advanced: false, turn: arena.turn };
 		}
-		// Tout le monde a fini : on avance la simulation.
+		// Everyone is done: advance the simulation.
 		for (let i = 0; i < arena.turnTicks; i += 1) this.world!.step();
 		arena.turn += 1;
 		for (const candidate of arena.agents) {
@@ -185,7 +185,7 @@ export class Arena extends DurableObject<Env> {
 				rank: index + 1,
 				quarters: world.modulesOwned(factionId),
 				control: Math.round(world.controlRatio(factionId) * 1000) / 10,
-				cashPropre: Math.round(faction.cashPropre),
+				cleanCash: Math.round(faction.cleanCash),
 				captures: faction.captures,
 				eliminations: faction.eliminations,
 			};
@@ -193,11 +193,11 @@ export class Arena extends DurableObject<Env> {
 		return { outcome: world.endReason, ranking, turns: this.arena!.turn };
 	}
 
-	/** Vue agent : snapshot complet (l'agent filtre lui-même). */
+	/** Agent view: full snapshot (the agent filters it itself). */
 	private async agentView(token: string): Promise<unknown> {
 		await this.load();
 		const agent = this.arena!.agents.find((candidate) => candidate.token === token);
-		if (!agent) return { error: "token inconnu" };
+		if (!agent) return { error: "unknown token" };
 		return {
 			factionId: agent.factionId,
 			view: this.view(this.arenaId()),
@@ -257,7 +257,7 @@ export class Arena extends DurableObject<Env> {
 	}
 
 	async webSocketMessage(): Promise<void> {
-		// Spectateurs en lecture seule : aucun message attendu.
+		// Read-only spectators: no message expected.
 	}
 
 	async webSocketClose(socket: WebSocket): Promise<void> {

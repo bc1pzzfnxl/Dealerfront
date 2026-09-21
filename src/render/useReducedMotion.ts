@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 const QUERY = "(prefers-reduced-motion: reduce)";
 
-/** Vrai si l'utilisateur demande moins d'animations (accessibilité). */
+/** True if the user requests less motion (accessibility). */
 export function useReducedMotion(): boolean {
 	const [reduced, setReduced] = useState(
 		() => typeof window !== "undefined" && window.matchMedia(QUERY).matches,

@@ -1,6 +1,6 @@
 /**
- * Spectateur d'arène — carte live (WorldMap sur un World miroir) + classement
- * des agents + stats de fin. Lecture seule.
+ * Arena spectator — live map (WorldMap over a mirror World) + agent
+ * standings + end stats. Read-only.
  */
 
 import { useMemo, useRef, useState } from "react";
@@ -24,10 +24,10 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 	if (!world || !view) {
 		return (
 			<div className="select-screen">
-				<h1>Arène {id}</h1>
-				<p className="select-pitch">{connected ? "Connexion…" : "En attente du serveur…"}</p>
+				<h1>Arena {id}</h1>
+				<p className="select-pitch">{connected ? "Connecting…" : "Waiting for the server…"}</p>
 				<button type="button" onClick={onExit}>
-					Retour
+					Back
 				</button>
 			</div>
 		);
@@ -48,6 +48,8 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 					selected={selected}
 					colorblind={false}
 					version={version}
+					playerId={world.player.id}
+					defenseAt={(module) => world.garrisonAt(module)}
 					onModuleClick={(module) => setSelected(module)}
 					onModuleHover={setHovered}
 					onEmptyClick={() => setSelected(null)}
@@ -60,15 +62,15 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 			<div className="hud">
 				<header className="topbar card">
 					<div className="brand">
-						<h1>Arène {id}</h1>
+						<h1>Arena {id}</h1>
 						<span className="brand-sub">
-							{view.phase === "finished" ? "Terminée" : "En cours"} · tour {view.turn} · tick{" "}
+							{view.phase === "finished" ? "Finished" : "In progress"} · turn {view.turn} · tick{" "}
 							{view.tick}
 						</span>
 					</div>
 					<div className="top-stats">
 						{view.agents.map((agent) => (
-							<div className="stat" key={agent.factionId} title={`${agent.name} — actions ce tour`}>
+							<div className="stat" key={agent.factionId} title={`${agent.name} — actions this turn`}>
 								<span
 									className="stat-label"
 									style={{ color: FACTION_COLORS[agent.factionId] }}
@@ -85,18 +87,18 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 					</div>
 					<div className="top-right">
 						<span className="objective">
-							<strong>{view.phase === "finished" ? "Terminée" : "En cours"}</strong>
-							<span className="objective-sub">{connected ? "live" : "déconnecté"}</span>
+							<strong>{view.phase === "finished" ? "Finished" : "In progress"}</strong>
+							<span className="objective-sub">{connected ? "live" : "disconnected"}</span>
 						</span>
 						<button type="button" className="toggle" onClick={onExit}>
-							Quitter
+							Exit
 						</button>
 					</div>
 				</header>
 
 				<aside className="panel-right">
 					<section className="card">
-						<h2>Classement</h2>
+						<h2>Standings</h2>
 						{ranking.map((factionId, index) => {
 							const faction = world.factions[factionId]!;
 							return (
@@ -105,7 +107,7 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 										{index + 1}. {faction.name}
 									</span>
 									<code>
-										{world.modulesOwned(factionId)} q · {Math.round(faction.cashPropre)} propre
+										{world.modulesOwned(factionId)} q · {Math.round(faction.cleanCash)} clean
 									</code>
 								</div>
 							);
@@ -115,13 +117,13 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 					{selected !== null ? (
 						<section className="card">
 							<h2>
-								Quartier <em>#{selected}</em>
+								Quarter <em>#{selected}</em>
 							</h2>
 							<div className="line">
-								<span>Propriétaire</span>
+								<span>Owner</span>
 								<code>
 									{world.ownerAt(selected) === -1
-										? "Neutre"
+										? "Neutral"
 										: world.factions[world.ownerAt(selected)]?.name}
 								</code>
 							</div>
@@ -130,7 +132,7 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 								<code>{ZONE_LABELS[world.city.modules[selected]!]}</code>
 							</div>
 							<div className="line">
-								<span>Contrôle</span>
+								<span>Control</span>
 								<code>{Math.round(world.controlAt(selected))}</code>
 							</div>
 						</section>
@@ -138,7 +140,7 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 
 					{view.result ? (
 						<section className="card">
-							<h2>Résultat</h2>
+							<h2>Result</h2>
 							<p className="hint-inline">{view.result.outcome}</p>
 							{view.result.ranking.map((row) => (
 								<div className="line" key={row.factionId}>
@@ -146,11 +148,11 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 										{row.rank}. {row.name}
 									</span>
 									<code>
-										{row.quarters} q · {row.captures} prises · {row.eliminations} élim.
+										{row.quarters} q · {row.captures} captures · {row.eliminations} elim.
 									</code>
 								</div>
 							))}
-							<p className="hint-inline">Durée : {view.result.turns} tours.</p>
+							<p className="hint-inline">Duration: {view.result.turns} turns.</p>
 						</section>
 					) : null}
 				</aside>
@@ -158,8 +160,8 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 				<footer className="panel-bottom">
 					<p className="hud-keys">
 						{hovered !== null && hoveredOwner !== null && hoveredOwner >= 0
-							? `${world.factions[hoveredOwner]?.name} · contrôle ${Math.round(world.controlAt(hovered))}`
-							: "Survolez un quartier pour l'inspecter."}
+							? `${world.factions[hoveredOwner]?.name} · control ${Math.round(world.controlAt(hovered))}`
+							: "Hover a quarter to inspect it."}
 					</p>
 				</footer>
 			</div>

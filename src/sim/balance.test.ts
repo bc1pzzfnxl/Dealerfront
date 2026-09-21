@@ -1,6 +1,6 @@
 /**
- * Tests d'équilibrage / non-régression — la simulation complète doit rester
- * saine (invariants), déterministe et viable économiquement sur de longs runs.
+ * Balancing / non-regression tests — the full simulation must stay sound
+ * (invariants), deterministic and economically viable over long runs.
  */
 
 import { describe, expect, it } from "vitest";
@@ -27,38 +27,38 @@ function assertSane(world: World): void {
 	for (const faction of world.factions) {
 		expect(Number.isFinite(faction.members)).toBe(true);
 		expect(faction.members).toBeGreaterThanOrEqual(0);
-		expect(Number.isFinite(faction.cashPropre)).toBe(true);
-		expect(faction.cashPropre).toBeGreaterThanOrEqual(0);
+		expect(Number.isFinite(faction.cleanCash)).toBe(true);
+		expect(faction.cleanCash).toBeGreaterThanOrEqual(0);
 	}
 }
 
-describe("composition des bâtiments", () => {
-	it("comble le plus grand déficit au lieu de tout remplir de logements", () => {
+describe("building composition", () => {
+	it("fills the biggest deficit instead of filling everything with Housing", () => {
 		const counts = empty();
-		expect(chooseBuildType(counts, 20, () => true)).toBe("logement");
+		expect(chooseBuildType(counts, 20, () => true)).toBe("housing");
 
-		counts.logement = 6;
-		expect(chooseBuildType(counts, 20, () => true)).toBe("labo");
+		counts.housing = 6;
+		expect(chooseBuildType(counts, 20, () => true)).toBe("lab");
 
-		counts.labo = 4;
-		expect(chooseBuildType(counts, 20, () => true)).toBe("vente");
+		counts.lab = 4;
+		expect(chooseBuildType(counts, 20, () => true)).toBe("storefront");
 	});
 
-	it("respecte les plafonds (ex. Ateliers)", () => {
+	it("respects caps (e.g. Workshops)", () => {
 		const counts = empty();
-		counts.logement = 60;
-		counts.labo = 40;
-		counts.vente = 30;
-		counts.facade = 30;
+		counts.housing = 60;
+		counts.lab = 40;
+		counts.storefront = 30;
+		counts.front = 30;
 		counts.depot = 10;
-		counts.contre = 10;
-		counts.planque = 10;
-		counts.atelier = 5;
-		expect(chooseBuildType(counts, 200, () => true)).toBe("atelier");
-		expect(chooseBuildType(counts, 200, () => true, { atelier: 5 })).toBeNull();
+		counts.counter = 10;
+		counts.safehouse = 10;
+		counts.workshop = 5;
+		expect(chooseBuildType(counts, 200, () => true)).toBe("workshop");
+		expect(chooseBuildType(counts, 200, () => true, { workshop: 5 })).toBeNull();
 	});
 
-	it("ignore les types non abordables et s'arrête aux cibles atteintes", () => {
+	it("ignores unaffordable types and stops at reached targets", () => {
 		const counts = empty();
 		expect(chooseBuildType(counts, 20, () => false)).toBeNull();
 
@@ -69,8 +69,8 @@ describe("composition des bâtiments", () => {
 	});
 });
 
-describe("bot — runs longs", () => {
-	it("reste sain et déterministe sur plusieurs seeds", () => {
+describe("bot — long runs", () => {
+	it("stays sound and deterministic across several seeds", () => {
 		for (let seed = 0; seed < 6; seed += 1) {
 			const world = new World(seed);
 			const rng = createRng((seed * 7919 + 13) >>> 0);
@@ -79,7 +79,7 @@ describe("bot — runs longs", () => {
 		}
 	}, 20000);
 
-	it("même seed + même bot ⇒ territoire identique", () => {
+	it("same seed + same bot ⇒ identical territory", () => {
 		const run = (): number[] => {
 			const world = new World(3);
 			const rng = createRng((3 * 7919 + 13) >>> 0);
@@ -89,16 +89,16 @@ describe("bot — runs longs", () => {
 		expect(run()).toEqual(run());
 	});
 
-	it("l'économie tourne : Cash propre > 0 et chaîne Produit → sale → propre", () => {
+	it("the economy runs: Clean cash > 0 and chain Product → dirty → clean", () => {
 		const world = new World(1);
 		const rng = createRng((1 * 7919 + 13) >>> 0);
 		playOut(world, rng, 3000);
-		expect(world.player.cashPropre).toBeGreaterThan(0);
+		expect(world.player.cleanCash).toBeGreaterThan(0);
 		expect(world.player.buildings).toBeGreaterThan(0);
 	});
 
 	it(
-		"une partie finit par se conclure (battle royale)",
+		"a game eventually concludes (battle royale)",
 		() => {
 			let finished = 0;
 			for (let seed = 0; seed < 4; seed += 1) {
@@ -113,8 +113,8 @@ describe("bot — runs longs", () => {
 	);
 });
 
-describe("bot — tueur à gage", () => {
-	it("un tueur ne capture pas (contrôle plancher 5)", () => {
+describe("bot — hitman", () => {
+	it("a hitman does not capture (control floor 5)", () => {
 		const world = new World(0);
 		const rng = createRng(99);
 		for (let tick = 0; tick < 4000; tick += 1) {

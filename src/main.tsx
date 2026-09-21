@@ -3,8 +3,8 @@ import App from "./App.tsx";
 import "./styles.css";
 
 const rootElement = document.getElementById("root");
-if (!rootElement) throw new Error("Élément #root introuvable");
+if (!rootElement) throw new Error("#root element not found");
 
-// Pas de StrictMode : le double-montage recrée la source mapcn au milieu de son
-// cycle de vie (MapLibre jette « already exists »).
+// No StrictMode: double-mounting recreates the mapcn source mid-lifecycle
+// (MapLibre throws "already exists").
 createRoot(rootElement).render(<App />);

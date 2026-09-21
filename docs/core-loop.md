@@ -1,79 +1,79 @@
-# Core Loop — Boucle de jeu et déroulé d'une partie
+# Core Loop — Game loop and pacing of a game
 
-> Statut : **v3 (DealerFront)** — boucle god-view équilibrée (gestion ↔ conquête).
+> Status: **v3 (DealerFront)** — balanced god-view loop (management ↔ conquest).
 
-## Objectif
+## Objective
 
-Décrire la boucle d'activité du joueur-cartel et le déroulé macro d'une partie (**≈ 25 min**) : ce qu'il fait en permanence, ce qu'il cherche à maximiser, et comment la partie se termine.
+Describe the cartel player's activity loop and the macro pacing of a game (**≈ 25 min**): what they do continuously, what they seek to maximize, and how the game ends.
 
-## Règles
+## Rules
 
-### Boucle de gameplay
+### Gameplay loop
 
-1. **Produire** — les **Labos** (quartiers possédés) génèrent du **Produit**.
-2. **Vendre** — les **Points de vente** convertissent le Produit en **Cash sale**.
-3. **Blanchir** — les **Façades** convertissent le Cash sale en **Cash propre** (commission) — base du score et de la victoire.
-4. **Étendre** — les **bagarres** conquièrent des quartiers **neutres** ou ennemis (`combat.md`), ce qui augmente l'Influence max et le revenu.
-5. **Équiper** — les **Ateliers** débloquent la **tech** (Armement/Protection/Logistique, `tech.md`) qui change l'issue des bagarres.
-6. **Défendre** — **Planques** et renforts protègent les quartiers ; **Contre-espionnage** contre les tueurs.
-7. **Gérer la police** — la **Pression** monte avec la part de contrôle du leader ; on l'endure ou on la **corrompt** (`police-ai.md`).
-8. **Gérer les gangs** — pactes, embargoes, trahisons, agents (`factions.md`).
+1. **Produce** — **Labs** (owned quarters) generate **Product**.
+2. **Sell** — **Storefronts** convert Product into **Dirty cash**.
+3. **Launder** — **Fronts** convert Dirty cash into **Clean cash** (commission) — basis of the score and victory.
+4. **Expand** — **brawls** conquer **neutral** or enemy quarters (`combat.md`), which increases max Influence and income.
+5. **Equip** — **Workshops** unlock **tech** (Armament/Protection/Logistics, `tech.md`) that changes the outcome of brawls.
+6. **Defend** — **Safehouses** and reinforcements protect quarters; **Counter-intel** against hitmen.
+7. **Manage the police** — **Pressure** rises with the leader's control share; you endure it or **corrupt** it (`police-ai.md`).
+8. **Manage the gangs** — pacts, embargoes, betrayals, agents (`factions.md`).
 
-### Condition de victoire / défaite
+### Victory / defeat condition
 
-- **Victoire** : **dernier cartel en jeu** (battle royale, voir `win-conditions.md`).
-- **Défaites** : 0 quartier (liquidation totale), faillite, **liquidation policière**.
+- **Victory**: **last cartel in play** (battle royale, see `win-conditions.md`).
+- **Defeats**: 0 quarters (total liquidation), bankruptcy, **police liquidation**.
 
-### Déroulé macro d'une partie
+### Macro pacing of a game
 
-| Phase | Repère | Caractéristique |
+| Phase | Marker | Characteristic |
 |---|---|---|
-| **Implantation** | ~0–5 min | 1–2 quartiers, quelques Labos/Points de vente, neutre partout ailleurs, IA discrètes |
-| **Expansion** | ~5–15 min | Conquête du neutre, premiers bâtiments, premiers pactes/trahisons, police faible |
-| **Guerre de quartiers** | ~15–25 min | Affrontements entre gangs, tech, tueurs, raids de police contre le leader |
-| **Clôture** | fin | Il ne reste qu'un cartel : les faibles sont achevés (encirclement), la police peut liquider |
+| **Setup** | ~0–5 min | 1–2 quarters, a few Labs/Storefronts, neutral everywhere else, discreet AIs |
+| **Expansion** | ~5–15 min | Conquest of neutrals, first buildings, first pacts/betrayals, weak police |
+| **Quarter war** | ~15–25 min | Clashes between gangs, tech, hitmen, police raids against the leader |
+| **Closing** | end | Only one cartel remains: the weak are finished off (encirclement), the police may liquidate |
 
-Le rythme est piloté par la **causalité** (contrôle + Heat), pas par un chrono dur.
+Pacing is driven by **causality** (control + Heat), not by a hard clock.
 
-## Paramètres chiffrés
+## Numeric parameters
 
-| Paramètre | Valeur | Statut |
+| Parameter | Value | Status |
 |---|---|---|
-| Durée | illimitée (jusqu'à élimination) | fixé |
-| Condition de victoire | dernier survivant (aucun seuil) | fixé |
-| Nombre de factions | 6 | fixé |
-| Quartiers | 992 (Paris IRIS) | fixé |
-| Fin de partie | causale (victoire/défaites) | fixé |
+| Duration | unlimited (until elimination) | fixed |
+| Victory condition | last survivor (no threshold) | fixed |
+| Number of factions | 6 | fixed |
+| Quarters | 992 (Paris IRIS) | fixed |
+| Endgame | causal (victory/defeat) | fixed |
 
-## Cas limites
+## Edge cases
 
-- **Attente passive** : ne rien faire ne baisse pas la difficulté de base, mais laisse les IA s'étendre → l'inaction est punie par le monde (pas par un artifice).
-- **Leader trop fort** : la police monte (anti-snowball) → aucun runaway gratuit.
-- **Faillite** : plus de Cash (sale et propre) pendant 300 ticks (30 s) → défaite.
-- **Élimination** : 0 quartier → défaite immédiate.
-- **Éliminations simultanées** : départage déterministe par quartiers, puis Membres, puis Cash (`win-conditions.md`).
+- **Passive waiting**: doing nothing does not lower base difficulty, but lets the AIs expand → inaction is punished by the world (not by an artifice).
+- **Leader too strong**: the police ramp up (anti-snowball) → no free runaway.
+- **Bankruptcy**: no more Cash (dirty and clean) for 300 ticks (30 s) → defeat.
+- **Elimination**: 0 quarters → immediate defeat.
+- **Simultaneous eliminations**: deterministic tiebreak by quarters, then Members, then Cash (`win-conditions.md`).
 
-## Dépendances
+## Dependencies
 
 - `pillars.md` — R1/R3/R8.
-- `territory.md` — quartiers, Influence, contrôle.
-- `economy.md` — production, vente, blanchiment.
-- `combat.md` — bagarres, capture.
+- `territory.md` — quarters, Influence, control.
+- `economy.md` — production, sales, laundering.
+- `combat.md` — brawls, capture.
 - `tech.md`, `factions.md`, `police-ai.md`.
 - `win-conditions.md`, `scoring.md`, `ui-ux.md`.
 
-## Critères de validation
+## Validation criteria
 
-- [ ] Un run complet se décrit avec les 8 étapes, sans étape manquante.
-- [ ] La boucle éco et la boucle conquête s'alimentent mutuellement (aucune n'est optionnelle).
-- [ ] Toute fin de partie est causale et traçable.
-- [ ] Aucun runaway : le leader subit une pression croissante.
+- [ ] A full run is described by the 8 steps, with no missing step.
+- [ ] The economy loop and the conquest loop feed each other (neither is optional).
+- [ ] Every endgame is causal and traceable.
+- [ ] No runaway: the leader faces increasing pressure.
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Boucle | 8 étapes (produire→vendre→blanchir→étendre→équiper→défendre→police→gangs) |
-| 2 | Équilibre | Économie ↔ conquête à égalité |
-| 3 | Victoire | Dernier survivant (battle royale) |
-| 4 | Durée | 20–30 min, pilotée par la causalité |
+| 1 | Loop | 8 steps (produce→sell→launder→expand→equip→defend→police→gangs) |
+| 2 | Balance | Economy ↔ conquest on equal footing |
+| 3 | Victory | Last survivor (battle royale) |
+| 4 | Duration | 20–30 min, driven by causality |

@@ -1,143 +1,143 @@
-# Difficulty — Philosophie, formules O/D et budget de difficulté
+# Difficulty — Philosophy, O/D formulas and difficulty budget
 
-> Statut : **obsolète (v2, ancien mode)** — l'équilibrage se fait désormais par simulation massive (`sim:mass`) sur la carte Paris.
+> Status: **obsolete (v2, old mode)** — balancing is now done by massive simulation (`sim:mass`) on the Paris map.
 
-## Objectif
+## Objective
 
-Fixer la **philosophie de difficulté** (non négociable), les **formules** des scores d'opportunité (O) et de danger (D), et les **valeurs de référence** traduisant des données réelles de criminologie en paramètres de jeu compressés sur 30 minutes.
+Fix the **difficulty philosophy** (non-negotiable), the **formulas** of the opportunity (O) and danger (D) scores, and the **reference values** translating real criminology data into game parameters compressed over 30 minutes.
 
-## Règles — Philosophie (non négociable)
+## Rules — Philosophy (non-negotiable)
 
-- **Pas de rubber-banding** : le jeu n'ajuste jamais l'IA ou les règles pour compenser la performance du joueur.
-- **Pas de méta-progression** : aucun lien entre les parties (pas d'XP, pas de déblocage permanent).
-- **Difficulté de base aléatoire mais visible** : fixée à la génération, communiquée par observation directe du monde (nombre de postes visibles, densité de patrouilles) — jamais par un chiffre caché ou un score annoncé.
-- **Difficulté évolutive = causalité pure** : toute montée de tension découle des actions du joueur (Heat, témoins, patrouilles alertées).
+- **No rubber-banding**: the game never adjusts the AI or the rules to compensate for player performance.
+- **No meta-progression**: no link between games (no XP, no permanent unlock).
+- **Base difficulty random but visible**: set at generation, communicated by directly observing the world (number of visible stations, patrol density) — never by a hidden number or an announced score.
+- **Evolving difficulty = pure causality**: every tension increase follows from the player's actions (Heat, witnesses, alerted patrols).
 
-> Voir `pillars.md` R1–R4.
+> See `pillars.md` R1–R4.
 
-## Formules des scores O et D
+## O and D score formulas
 
-Les scores sont calculés **à la génération**, par carte, puis agrégés en un ratio `O/D`.
+The scores are computed **at generation**, per map, then aggregated into an `O/D` ratio.
 
-### Score d'opportunité O (complet)
+### Opportunity score O (complete)
 
-`O = Σ_z [ Profit_z × DensitéClients_z × Accessibilité_z ] + α·N_façades − β·D_moyenne(labo → points de vente)`
+`O = Σ_z [ Profit_z × ClientDensity_z × Accessibility_z ] + α·N_fronts − β·D_mean(lab → storefronts)`
 
-| Terme | Description |
+| Term | Description |
 |---|---|
-| `Profit_z` | Profit potentiel de la zone `z` (type de zone/client). |
-| `DensitéClients_z` | Densité de clients PNJ potentiels. |
-| `Accessibilité_z` | Facilité d'accès depuis le reste du réseau. |
-| `N_façades` | Nombre de façades de blanchiment disponibles. |
-| `D_moyenne(labo→vente)` | Distance moyenne labo → points de vente (pénalise la logistique trop longue). |
-| `α`, `β` | Poids à équilibrer. |
+| `Profit_z` | Potential profit of zone `z` (zone/client type). |
+| `ClientDensity_z` | Density of potential NPC clients. |
+| `Accessibility_z` | Ease of access from the rest of the network. |
+| `N_fronts` | Number of available laundering fronts. |
+| `D_mean(lab→store)` | Mean distance lab → storefronts (penalizes overly long logistics). |
+| `α`, `β` | Weights to balance. |
 
-### Score de danger D (complet)
+### Danger score D (complete)
 
-`D = Σ_z [ CouverturePatrouille_z + ProximitéPoste_z + DensitéTémoins_z ] + γ·Σ_z H_base(z)`
+`D = Σ_z [ PatrolCoverage_z + StationProximity_z + WitnessDensity_z ] + γ·Σ_z H_base(z)`
 
-| Terme | Description |
+| Term | Description |
 |---|---|
-| `CouverturePatrouille_z` | Densité/couverture de patrouilles de base. |
-| `ProximitéPoste_z` | Proximité et nombre de postes de police. |
-| `DensitéTémoins_z` | Potentiel de témoins civils (`city-sim.md`). |
-| `H_base(z)` | Danger de base de la zone (postes de police, `police-ai.md`). |
-| `γ` | Poids à équilibrer. |
+| `PatrolCoverage_z` | Base patrol density/coverage. |
+| `StationProximity_z` | Proximity and number of police stations. |
+| `WitnessDensity_z` | Potential for civilian witnesses (`city-sim.md`). |
+| `H_base(z)` | Base danger of the zone (police stations, `police-ai.md`). |
+| `γ` | Weight to balance. |
 
-### Fourchette cible
+### Target range
 
-- **Ratio O/D entre 0,90 et 1,10** (variance acceptée mais limitée : pas de run trivial, pas de run injouable).
-- Hors fourchette → **correction automatique** (ajout/retrait d'une patrouille, déplacement d'un poste, ajustement d'une zone de profit) ; si l'échec persiste après **N itérations**, la seed est **régénérée**.
-- Le ratio n'est **jamais recalculé pendant la partie** (R1).
+- **O/D ratio between 0.90 and 1.10** (variance accepted but limited: no trivial run, no unplayable run).
+- Out of range → **automatic correction** (add/remove a patrol, move a station, adjust a profit zone); if the failure persists after **N iterations**, the seed is **regenerated**.
+- The ratio is **never recomputed during the game** (R1).
 
-## Paramètres chiffrés — Valeurs de référence (ancrées dans le réel)
+## Numeric parameters — Reference values (grounded in reality)
 
-### Sources utilisées (criminologie réelle, abstraite pour le jeu)
+### Sources used (real criminology, abstracted for the game)
 
-- **Temps de réponse policière** : dans les grandes agglomérations, la moyenne pour un appel prioritaire varie fortement — environ **5 à 9 min** dans les villes les mieux dotées / incidents les plus graves, jusqu'à **15–20 min** (voire plus) dans les zones sous-dotées ou pour des appels moins critiques.
-- **Taux d'élucidation réel** : une minorité des infractions sont résolues par arrestation (de l'ordre de **35–40 %** pour les crimes violents, **~12 %** pour les atteintes aux biens). Pour la drogue spécifiquement, l'écrasante majorité des arrestations concerne la **possession simple** ; la vente/fabrication ne représente qu'une **fraction (~15–16 %)** des arrestations — l'activité de deal organisée est structurellement plus difficile à intercepter que la consommation visible.
+- **Police response time**: in large metropolitan areas, the average for a priority call varies widely — about **5 to 9 min** in the best-equipped cities / most serious incidents, up to **15–20 min** (or more) in under-resourced areas or for less critical calls.
+- **Real clearance rate**: a minority of offenses are solved by arrest (on the order of **35–40%** for violent crimes, **~12%** for property offenses). For drugs specifically, the overwhelming majority of arrests concern **simple possession**; sale/manufacture accounts for only a **fraction (~15–16%)** of arrests — organized dealing activity is structurally harder to intercept than visible consumption.
 
-### Détection par action (fourchettes)
+### Detection per action (ranges)
 
-Tirage à l'intérieur de la fourchette selon l'action :
+Draw within the range depending on the action:
 
-| Action | Détection (dossier fermé) | Détection (dossier ouvert) |
+| Action | Detection (closed case) | Detection (open case) |
 |---|---|---|
-| Transport / déplacement porteur | 8–10 % | 60–70 % |
-| Vente | 8–15 % | 60–85 % |
-| Blanchiment (action engageante longue) | 12–18 % *(à équilibrer)* | 70–85 % *(à équilibrer)* |
+| Transport / courier movement | 8–10% | 60–70% |
+| Sales | 8–15% | 60–85% |
+| Laundering (long committing action) | 12–18% *(to balance)* | 70–85% *(to balance)* |
 
-- **Détection cumulée sur zone** (`H_L` > seuil 60) : croissance progressive, jamais de palier brutal **avant** le seuil ; **palier net** une fois le seuil franchi.
+- **Cumulative detection per zone** (`H_L` > threshold 60): gradual growth, never a sharp step **before** the threshold; a **clear step** once the threshold is crossed.
 
-### Délais de réaction (3 paliers, alignés `police-ai.md`)
+### Reaction times (3 tiers, aligned with `police-ai.md`)
 
-| Palier structurel | `H_G` | Délai de réaction |
+| Structural tier | `H_G` | Reaction time |
 |---|---|---|
-| P1 — agent seul | 0–29 | 90–150 s |
-| P2 — duo motorisé | 30–54 | 60–90 s |
-| P3 / P4 — renforcé / descente | 55–100 | 15–30 s |
+| P1 — lone agent | 0–29 | 90–150 s |
+| P2 — motorized duo | 30–54 | 60–90 s |
+| P3 / P4 — reinforced / bust | 55–100 | 15–30 s |
 
-### Budgets cibles par profil de quartier
+### Target budgets per quarter profile
 
-Chaque profil de quartier (Paris : arrondissement, type IRIS) module l'opportunité et le danger autour de la fourchette globale 0,90–1,10 :
+Each quarter profile (Paris: arrondissement, IRIS type) modulates opportunity and danger around the global range 0.90–1.10:
 
-| Archétype | Cible O/D | Intention |
+| Archetype | O/D target | Intention |
 |---|---|---|
-| Centre-ville dense / night-life | ≈ 0,95 | Riche mais dangereux |
-| Quartier résidentiel | ≈ 1,05 | Calme, opportunité modérée |
-| Zone industrielle/portuaire | ≈ 1,00 | Production/logistique |
-| Quartier universitaire/étudiant | ≈ 1,00 | Volatile (jour/nuit) |
-| Zone portuaire/frontalière | ≈ 0,95 | Import risqué, douane active |
+| Dense city center / nightlife | ≈ 0.95 | Rich but dangerous |
+| Residential quarter | ≈ 1.05 | Calm, moderate opportunity |
+| Industrial/port zone | ≈ 1.00 | Production/logistics |
+| University/student quarter | ≈ 1.00 | Volatile (day/night) |
+| Port/border zone | ≈ 0.95 | Risky import, active customs |
 
-### Tableau récapitulatif des paramètres
+### Parameter summary table
 
-| Paramètre | Valeur / fourchette | Statut |
+| Parameter | Value / range | Status |
 |---|---|---|
-| Fourchette O/D globale | 0,90–1,10 | fixé |
-| Cible O/D | 0,95–1,05 (profils de quartier) | à équilibrer |
-| Composantes de O | profit, densité clients, accessibilité, façades, distance labo→vente | fixé |
-| Composantes de D | patrouilles, postes, témoins, `H_base` | fixé |
-| Poids `α`, `β`, `γ` | **TBD** | TBD |
-| Détection transport | 8–10 % / 60–70 % | à équilibrer |
-| Détection vente | 8–15 % / 60–85 % | GDD |
-| Détection blanchiment | 12–18 % / 70–85 % | à équilibrer |
-| Délais de réaction | 90–150 / 60–90 / 15–30 s | fixé (3 paliers) |
-| Nombre max d'itérations de correction | **N** (ex. 5) **TBD** | TBD |
-| Critère de régénération de seed | échec après N itérations | fixé |
+| Global O/D range | 0.90–1.10 | fixed |
+| O/D target | 0.95–1.05 (quarter profiles) | to balance |
+| Components of O | profit, client density, accessibility, fronts, lab→storefront distance | fixed |
+| Components of D | patrols, stations, witnesses, `H_base` | fixed |
+| Weights `α`, `β`, `γ` | **TBD** | TBD |
+| Transport detection | 8–10% / 60–70% | to balance |
+| Sales detection | 8–15% / 60–85% | GDD |
+| Laundering detection | 12–18% / 70–85% | to balance |
+| Reaction times | 90–150 / 60–90 / 15–30 s | fixed (3 tiers) |
+| Max correction iterations | **N** (e.g. 5) **TBD** | TBD |
+| Seed regeneration criterion | failure after N iterations | fixed |
 
-## Cas limites
+## Edge cases
 
-- **Compression temporelle** : les valeurs réelles sont ramenées à l'échelle de la session (30 min) ; la proportionnalité doit rester cohérente.
-- **Correction impossible** : désormais la carte est **fixe** (Paris) → on ajuste les **profils de marché** plutôt que de régénérer une carte.
-- **Perception de l'aléa** : la difficulté de base doit être *lisible* avant le run (choix parmi 3 villes, `ui-ux.md`), sinon elle est injuste (R4).
-- **Rubber-banding déguisé** : toute mécanique qui « compense » la performance est interdite, même présentée comme du confort.
-- **Score indépendant de la difficulté** : le score final ne contient **aucun** bonus/malus de difficulté (sinon inéquitable entre runs, `scoring.md`).
-- **Archétype extrême** : même le plus riche ou le plus calme reste borné par la fourchette globale.
+- **Time compression**: real values are scaled to the session length (30 min); proportionality must remain coherent.
+- **Impossible correction**: the map is now **fixed** (Paris) → adjust the **market profiles** rather than regenerating a map.
+- **Perception of randomness**: base difficulty must be *readable* before the run (choice among 3 cities, `ui-ux.md`), otherwise it is unfair (R4).
+- **Disguised rubber-banding**: any mechanic that "compensates" performance is forbidden, even presented as convenience.
+- **Score independent of difficulty**: the final score contains **no** difficulty bonus/malus (otherwise unfair between runs, `scoring.md`).
+- **Extreme archetype**: even the richest or calmest remains bounded by the global range.
 
-## Dépendances
+## Dependencies
 
 - `pillars.md` — R1–R4.
-- `procgen.md` — applique les formules O/D, corrections et régénérations.
-- `police-ai.md` — consomme les probabilités et les délais par palier.
-- `police-ai.md` — seuils de Pression et danger de base.
-- `city-sim.md` — densité de clients/témoins par zone.
-- `scoring.md` — pas de bonus/malus de difficulté.
+- `procgen.md` — applies the O/D formulas, corrections and regenerations.
+- `police-ai.md` — consumes the probabilities and per-tier reaction times.
+- `police-ai.md` — Pressure thresholds and base danger.
+- `city-sim.md` — client/witness density per zone.
+- `scoring.md` — no difficulty bonus/malus.
 
-## Critères de validation
+## Validation criteria
 
-- [ ] Aucun paramètre de difficulté n'est recalculé pendant le run (audit anti-rubber-banding).
-- [ ] Les probabilités/délais sont cohérents avec la logique réelle décrite ci-dessus.
-- [ ] Le ratio O/D de chaque carte reste dans [0,90 ; 1,10] après correction.
-- [ ] Deux runs sur la même carte avec la même séquence d'actions donnent le même résultat (déterminisme, hors choix).
-- [ ] La difficulté de base est lisible sans connaître les formules.
+- [ ] No difficulty parameter is recomputed during the run (anti-rubber-banding audit).
+- [ ] The probabilities/times are consistent with the real logic described above.
+- [ ] Each map's O/D ratio stays within [0.90; 1.10] after correction.
+- [ ] Two runs on the same map with the same action sequence give the same result (determinism, aside from choices).
+- [ ] Base difficulty is readable without knowing the formulas.
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Composantes de O | Complètes (profit, clients, accès, façades, distance) |
-| 2 | Composantes de D | Complètes (patrouilles, postes, témoins, `H_base`) |
-| 3 | Détection | Fourchettes par action (transport/vente/blanchiment) |
-| 4 | Délais de réaction | 3 paliers : 90–150 / 60–90 / 15–30 s |
-| 5 | Contrôle de variance | Correction auto puis régénération après N itérations |
-| 6 | Budgets | Cible O/D par profil de quartier, dans la fourchette globale |
+| 1 | Components of O | Complete (profit, clients, access, fronts, distance) |
+| 2 | Components of D | Complete (patrols, stations, witnesses, `H_base`) |
+| 3 | Detection | Ranges per action (transport/sales/laundering) |
+| 4 | Reaction times | 3 tiers: 90–150 / 60–90 / 15–30 s |
+| 5 | Variance control | Auto-correction then regeneration after N iterations |
+| 6 | Budgets | O/D target per quarter profile, within the global range |

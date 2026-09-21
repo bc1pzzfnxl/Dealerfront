@@ -1,8 +1,8 @@
 /**
- * Agent de référence — joue une arène DealerFront via l'API HTTP.
- * Sert de **template** : remplace `decide()` par ton LLM.
+ * Reference agent — plays a DealerFront arena via the HTTP API.
+ * Serves as a **template**: replace `decide()` with your LLM.
  *
- * Usage : bun run scripts/agent-example.ts <arena> <token> [baseUrl]
+ * Usage: bun run scripts/agent-example.ts <arena> <token> [baseUrl]
  */
 
 import type { Intent } from "../src/sim/intents";
@@ -17,9 +17,9 @@ interface Snapshot {
 	factions: {
 		id: number;
 		members: number;
-		produit: number;
-		cashSale: number;
-		cashPropre: number;
+		product: number;
+		dirtyCash: number;
+		cleanCash: number;
 		buildings: number;
 	}[];
 }
@@ -41,19 +41,19 @@ const state = async (): Promise<{ factionId: number; snapshot: Snapshot }> =>
 
 const act = (intent: Intent): Promise<unknown> => post(`/api/arena/${ARENA}/act`, { token: TOKEN, intent });
 
-/** Stratégie naïve : bâtir la chaîne éco, puis étendre sur le voisin le plus faible. */
+/** Naive strategy: build the economy chain, then expand into the weakest neighbor. */
 async function decide(snapshot: Snapshot, factionId: number): Promise<Intent[]> {
 	const me = snapshot.factions[factionId]!;
 	const mine = snapshot.territory.owner.filter((owner) => owner === factionId).length;
 	const intents: Intent[] = [];
 
-	// 1. Chaîne économique d'abord.
+	// 1. Economy chain first.
 	if (me.buildings < mine) {
 		intents.push({ type: "batchBuild" });
 	}
-	// 2. Puis un peu de tech / guerre quand on a du Cash propre.
-	if (me.cashPropre > 8000) intents.push({ type: "upgradeTech", branch: "armement" });
-	if (me.cashSale > 6000) intents.push({ type: "hireMercenaries" });
+	// 2. Then a bit of tech / war once we have Clean cash.
+	if (me.cleanCash > 8000) intents.push({ type: "upgradeTech", branch: "armament" });
+	if (me.dirtyCash > 6000) intents.push({ type: "hireMercenaries" });
 	// 3. Expansion.
 	intents.push({ type: "attackBest" });
 	return intents;
@@ -61,14 +61,14 @@ async function decide(snapshot: Snapshot, factionId: number): Promise<Intent[]> 
 
 async function main(): Promise<void> {
 	if (!ARENA || !TOKEN) {
-		console.error("Usage : bun run scripts/agent-example.ts <arena> <token> [baseUrl]");
+		console.error("Usage: bun run scripts/agent-example.ts <arena> <token> [baseUrl]");
 		process.exit(1);
 	}
 	let lastTurn = -1;
 	for (;;) {
 		const { factionId, snapshot } = await state();
 		if (!snapshot) {
-			console.error("arène introuvable");
+			console.error("arena not found");
 			process.exit(1);
 		}
 		const view = (await fetch(`${BASE}/api/arena/${ARENA}/view`).then((r) => r.json())) as {
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
 			phase: string;
 		};
 		if (view.phase === "finished") {
-			console.log("Partie terminée.");
+			console.log("Game finished.");
 			return;
 		}
 		if (view.turn !== lastTurn) {
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
 				await act(intent);
 			}
 			await post(`/api/arena/${ARENA}/endTurn`, { token: TOKEN });
-			console.log(`Tour ${view.turn} joué (${intents.length} actions).`);
+			console.log(`Turn ${view.turn} played (${intents.length} actions).`);
 		}
 		await new Promise((resolve) => setTimeout(resolve, 500));
 	}

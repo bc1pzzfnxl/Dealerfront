@@ -1,7 +1,7 @@
 /**
- * Playtest d'intégration : exerce toute la boucle joueur via l'API `World`
- * (la même que l'UI) et vérifie qu'une partie reste jouable jusqu'au bout.
- * Usage : bun run scripts/playtest.ts
+ * Integration playtest: exercises the entire player loop through the `World`
+ * API (the same one the UI uses) and checks that a game stays playable to the end.
+ * Usage: bun run scripts/playtest.ts
  */
 import { BUILDING_INDEX, type BuildingType } from "../src/sim/buildings";
 import { NEUTRAL } from "../src/sim/territory";
@@ -33,12 +33,12 @@ function ownConversion(world: World, factionId: number, type: BuildingType): num
 	return -1;
 }
 
-/** Quartier possédé adjacent à `target` (pour lancer un assaut). */
+/** Owned quarter adjacent to `target` (to launch an assault). */
 function ownAdjacentTo(world: World, factionId: number, target: number): number {
 	for (const n of world.neighbors(target)) {
 		if (world.territory.owner[n] === factionId) return n;
 	}
-	// Sinon on prend un quartier neutre voisin et on le donne à la faction.
+	// Otherwise take a neighboring neutral quarter and give it to the faction.
 	for (const n of world.neighbors(target)) {
 		if (world.territory.owner[n] === NEUTRAL) {
 			world.territory.owner[n] = factionId;
@@ -51,12 +51,12 @@ function ownAdjacentTo(world: World, factionId: number, target: number): number 
 
 function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 	const p = world.player;
-	p.cashPropre = clean;
-	p.cashSale = sale;
+	p.cleanCash = clean;
+	p.dirtyCash = sale;
 	p.members = members;
 }
 
-// ---------- 1. Conquête ----------
+// ---------- 1. Conquest ----------
 {
 	const world = new World(1);
 	const target = world.neighbors(0)[0]!;
@@ -70,15 +70,15 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 		world.step();
 		if (world.ownerAt(target) === world.player.id) captured = true;
 	}
-	check("assaut + capture", ok && captured, `quartiers ${before}→${world.modulesOwned(world.player.id)}`);
+	check("assault + capture", ok && captured, `quarters ${before}→${world.modulesOwned(world.player.id)}`);
 }
 
-// ---------- 2. Construction (labo / vente / façade) ----------
+// ---------- 2. Construction (lab / storefront / front) ----------
 {
 	const world = new World(1);
 	boost(world);
 	const built: string[] = [];
-	for (const type of ["labo", "vente", "facade"] as const) {
+	for (const type of ["lab", "storefront", "front"] as const) {
 		const module = ownConversion(world, world.player.id, type);
 		if (module < 0) continue;
 		if (world.playerBuild(module, type)) {
@@ -86,87 +86,87 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 			if (world.buildingAt(module) === type) built.push(type);
 		}
 	}
-	check("construire labo/vente/façade", built.length === 3, built.join(", "));
+	check("build lab/storefront/front", built.length === 3, built.join(", "));
 }
 
-// ---------- 3. Chantiers (sans file) ----------
+// ---------- 3. Build sites (no queue) ----------
 {
 	const world = new World(1);
 	boost(world);
-	const a = ownConversion(world, world.player.id, "labo");
-	const b = ownConversion(world, world.player.id, "vente");
-	const builtA = a >= 0 && world.playerBuild(a, "labo");
-	const builtB = b >= 0 && world.playerBuild(b, "vente");
+	const a = ownConversion(world, world.player.id, "lab");
+	const b = ownConversion(world, world.player.id, "storefront");
+	const builtA = a >= 0 && world.playerBuild(a, "lab");
+	const builtB = b >= 0 && world.playerBuild(b, "storefront");
 	const active = world.activeConstructions(world.player.id);
 	const batch = world.playerBatchPreview();
-	check("chantiers directs + lot", builtA && builtB && active === 2, `${active} chantiers, lot ${batch.count}`);
+	check("direct build sites + batch", builtA && builtB && active === 2, `${active} build sites, batch ${batch.count}`);
 }
 
 // ---------- 4. Tech ----------
 {
 	const world = new World(1);
 	boost(world);
-	const module = ownConversion(world, world.player.id, "atelier");
-	world.territory.building[module] = BUILDING_INDEX.atelier;
+	const module = ownConversion(world, world.player.id, "workshop");
+	world.territory.building[module] = BUILDING_INDEX.workshop;
 	world.step();
-	const ok = world.playerUpgradeTech("armement");
-	check("recherche tech", ok && world.player.tech.armement === 1, `armement ${world.player.tech.armement}`);
+	const ok = world.playerUpgradeTech("armament");
+	check("tech research", ok && world.player.tech.armament === 1, `armament ${world.player.tech.armament}`);
 }
 
-// ---------- 5. Opérations ----------
+// ---------- 5. Operations ----------
 {
 	const world = new World(1);
 	boost(world);
-	world.player.tech.armement = 3;
+	world.player.tech.armament = 3;
 	const target = firstNeutral(world);
 	world.territory.owner[target] = 1;
 	world.territory.control[target] = 60;
-	world.territory.building[target] = BUILDING_INDEX.vente;
-	world.factions[1]!.cashSale = 5000;
+	world.territory.building[target] = BUILDING_INDEX.storefront;
+	world.factions[1]!.dirtyCash = 5000;
 	ownAdjacentTo(world, world.player.id, target);
-	// Descente et sabotage exigent un bâtiment : on les joue AVANT le raid (qui le détruit).
-	const descent = world.playerCanDescent(target) && world.playerDescent(target);
+	// Bust and sabotage require a building: play them BEFORE the raid (which destroys it).
+	const bust = world.playerCanBust(target) && world.playerBust(target);
 	const sabotage = world.playerCanSabotage(target) && world.playerSabotage(target);
 	const raid = world.playerCanRaid(target) && world.playerRaid(target);
-	check("descente / sabotage / raid", descent && sabotage && raid, `descente=${descent} sabotage=${sabotage} raid=${raid}`);
+	check("bust / sabotage / raid", bust && sabotage && raid, `bust=${bust} sabotage=${sabotage} raid=${raid}`);
 }
 
-// ---------- 6. Tueur à gage ----------
+// ---------- 6. Hitman ----------
 {
 	const world = new World(1);
 	boost(world);
-	world.player.tech.armement = 2;
+	world.player.tech.armament = 2;
 	const target = firstNeutral(world);
 	world.territory.owner[target] = 1;
 	world.territory.control[target] = 90;
 	ownAdjacentTo(world, world.player.id, target);
 	const ok = world.playerCanHitman(target) && world.playerHitman(target);
-	check("tueur à gage", ok, `contrôle cible ${Math.round(world.controlAt(target))}`);
+	check("hitman", ok, `target control ${Math.round(world.controlAt(target))}`);
 }
 
-// ---------- 7. Corruption police ----------
+// ---------- 7. Police corruption ----------
 {
 	const world = new World(1);
 	boost(world);
 	world.police.pressure = 50;
 	const cost = world.playerCorruptionCost();
 	const ok = world.playerCanCorrupt() && world.playerCorrupt();
-	check("corrompre la police", ok && world.police.pressure < 50, `coût ${cost}`);
+	check("corrupt the police", ok && world.police.pressure < 50, `cost ${cost}`);
 }
 
-// ---------- 8. Diplomatie ----------
+// ---------- 8. Diplomacy ----------
 {
 	const world = new World(1);
 	boost(world);
 	const proposed = world.playerProposePact(1);
-	// Une offre sortante met le cooldown : impossible de reproposer aussitôt.
+	// An outgoing offer sets the cooldown: you can't propose again right away.
 	const cooldown = world.playerCanProposePact(1) === false;
 	const embargo = world.playerCanEmbargo(2) && world.playerEmbargo(2);
-	const refuses = world.playerBreakPact(1) === false; // pas encore de pacte
-	check("pacte / embargo", proposed && cooldown && embargo && refuses, `proposé=${proposed} embargo=${embargo}`);
+	const refuses = world.playerBreakPact(1) === false; // no pact yet
+	check("pact / embargo", proposed && cooldown && embargo && refuses, `proposed=${proposed} embargo=${embargo}`);
 }
 
-// ---------- 9. Événement à choix ----------
+// ---------- 9. Choice event ----------
 {
 	const world = new World(1);
 	boost(world);
@@ -181,37 +181,37 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 		],
 	});
 	const pending = world.pendingEvent();
-	const before = world.player.cashSale;
+	const before = world.player.dirtyCash;
 	const chosen = pending ? world.playerChoose(0) : false;
-	check("événement à choix", !!pending && chosen && world.player.cashSale > before, `+${world.player.cashSale - before} sale`);
+	check("choice event", !!pending && chosen && world.player.dirtyCash > before, `+${world.player.dirtyCash - before} dirty`);
 }
 
-// ---------- 9b. Trésorerie de guerre (armement payant) ----------
+// ---------- 9b. War chest (paid armament) ----------
 {
 	const world = new World(1);
 	boost(world);
 	const before = world.attackBonus(world.player.id);
-	const ok = world.playerCanBuyArmement() && world.playerBuyArmement();
-	check("acheter de l'armement", ok && world.attackBonus(world.player.id) > before, `bonus ${before.toFixed(2)} → ${world.attackBonus(world.player.id).toFixed(2)}`);
+	const ok = world.playerCanBuyArmament() && world.playerBuyArmament();
+	check("buy armament", ok && world.attackBonus(world.player.id) > before, `bonus ${before.toFixed(2)} → ${world.attackBonus(world.player.id).toFixed(2)}`);
 }
 
-// ---------- 9c. Mercenaires ----------
+// ---------- 9c. Mercenaries ----------
 {
 	const world = new World(1);
 	boost(world);
 	world.player.members = 0;
 	const ok = world.playerCanHireMercenaries() && world.playerHireMercenaries();
-	check("mercenaires (sale → Membres)", ok && world.player.members > 0, `+${Math.round(world.player.members)} membres`);
+	check("mercenaries (dirty → Members)", ok && world.player.members > 0, `+${Math.round(world.player.members)} members`);
 }
 
-// ---------- 9d. Rachat de quartier ----------
+// ---------- 9d. Quarter buyout ----------
 {
 	const world = new World(1);
 	boost(world);
 	const target = firstNeutral(world);
 	world.territory.owner[target] = NEUTRAL;
 	const adjacent = world.neighbors(target).some((n) => world.territory.owner[n] === world.player.id);
-	// On force l'adjacence en donnant un voisin au joueur si besoin.
+	// Force adjacency by giving the player a neighbor if needed.
 	if (!adjacent) {
 		const n = world.neighbors(target)[0];
 		if (n !== undefined) {
@@ -220,18 +220,18 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 		}
 	}
 	const ok = world.playerCanBuy(target) && world.playerBuy(target);
-	check("racheter un quartier (propre → territoire)", ok && world.ownerAt(target) === world.player.id);
+	check("buy a quarter (clean → territory)", ok && world.ownerAt(target) === world.player.id);
 }
 
-// ---------- 9e. Contrat contre un gang ----------
+// ---------- 9e. Contract against a gang ----------
 {
 	const world = new World(1);
 	boost(world);
 	const ok = world.playerCanFundContract(1) && world.playerFundContract(1, 2);
-	check("contrat (payer un gang)", ok && world.factions[1]!.contractTarget === 2);
+	check("contract (pay a gang)", ok && world.factions[1]!.contractTarget === 2);
 }
 
-// ---------- 10. Partie complète (bot) ----------
+// ---------- 10. Full game (bot) ----------
 {
 	let finished = 0;
 	let violations = 0;
@@ -244,7 +244,7 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 			if (!Number.isFinite(f.members) || f.members < 0) violations += 1;
 		}
 	}
-	check("parties complètes (8 seeds)", finished === 8 && violations === 0, `${finished}/8 finies, ${violations} violation(s)`);
+	check("full games (8 seeds)", finished === 8 && violations === 0, `${finished}/8 finished, ${violations} violation(s)`);
 }
 
 console.log(results.join("\n"));

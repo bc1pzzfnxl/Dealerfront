@@ -1,128 +1,128 @@
-# City Sim — La ville comme système vivant
+# City Sim — The city as a living system
 
-> Statut : **affiné (v2)** — cycle jour/nuit (2 cycles), densités, témoins, camouflage double et pool d'événements étendu tranchés.
+> Status: **refined (v2)** — day/night cycle (2 cycles), densities, witnesses, double camouflage and extended event pool decided.
 
-## Objectif
+## Objective
 
-Décrire la ville comme une **simulation** génératrice de contexte et de risque : flux de civils, types de zones, densité/camouflage et événements urbains dynamiques. Ces éléments ne sont pas décoratifs : ils modulent la détection, l'opportunité et la Heat.
+Describe the city as a **simulation** generating context and risk: civilian flows, zone types, density/camouflage and dynamic urban events. These elements are not decorative: they modulate detection, opportunity and Heat.
 
-## Règles
+## Rules
 
-### Cycle jour/nuit — deux cycles
+### Day/night cycle — two cycles
 
-- Le run de 30 min comporte **deux cycles jour/nuit** (≈ **15 min par cycle**).
-- La densité de civils par zone **varie selon le cycle** (voir barème).
-- Le camouflage et la lisibilité du danger évoluent avec l'heure ; la nuit favorise certaines zones (night-life) et vide les autres (résidentiel, universitaire).
+- The 30-min run has **two day/night cycles** (≈ **15 min per cycle**).
+- Civilian density per zone **varies by cycle** (see scale).
+- Camouflage and danger readability evolve with the hour; night favors some zones (nightlife) and empties others (residential, university).
 
-### Densité de civils par zone (barème contrasté)
+### Civilian density per zone (contrasted scale)
 
-| Zone | Densité jour | Densité nuit |
+| Zone | Day density | Night density |
 |---|---|---|
-| Commercial / night-life | 80 | 95 |
-| Commercial (bureaux) | 75 | 50 |
-| Universitaire / étudiant | 70 | 20 |
-| Résidentiel | 40 | 30 |
-| Parc / zones tampons | 30 | 20 |
-| Industriel | 15 | 10 |
+| Commercial / nightlife | 80 | 95 |
+| Commercial (offices) | 75 | 50 |
+| University / student | 70 | 20 |
+| Residential | 40 | 30 |
+| Park / buffer zones | 30 | 20 |
+| Industrial | 15 | 10 |
 
-*(Valeurs 0–100, à équilibrer.)*
+*(Values 0–100, to balance.)*
 
-### Densité = camouflage (double effet)
+### Density = camouflage (double effect)
 
-La densité agit de **deux façons simultanées** :
+Density acts in **two simultaneous ways**:
 
-1. **Réduit la montée de suspicion** — on se fond dans la foule : `montée de suspicion × (1 − densité / 150)` (coefficient **TBD**).
-2. **Réduit la portée de vue effective des patrouilles** — `portée` couvre le quartier et ses voisins.
+1. **Reduces suspicion rise** — you blend into the crowd: `suspicion rise × (1 − density / 150)` (coefficient **TBD**).
+2. **Reduces the effective sight range of patrols** — `range` covers the quarter and its neighbors.
 
-Une rue vide expose donc davantage (peu de camouflage **et** patrouilles qui voient loin).
+An empty street therefore exposes you more (little camouflage **and** patrols that see far).
 
-### Témoignage civil
+### Civilian witnessing
 
-- **Probabiliste**, à **portée locale (quartier + voisins)**.
-- Probabilité **∝ densité** de la zone **et visibilité de l'action** du joueur.
-- **Se planquer** réduit fortement la probabilité ; une **action engageante** (vente, blanchiment) l'augmente (**risque accru en action**).
-- Un témoin qui signale génère : **+Pression police** (voir `police-ai.md`) **et** une **position approximative** (`police-ai.md`, recoupement).
+- **Probabilistic**, at **local range (quarter + neighbors)**.
+- Probability **∝ zone density** **and visibility of the player's action**.
+- **Hiding** greatly reduces the probability; a **committing action** (sales, laundering) increases it (**increased risk while acting**).
+- A witness who reports generates: **+police Pressure** (see `police-ai.md`) **and** an **approximate position** (`police-ai.md`, cross-referencing).
 
-### Événements urbains dynamiques
+### Dynamic urban events
 
-- **Fréquence** : **1 à 3 par run**, pondérée par la phase (`core-loop.md`) — plus fréquents en phase Alerte.
-- **Causes systémiques**, jamais scriptées sur la progression du joueur (R3) : tirage selon la ville et l'état courant.
-- **Pool proposé (MVP étendu)** :
+- **Frequency**: **1 to 3 per run**, weighted by phase (`core-loop.md`) — more frequent in the Alert phase.
+- **Systemic causes**, never scripted on player progression (R3): drawn according to the city and the current state.
+- **Proposed pool (extended MVP)**:
 
-| Événement | Effet système |
+| Event | System effect |
 |---|---|
-| **Contrôle routier** | Checkpoint mobile sur un axe ; contrôle du produit transporté. |
-| **Manifestation** | Bloque une rue **mais distrait la police** (double effet risque/opportunité). |
-| **Affluence événementielle** | Vide ou remplit fortement une zone (densité, profit, témoins). |
-| **Embouteillage / travaux** | Bloque ou ralentit un axe (rallonge les trajets). |
-| **Coupure de courant** (nuit) | Réduit la visibilité : camouflage accru, patrouilles moins efficaces. |
-| **Razzia localisée** | Descente ciblée sur une zone (danger ponctuel élevé). |
-| **Fête privée / festival** | Boost densité + profit + police dans une zone. |
-| **Alarme / incident** | Attire police **et** civils vers un point (détourne l'attention). |
+| **Road check** | Mobile checkpoint on an axis; checks the product being transported. |
+| **Protest** | Blocks a street **but distracts the police** (double risk/opportunity effect). |
+| **Event crowd** | Empties or heavily fills a zone (density, profit, witnesses). |
+| **Traffic jam / roadwork** | Blocks or slows an axis (lengthens trips). |
+| **Power outage** (night) | Reduces visibility: increased camouflage, less effective patrols. |
+| **Localized sweep** | Targeted bust on a zone (high one-off danger). |
+| **Private party / festival** | Boosts density + profit + police in a zone. |
+| **Alarm / incident** | Attracts police **and** civilians to a point (diverts attention). |
 
-> Le pool exact et les poids de tirage sont **à affiner** (`open-questions.md`).
+> The exact pool and draw weights are **to refine** (`open-questions.md`).
 
-## Paramètres chiffrés
+## Numeric parameters
 
-| Paramètre | Valeur | Statut |
+| Parameter | Value | Status |
 |---|---|---|
-| Nombre de cycles jour/nuit | 2 sur 30 min (≈ 15 min/cycle) | fixé |
-| Densités par zone (jour/nuit) | voir barème ci-dessus | à équilibrer |
-| Effet densité sur la montée de suspicion | × (1 − densité/150) | à équilibrer |
-| Effet densité sur la portée de vue | × (1 − densité/300) | à équilibrer |
-| Portée de témoignage civil | quartier + voisins | fixé |
-| Probabilité de témoignage | ∝ densité × visibilité action | **TBD** (coefficients) |
-| Fréquence des événements | 1–3 / run, pondérée par phase | fixé |
-| Pool d'événements | 8 types (voir tableau) | à affiner |
-| Poids de tirage des événements | **TBD** | TBD |
+| Number of day/night cycles | 2 over 30 min (≈ 15 min/cycle) | fixed |
+| Densities per zone (day/night) | see scale above | to balance |
+| Density effect on suspicion rise | × (1 − density/150) | to balance |
+| Density effect on sight range | × (1 − density/300) | to balance |
+| Civilian witness range | quarter + neighbors | fixed |
+| Witness probability | ∝ density × action visibility | **TBD** (coefficients) |
+| Event frequency | 1–3 / run, weighted by phase | fixed |
+| Event pool | 8 types (see table) | to refine |
+| Event draw weights | **TBD** | TBD |
 
-### Types de zones
+### Zone types
 
-| Zone | Vocation | Caractéristique |
+| Zone | Purpose | Characteristic |
 |---|---|---|
-| Résidentiel | Clients réguliers | Faible Heat, faible profit |
-| Commercial / night-life | Gros profit, gros passage | Patrouilles fréquentes |
-| Industriel | Bon pour les labos | Peu de civils, isolement suspect si trop de mouvement |
-| Parc / zones tampons | Transition | — |
-| Poste de police | Base police | Source de patrouilles, danger structurel |
-| Façade de blanchiment | Blanchiment (bar, laverie…) | Infrastructure de conversion |
-| Terrain vague / place ouverte | Respiration urbaine, espace ouvert | Traversable, aucun bâti |
+| Residential | Regular customers | Low Heat, low profit |
+| Commercial / nightlife | High profit, high traffic | Frequent patrols |
+| Industrial | Good for labs | Few civilians, suspicious isolation if too much movement |
+| Park / buffer zones | Transition | — |
+| Police station | Police base | Source of patrols, structural danger |
+| Laundering front | Laundering (bar, laundromat…) | Conversion infrastructure |
+| Vacant lot / open square | Urban breathing room, open space | Passable, no buildings |
 
-## Cas limites
+## Edge cases
 
-- **Manifestation** : bloque une rue **mais distrait la police** (risque vs opportunité à documenter).
-- **Zone vide** (nuit) : le camouflage chute de façon lisible, sans rendre le run injouable.
-- **Événement sur une zone critique** (ex. façade) : comportement à définir → **TBD** (report de l'événement vs effet appliqué).
-- **Civils pendant une action engageante** : le risque de témoignage augmente ; l'action reste non interruptible (tension).
-- **Deux effets du camouflage** : à vérifier qu'ils ne se cumulent pas de façon excessive en zone très dense (risque de zone « trop safe »).
-- **Coupure de courant** : ne doit pas annuler totalement la menace policière (sinon exploit).
+- **Protest**: blocks a street **but distracts the police** (risk vs opportunity to document).
+- **Empty zone** (night): camouflage drops in a readable way, without making the run unplayable.
+- **Event on a critical zone** (e.g. front): behavior to define → **TBD** (event deferral vs effect applied).
+- **Civilians during a committing action**: the witness risk increases; the action remains non-interruptible (tension).
+- **Two camouflage effects**: verify they do not stack excessively in a very dense zone (risk of a "too safe" zone).
+- **Power outage**: must not totally cancel the police threat (otherwise an exploit).
 
-## Dépendances
+## Dependencies
 
-- `pillars.md` — R3 (événements systémiques, pas scriptés), R4 (lisibilité).
-- `police-ai.md` — la ville (témoins, affluence) alimente la **Pression police**.
-- `police-ai.md` — les événements et la densité modulent suspicion/portée de vue ; les témoins donnent une position approximative.
-- `procgen.md` — la ville et `H_base` sont produites par la génération.
-- `factions.md` — les agents vivent selon le cycle jour/nuit.
-- `art-direction.md` — densité/camouflage lisibles dans le N&B.
+- `pillars.md` — R3 (systemic events, not scripted), R4 (readability).
+- `police-ai.md` — the city (witnesses, crowds) feeds **police Pressure**.
+- `police-ai.md` — events and density modulate suspicion/sight range; witnesses give an approximate position.
+- `procgen.md` — the city and `H_base` are produced by generation.
+- `factions.md` — agents live according to the day/night cycle.
+- `art-direction.md` — density/camouflage readable in B&W.
 
-## Critères de validation
+## Validation criteria
 
-- [ ] Le camouflage dépend visiblement de la densité (double effet vérifié).
-- [ ] Les deux cycles jour/nuit modifient perceptiblement les densités et le danger.
-- [ ] Un événement urbain a un effet système traçable et non scénarisé.
-- [ ] Chaque type de zone a un profil de risque/opportunité distinct et reconnaissable.
-- [ ] Aucun événement n'est lié à la progression du joueur (audit de non-scripting).
+- [ ] Camouflage visibly depends on density (double effect verified).
+- [ ] The two day/night cycles perceptibly change densities and danger.
+- [ ] An urban event has a traceable, non-scripted system effect.
+- [ ] Each zone type has a distinct, recognizable risk/opportunity profile.
+- [ ] No event is tied to player progression (non-scripting audit).
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Cycle jour/nuit | 2 cycles (≈ 15 min/cycle) |
-| 2 | Densités par zone | Barème contrasté (jour/nuit) |
-| 3 | Témoignage civil | Probabiliste, portée courte (~4 tuiles) |
-| 4 | Civils & actions | Risque de témoignage accru pendant une action engageante |
-| 5 | Fréquence des événements | 1–3 / run, pondérés par phase |
-| 6 | Types d'événements | 8 types (3 du GDD + 5 ajoutés) |
-| 7 | Effet camouflage | Double : réduit la suspicion **et** la portée de vue |
-| 8 | Témoins (impl. base) | Apparition ~0,4 %/tick × exposition (×3 en action), cooldown 6 s, max 4 ; **vitesse 2,6 tuile/s** ; rejoint le poste → +4 Heat locale + suspicion d'une patrouille |
+| 1 | Day/night cycle | 2 cycles (≈ 15 min/cycle) |
+| 2 | Densities per zone | Contrasted scale (day/night) |
+| 3 | Civilian witnessing | Probabilistic, short range (~4 tiles) |
+| 4 | Civilians & actions | Increased witness risk during a committing action |
+| 5 | Event frequency | 1–3 / run, weighted by phase |
+| 6 | Event types | 8 types (3 from the GDD + 5 added) |
+| 7 | Camouflage effect | Double: reduces suspicion **and** sight range |
+| 8 | Witnesses (base impl.) | Spawn ~0.4%/tick × exposure (×3 while acting), cooldown 6 s, max 4; **speed 2.6 tiles/s**; reaches the station → +4 local Heat + patrol suspicion |

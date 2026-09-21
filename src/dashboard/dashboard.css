@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Le dashboard est gitignoré : Tailwind doit scanner explicitement ses sources. */
+/* The dashboard is gitignored: Tailwind must scan its sources explicitly. */
 @source "./";
 @source "../components";
 

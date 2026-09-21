@@ -1,5 +1,5 @@
 /**
- * Diplomatie — relations, pactes, trahison. Voir docs/factions.md.
+ * Diplomacy — relations, pacts, betrayal. See docs/factions.md.
  */
 
 import { describe, expect, it } from "vitest";
@@ -7,17 +7,17 @@ import { DIPLOMACY, EMBARGO } from "./diplomacy";
 import { CONTACT_NAMES } from "./police";
 import { World } from "./world";
 
-/** Quartier adjacent au spawn du joueur (adjacence de la carte). */
+/** Quarter adjacent to the player spawn (map adjacency). */
 const ADJACENT = 6;
 
-describe("diplomatie", () => {
-	it("démarre sans pacte avec une relation initiale", () => {
+describe("diplomacy", () => {
+	it("starts with no pact and an initial relation", () => {
 		const world = new World(1);
 		expect(world.hasPact(0, 1)).toBe(false);
 		expect(world.relationBetween(0, 1)).toBe(DIPLOMACY.initialRelation);
 	});
 
-	it("attaquer une faction fait chuter la relation", () => {
+	it("attacking a faction drops the relation", () => {
 		const world = new World(1);
 		world.territory.owner[ADJACENT] = 1;
 		world.territory.control[ADJACENT] = 100;
@@ -27,7 +27,7 @@ describe("diplomatie", () => {
 		);
 	});
 
-	it("une offre de pacte acceptée devient un pacte", () => {
+	it("an accepted pact offer becomes a pact", () => {
 		const world = new World(1);
 		expect(world.playerProposePact(1)).toBe(true);
 		expect(world.offers.length).toBe(1);
@@ -36,7 +36,7 @@ describe("diplomatie", () => {
 		expect(world.hasPact(0, 1)).toBe(true);
 	});
 
-	it("une offre à relation basse est refusée", () => {
+	it("an offer with a low relation is refused", () => {
 		const world = new World(1);
 		world.territory.owner[ADJACENT] = 1;
 		world.territory.control[ADJACENT] = 100;
@@ -46,7 +46,7 @@ describe("diplomatie", () => {
 		expect(world.hasPact(0, 1)).toBe(false);
 	});
 
-	it("trahir rompt le pacte, fait chuter la relation et marque le traître", () => {
+	it("betraying breaks the pact, drops the relation and marks the traitor", () => {
 		const world = new World(1);
 		world.playerProposePact(1);
 		for (let i = 0; i < 60; i += 1) world.step();
@@ -61,14 +61,14 @@ describe("diplomatie", () => {
 		expect(world.isTraitor(0)).toBe(true);
 	});
 
-	it("les alliés ne s'attaquent pas", () => {
+	it("allies don't attack each other", () => {
 		const world = new World(1);
-		// Force un pacte joueur ↔ gang 1.
+		// Forces a player ↔ gang 1 pact.
 		world.playerProposePact(1);
 		for (let i = 0; i < 40; i += 1) world.step();
 		expect(world.hasPact(0, 1)).toBe(true);
 
-		// Le gang 1 est adjacent (quartier collé au spawn) : sans pacte il attaquerait.
+		// Gang 1 is adjacent (quarter stuck to the spawn): without a pact it would attack.
 		const attacker = 1;
 		let attackedPlayer = false;
 		for (let i = 0; i < 400; i += 1) {
@@ -83,7 +83,7 @@ describe("diplomatie", () => {
 });
 
 describe("embargo & contact", () => {
-	it("un embargo bloque les pactes, fait chuter la relation et expire", () => {
+	it("an embargo blocks pacts, drops the relation and expires", () => {
 		const world = new World(1);
 		expect(world.playerEmbargo(1)).toBe(true);
 		expect(world.playerHasEmbargo(1)).toBe(true);
@@ -98,7 +98,7 @@ describe("embargo & contact", () => {
 		expect(world.playerHasEmbargo(1)).toBe(false);
 	});
 
-	it("le contact corrompu porte un nom", () => {
+	it("the corrupt contact has a name", () => {
 		const world = new World(1);
 		expect(CONTACT_NAMES).toContain(world.contactName);
 	});

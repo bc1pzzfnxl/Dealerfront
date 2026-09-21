@@ -1,81 +1,81 @@
-# Dealer RTS — Index des spécifications (mode DealerFront)
+# Dealer RTS — Spec index (DealerFront mode)
 
-> Spécifications de **game design** du projet, une par système.
-> Statut global : **v1 DealerFront** — bascule d'un dealer incarné vers un **god-view cartel** (contrôle de quartiers, économie, gangs IA, police).
-> Le `GDD-dealer-rts.md` à la racine reste l'orchestrateur / historique.
+> **Game design** specs for the project, one per system.
+> Global status: **v1 DealerFront** — switch from an embodied dealer to a **god-view cartel** (quarter control, economy, AI gangs, police).
+> The root `GDD-dealer-rts.md` remains the orchestrator / history.
 
-## Le mode en une phrase
+## The mode in one sentence
 
-Jeu **solo** de stratégie/gestion sur une **carte réelle** (Paris, quartiers IRIS), où tu incarnes **le cartel** : **rester le dernier cartel en jeu** (battle royale), face à **5 gangs IA** et à la **police**.
+**Solo** strategy/management game on a **real map** (Paris, IRIS quarters), where you play **the cartel**: **stay the last cartel in play** (battle royale), against **5 AI gangs** and the **police**.
 
-Second mode : **arène agent vs agent** — 2 à 4 agents IA s'affrontent sans joueur humain (API HTTP/MCP), un humain regarde en direct. Voir `arena.md` et [`../MCP.md`](../MCP.md).
+Second mode: **agent-vs-agent arena** — 2 to 4 AI agents fight with no human player (HTTP/MCP API), a human watches live. See `arena.md` and [`../MCP.md`](../MCP.md).
 
-## Ordre de lecture
+## Reading order
 
-1. `pillars.md` — vision et règles non négociables.
-2. `core-loop.md` — boucle et déroulé d'une partie.
-3. `territory.md` — quartiers, Influence, Contrôle, expansion.
-4. `combat.md` — bagarres, défense, tueurs.
-5. `economy.md` — ressources et 7 bâtiments.
-6. `tech.md` — arbre de matos.
-7. `factions.md` — gangs IA, diplomatie, agents.
-8. `police-ai.md` — police anti-leader + corruption.
-9. `procgen.md` — ville préexistante, spawns, neutres.
-10. `command.md` — interface de commandement.
-11. `win-conditions.md` + `scoring.md` — fin de partie et score.
-12. `ui-ux.md` + `art-direction.md` — présentation et couleur de faction.
-13. `city-sim.md` + `difficulty.md` — contexte de ville et difficulté.
-14. `tech-stack.md` — contraintes techniques.
-15. `arena.md` — arène **agent vs agent** (serveur, HTTP/MCP, spectateur). Guide de branchement : [`../MCP.md`](../MCP.md).
+1. `pillars.md` — vision and non-negotiable rules.
+2. `core-loop.md` — loop and pacing of a game.
+3. `territory.md` — quarters, Influence, Control, expansion.
+4. `combat.md` — brawls, defense, hitmen.
+5. `economy.md` — resources and 7 buildings.
+6. `tech.md` — gear tree.
+7. `factions.md` — AI gangs, diplomacy, agents.
+8. `police-ai.md` — anti-leader police + corruption.
+9. `procgen.md` — pre-existing city, spawns, neutrals.
+10. `command.md` — command interface.
+11. `win-conditions.md` + `scoring.md` — endgame and score.
+12. `ui-ux.md` + `art-direction.md` — presentation and faction color.
+13. `city-sim.md` + `difficulty.md` — city context and difficulty.
+14. `tech-stack.md` — technical constraints.
+15. `arena.md` — **agent-vs-agent** arena (server, HTTP/MCP, spectator). Connection guide: [`../MCP.md`](../MCP.md).
 
-## Gabarit des specs
+## Spec template
 
-`Objectif` → `Règles` → `Paramètres chiffrés` → `Cas limites` → `Dépendances` → `Critères de validation` → `Décisions tranchées`.
-Les valeurs non tranchées sont **TBD** et listées dans `open-questions.md`.
+`Objective` → `Rules` → `Numeric parameters` → `Edge cases` → `Dependencies` → `Validation criteria` → `Decisions made`.
+Unsettled values are **TBD** and listed in `open-questions.md`.
 
-## Statut des specs
+## Spec status
 
-| Fichier | Système | Statut |
+| File | System | Status |
 |---|---|---|
-| `pillars.md` | Vision + piliers | v3 DealerFront |
-| `core-loop.md` | Boucle + déroulé | v3 DealerFront |
-| `territory.md` | Quartiers / Influence / Contrôle | v1 DealerFront |
-| `combat.md` | Bagarres / défense / tueurs | v1 DealerFront |
-| `economy.md` | Ressources / 7 bâtiments | v1 DealerFront |
-| `tech.md` | Arbre de matos | v1 DealerFront |
-| `factions.md` | Gangs IA / diplomatie / agents | v1 DealerFront |
-| `police-ai.md` | Police anti-leader + corruption | v2 DealerFront |
-| `procgen.md` | Ville + mise en place | v1 DealerFront |
-| `command.md` | Commandement god-view | v1 DealerFront |
-| `win-conditions.md` | Victoire / défaite | v1 DealerFront |
-| `scoring.md` | Score final | v1 DealerFront |
-| `ui-ux.md` | Interface god-view | v1 DealerFront |
-| `art-direction.md` | N&B + couleurs de faction | v1 DealerFront |
-| `city-sim.md` | Types de zones / densité | v2 |
-| `difficulty.md` | Philosophie + fourchette O/D | v2 |
-| `npc-events.md` | Événements à choix / leurre | v2 |
-| `tech-stack.md` | Stack technique | v2 DealerFront |
-| `arena.md` | Arène agent vs agent (DO, HTTP/MCP, spectateur) | v1 |
-| `open-questions.md` | Questions vivantes | vivant |
+| `pillars.md` | Vision + pillars | v3 DealerFront |
+| `core-loop.md` | Loop + pacing | v3 DealerFront |
+| `territory.md` | Quarters / Influence / Control | v1 DealerFront |
+| `combat.md` | Brawls / defense / hitmen | v1 DealerFront |
+| `economy.md` | Resources / 7 buildings | v1 DealerFront |
+| `tech.md` | Gear tree | v1 DealerFront |
+| `factions.md` | AI gangs / diplomacy / agents | v1 DealerFront |
+| `police-ai.md` | Anti-leader police + corruption | v2 DealerFront |
+| `procgen.md` | City + setup | v1 DealerFront |
+| `command.md` | God-view command | v1 DealerFront |
+| `win-conditions.md` | Victory / defeat | v1 DealerFront |
+| `scoring.md` | Final score | v1 DealerFront |
+| `ui-ux.md` | God-view interface | v1 DealerFront |
+| `art-direction.md` | B&W + faction colors | v1 DealerFront |
+| `city-sim.md` | Zone types / density | v2 |
+| `difficulty.md` | Philosophy + O/D range | v2 |
+| `npc-events.md` | Choice events / decoy | v2 |
+| `tech-stack.md` | Tech stack | v2 DealerFront |
+| `arena.md` | Agent-vs-agent arena (DO, HTTP/MCP, spectator) | v1 |
+| `open-questions.md` | Living questions | living |
 
-## Remplacements (ancien mode)
+## Replacements (old mode)
 
-- Ancien *orders.md* → **`command.md`** (ordres de faction, plus de dealer unique).
-- Ancien *agents.md* → **fusionné dans `factions.md`** (cerveau d'agent, rôles, services).
-- Ancien *resources-heat.md* → **remplacé** par `economy.md` + `police-ai.md` (Heat → **Pression police**).
+- Old *orders.md* → **`command.md`** (faction orders, no more single dealer).
+- Old *agents.md* → **merged into `factions.md`** (agent brain, roles, services).
+- Old *resources-heat.md* → **replaced** by `economy.md` + `police-ai.md` (Heat → **police Pressure**).
 
-## Glossaire
+## Glossary
 
-| Terme | Définition |
+| Term | Definition |
 |---|---|
-| **Quartier** | Quartier IRIS réel ; unité de territoire (992 au total). |
-| **Influence** | Ressource-troupe d'une faction (pool), sert à conquérir/défendre. |
-| **Contrôle** | Solidité d'un quartier possédé (0–100) ; tombe à 0 → capture. |
-| **Produit** | Ressource produite par les Labos, vendue. |
-| **Cash sale** | Argent non blanchi obtenu à la vente. |
-| **Cash propre** | Argent blanchi (Façades) ; base du score et de la victoire. |
-| **Bâtiment** | Labo, Point de vente, Façade, Planque, Atelier, Contre-espionnage, Dépôt. |
-| **Faction** | Le joueur ou un gang IA (6 au total). |
-| **Pression police** | Jauge anti-leader (0–100) qui déclenche raids/saisies. |
-| **Tueur à gage** | Action ciblée (tech) infligeant des dégâts de zone à un quartier. |
-| **Pacte** | Alliance temporaire entre factions. |
+| **Quarter** | Real IRIS quarter; unit of territory (992 total). |
+| **Influence** | A faction's troop resource (pool), used to conquer/defend. |
+| **Control** | Durability of an owned quarter (0–100); drops to 0 → capture. |
+| **Product** | Resource produced by Labs, sold. |
+| **Dirty cash** | Unlaundered money obtained from sales. |
+| **Clean cash** | Laundered money (Fronts); basis of the score and victory. |
+| **Building** | Lab, Storefront, Front, Safehouse, Workshop, Counter-intel, Depot. |
+| **Faction** | The player or an AI gang (6 total). |
+| **Police Pressure** | Anti-leader gauge (0–100) that triggers raids/seizures. |
+| **Hitman** | Targeted action (tech) dealing area damage to a quarter. |
+| **Pact** | Temporary alliance between factions. |

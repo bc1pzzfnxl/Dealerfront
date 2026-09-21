@@ -1,29 +1,29 @@
 /**
- * Territory — propriété, contrôle et bâtiments des quartiers (zones IRIS réelles).
- * Voir docs/territory.md et docs/economy.md.
+ * Territory — ownership, control and buildings of quarters (real IRIS zones).
+ * See docs/territory.md and docs/economy.md.
  */
 
 import { NO_BUILDING } from "./buildings";
 
-/** Propriétaire neutre. */
+/** Neutral owner. */
 export const NEUTRAL = -1;
 
 export interface Territory {
-	/** id de faction par quartier, NEUTRAL sinon. */
+	/** faction id per quarter, NEUTRAL otherwise. */
 	readonly owner: Int16Array;
-	/** Contrôle 0–100 (quartiers possédés) ou garnison (neutres). */
+	/** Control 0–100 (owned quarters) or garrison (neutral). */
 	readonly control: Float32Array;
-	/** Bâtiment aménagé : NO_BUILDING, sinon index dans BUILDING_TYPES. */
+	/** Upgraded building: NO_BUILDING, otherwise index in BUILDING_TYPES. */
 	readonly building: Int8Array;
-	/** Chantier en cours : ticks restants (0 = aucun). */
+	/** Ongoing build site: remaining ticks (0 = none). */
 	readonly construction: Int16Array;
-	/** Bâtiment en chantier : NO_BUILDING sinon index. */
+	/** Building under construction: NO_BUILDING otherwise index. */
 	readonly pending: Int8Array;
-	/** Tick de livraison du bâtiment (animation de création). */
+	/** Building delivery tick (creation animation). */
 	readonly builtAt: Int32Array;
-	/** Tick de la dernière capture (animation). */
+	/** Tick of the last capture (animation). */
 	readonly capturedAt: Int32Array;
-	/** Fin du sabotage d'un bâtiment (production réduite), 0 = aucun. */
+	/** End of a building's sabotage (reduced production), 0 = none. */
 	readonly sabotageUntil: Int32Array;
 	readonly count: number;
 }

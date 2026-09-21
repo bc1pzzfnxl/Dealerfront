@@ -1,6 +1,6 @@
 /**
- * Simulation massive — harnais d'équilibrage headless (bun).
- * Usage : bun run sim:mass   (variables : SEEDS, TICKS)
+ * Mass simulation — headless balancing harness (bun).
+ * Usage: bun run sim:mass   (env vars: SEEDS, TICKS)
  */
 
 import { BUILDING_TYPES } from "../src/sim/buildings";
@@ -20,27 +20,27 @@ function checkInvariants(world: World): void {
 		const owner = world.territory.owner[i]!;
 		if (owner < -1 || owner >= factions) {
 			violations += 1;
-			console.error(`[invariant] owner invalide ${owner} au module ${i}`);
+			console.error(`[invariant] invalid owner ${owner} at module ${i}`);
 		}
 		const control = world.territory.control[i]!;
 		if (!Number.isFinite(control) || control < 0) {
 			violations += 1;
-			console.error(`[invariant] contrôle invalide ${control} au module ${i}`);
+			console.error(`[invariant] invalid control ${control} at module ${i}`);
 		}
 		const building = world.territory.building[i]!;
 		if (building < -1 || building >= BUILDING_TYPES.length) {
 			violations += 1;
-			console.error(`[invariant] bâtiment invalide ${building} au module ${i}`);
+			console.error(`[invariant] invalid building ${building} at module ${i}`);
 		}
 	}
 	for (const faction of world.factions) {
 		if (!Number.isFinite(faction.members) || faction.members < 0) {
 			violations += 1;
-			console.error(`[invariant] membres invalides pour ${faction.name}`);
+			console.error(`[invariant] invalid members for ${faction.name}`);
 		}
-		if (!Number.isFinite(faction.cashPropre) || faction.cashPropre < 0) {
+		if (!Number.isFinite(faction.cleanCash) || faction.cleanCash < 0) {
 			violations += 1;
-			console.error(`[invariant] cash propre invalide pour ${faction.name}`);
+			console.error(`[invariant] invalid clean cash for ${faction.name}`);
 		}
 	}
 }
@@ -64,12 +64,12 @@ function runSeed(seed: number): {
 	let cleanAll = 0;
 	const ticks = playOut(world, rng, MAX_TICKS, CADENCE);
 	checkInvariants(world);
-	for (const faction of world.factions) cleanAll += faction.cashPropre;
+	for (const faction of world.factions) cleanAll += faction.cleanCash;
 	return {
 		outcome: world.outcome ?? "none",
 		ticks,
 		control: world.controlRatio(world.player.id),
-		clean: world.player.cashPropre,
+		clean: world.player.cleanCash,
 		buildings: world.player.buildings,
 		cleanAll,
 		pressure: world.police.pressure,
@@ -92,7 +92,7 @@ function determinismCheck(): boolean {
 		const a = run();
 		const b = run();
 		if (a.some((value, index) => value !== b[index])) {
-			console.error(`[déterminisme] divergence à la seed ${seed}`);
+			console.error(`[determinism] divergence at seed ${seed}`);
 			return false;
 		}
 	}
@@ -127,37 +127,37 @@ for (let seed = 0; seed < SEEDS; seed += 1) {
 	if (result.policeDefeat) policeDefeats += 1;
 	totalPacts += result.pacts;
 	const cause = result.reason.includes("Liquidation")
-		? "liquidation policière"
-		: result.reason.includes("Faillite")
-			? "faillite"
-			: result.reason.includes("éliminé")
-				? "élimination"
-				: "victoire (dernier survivant)";
+		? "police liquidation"
+		: result.reason.includes("Bankruptcy")
+			? "bankruptcy"
+			: result.reason.includes("eliminated")
+				? "elimination"
+				: "victory (last survivor)";
 	causes[cause] = (causes[cause] ?? 0) + 1;
 }
 const elapsed = (performance.now() - start) / 1000;
 const deterministic = determinismCheck();
 const avgSeconds = totalTicks / SEEDS / 10;
 
-console.log("=== Simulation massive (DealerFront) ===");
-console.log(`Seeds             : ${SEEDS}  ·  ticks max/seed : ${MAX_TICKS}  ·  bot toutes les ${CADENCE} ticks`);
+console.log("=== Mass simulation (DealerFront) ===");
+console.log(`Seeds             : ${SEEDS}  ·  max ticks/seed : ${MAX_TICKS}  ·  bot every ${CADENCE} ticks`);
 console.log(
-	`Résultats         : victoire ${outcomes.victory} · défaite ${outcomes.defeat} · sans fin ${outcomes.none}`,
+	`Results           : victory ${outcomes.victory} · defeat ${outcomes.defeat} · no end ${outcomes.none}`,
 );
-console.log(`Durée moyenne     : ${avgSeconds.toFixed(0)} s (${(totalTicks / SEEDS).toFixed(0)} ticks)`);
-console.log(`Contrôle joueur   : ${((totalControl / SEEDS) * 100).toFixed(1)} %`);
-console.log(`Cash propre joueur: ${(totalClean / SEEDS).toFixed(0)}`);
-console.log(`Cash propre total : ${(totalCleanAll / SEEDS).toFixed(0)} (toutes factions)`);
-console.log(`Bâtiments joueur  : ${(totalBuildings / SEEDS).toFixed(1)}`);
+console.log(`Average length    : ${avgSeconds.toFixed(0)} s (${(totalTicks / SEEDS).toFixed(0)} ticks)`);
+console.log(`Player control    : ${((totalControl / SEEDS) * 100).toFixed(1)} %`);
+console.log(`Player clean cash : ${(totalClean / SEEDS).toFixed(0)}`);
+console.log(`Total clean cash  : ${(totalCleanAll / SEEDS).toFixed(0)} (all factions)`);
+console.log(`Player buildings  : ${(totalBuildings / SEEDS).toFixed(1)}`);
 console.log(
-	`Police            : Pression ${(totalPressure / SEEDS).toFixed(1)} · raids ${(totalRaids / SEEDS).toFixed(1)}/partie · liquidations ${(totalLiquidations / SEEDS).toFixed(2)}/partie`,
+	`Police            : Pressure ${(totalPressure / SEEDS).toFixed(1)} · raids ${(totalRaids / SEEDS).toFixed(1)}/game · liquidations ${(totalLiquidations / SEEDS).toFixed(2)}/game`,
 );
-console.log(`Défaites police   : ${policeDefeats}`);
-console.log(`Pactes actifs     : ${(totalPacts / SEEDS).toFixed(2)} en fin de partie`);
-console.log(`Causes de fin     : ${Object.entries(causes).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
+console.log(`Police defeats    : ${policeDefeats}`);
+console.log(`Active pacts      : ${(totalPacts / SEEDS).toFixed(2)} at end of game`);
+console.log(`End causes        : ${Object.entries(causes).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
 console.log(`Violations        : ${violations}`);
-console.log(`Déterminisme      : ${deterministic ? "OK" : "ÉCHEC"}`);
-console.log(`Durée calcul      : ${elapsed.toFixed(2)} s`);
+console.log(`Determinism       : ${deterministic ? "OK" : "FAIL"}`);
+console.log(`Compute time      : ${elapsed.toFixed(2)} s`);
 
 if (violations > 0 || !deterministic) {
 	process.exit(1);

@@ -1,47 +1,47 @@
 /**
- * Tech — arbre de matos piloté par les Ateliers. Voir docs/tech.md.
- * Les Ateliers donnent la **capacité** (niveau max) ; le Cash propre paie les paliers.
+ * Tech — gear tree driven by Workshops. See docs/tech.md.
+ * Workshops provide the **capacity** (max level); Clean cash pays for tiers.
  */
 
-export const TECH_BRANCHES = ["armement", "protection", "logistique"] as const;
+export const TECH_BRANCHES = ["armament", "protection", "logistics"] as const;
 export type TechBranch = (typeof TECH_BRANCHES)[number];
 
 export const TECH_LABELS: Record<TechBranch, string> = {
-	armement: "Armement",
+	armament: "Armament",
 	protection: "Protection",
-	logistique: "Logistique",
+	logistics: "Logistics",
 };
 
 export const TECH = {
 	maxLevel: 5,
-	/** Coût(n) = costPerLevel × n (en Cash propre). */
+	/** Cost(n) = costPerLevel × n (in Clean cash). */
 	costPerLevel: 2000,
-	/** Bonus d'attaque par palier d'Armement. */
+	/** Attack bonus per Armament tier. */
 	attackPerLevel: 0.1,
-	/** Bonus de défense par palier de Protection. */
+	/** Defense bonus per Protection tier. */
 	defensePerLevel: 0.1,
-	/** Bonus de production de Membres par palier de Logistique. */
-	logistiqueProduction: 0.2,
-	/** Bonus de régénération de Contrôle par palier de Logistique. */
-	logistiqueControlRegen: 0.2,
+	/** Member production bonus per Logistics tier. */
+	logisticsProduction: 0.2,
+	/** Control regeneration bonus per Logistics tier. */
+	logisticsControlRegen: 0.2,
 } as const;
 
 export function techCost(nextLevel: number): number {
 	return TECH.costPerLevel * nextLevel;
 }
 
-/** Tueur à gage (débloqué par Armement ≥ 2). */
+/** Hitman (unlocked by Armament ≥ 2). */
 export const HITMAN = {
-	requiredArmement: 2,
+	requiredArmament: 2,
 	costClean: 3000,
 	costMembers: 1000,
-	/** Dégâts de Contrôle au quartier visé. */
+	/** Control damage to the targeted quarter. */
 	damageCenter: 40,
-	/** Dégâts de Contrôle aux quartiers adjacents. */
+	/** Control damage to adjacent quarters. */
 	damageSplash: 20,
 	/** Cooldown (ticks). */
 	cooldownTicks: 100,
-	/** Réduction de dégâts par Contre-espionnage du défenseur (plafonnée). */
-	contreReductionPerUnit: 0.15,
-	contreReductionMax: 0.6,
+	/** Damage reduction per defender Counter-intel (capped). */
+	counterReductionPerUnit: 0.15,
+	counterReductionMax: 0.6,
 } as const;

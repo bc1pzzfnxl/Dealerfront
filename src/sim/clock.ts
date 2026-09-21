@@ -1,13 +1,13 @@
 /**
- * Horloge de simulation à pas fixe — tech-stack.md.
- * Découple la simulation (10 Hz) du rendu (60 FPS) et garantit le déterminisme.
+ * Fixed-step simulation clock — tech-stack.md.
+ * Decouples the simulation (10 Hz) from rendering (60 FPS) and guarantees determinism.
  */
 
 import { SIM_STEP_MS } from "./constants";
 
 export type TickHandler = (tick: number) => void;
 
-/** Clamp anti-spirale : évite une rafale de ticks après un onglet en arrière-plan. */
+/** Anti-spiral clamp: avoids a burst of ticks after a backgrounded tab. */
 const MAX_ACCUMULATED_MS = 1000;
 
 export class SimClock {
@@ -25,7 +25,7 @@ export class SimClock {
 		return this.tickCount;
 	}
 
-	/** Avance selon le temps réel écoulé ; exécute N pas fixes. Retourne N. */
+	/** Advances based on elapsed real time; runs N fixed steps. Returns N. */
 	advance(deltaMs: number): number {
 		this.accumulatorMs = Math.min(this.accumulatorMs + deltaMs, MAX_ACCUMULATED_MS);
 		let steps = 0;
@@ -38,4 +38,3 @@ export class SimClock {
 		return steps;
 	}
 }
-

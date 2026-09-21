@@ -4,9 +4,9 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 /**
- * App Vite dédiée au dashboard d'équilibrage (outil LOCAL, séparé du jeu).
- * Racine = src/dashboard : `/` sert le dashboard, jamais le jeu.
- * Usage : bun run dashboard:dev / dashboard:build
+ * Vite app dedicated to the balancing dashboard (LOCAL tool, separate from the game).
+ * Root = src/dashboard: `/` serves the dashboard, never the game.
+ * Usage: bun run dashboard:dev / dashboard:build
  */
 export default defineConfig({
 	root: fileURLToPath(new URL("./src/dashboard", import.meta.url)),

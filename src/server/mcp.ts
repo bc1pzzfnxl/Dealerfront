@@ -1,8 +1,8 @@
 /**
- * Serveur MCP (Model Context Protocol) minimal, transport **Streamable HTTP**
- * (JSON-RPC 2.0 en POST). Expose l'arène comme des outils : les agents LLM
- * n'ont qu'à appeler `get_state`, `act`, `end_turn`, `list_actions`.
- * Voir docs/arena.md.
+ * Minimal MCP (Model Context Protocol) server, **Streamable HTTP** transport
+ * (JSON-RPC 2.0 over POST). Exposes the arena as tools: LLM agents
+ * only need to call `get_state`, `act`, `end_turn`, `list_actions`.
+ * See docs/arena.md.
  */
 
 import { INTENT_CATALOG, type Intent } from "../sim/intents";
@@ -21,31 +21,31 @@ const TOOLS = [
 	{
 		name: "get_state",
 		description:
-			"État complet de la partie pour ton agent : ta faction, le tour, et l'instantané (quartiers, factions, police).",
+			"Full game state for your agent: your faction, the turn, and the snapshot (quarters, factions, police).",
 		inputSchema: {
 			type: "object",
 			properties: {
-				arena: { type: "string", description: "Identifiant de l'arène." },
-				token: { type: "string", description: "Ton token d'agent." },
+				arena: { type: "string", description: "Arena identifier." },
+				token: { type: "string", description: "Your agent token." },
 			},
 			required: ["arena", "token"],
 		},
 	},
 	{
 		name: "list_actions",
-		description: "Catalogue des actions (intents) que tu peux jouer.",
+		description: "Catalog of actions (intents) you can play.",
 		inputSchema: { type: "object", properties: {} },
 	},
 	{
 		name: "act",
 		description:
-			"Joue une action pour ta faction (autant que tu veux par tour). Ex. : {type:'attack',module:42}, {type:'build',module:7,building:'labo'}.",
+			"Play an action for your faction (as many as you want per turn). Ex.: {type:'attack',module:42}, {type:'build',module:7,building:'lab'}.",
 		inputSchema: {
 			type: "object",
 			properties: {
 				arena: { type: "string" },
 				token: { type: "string" },
-				intent: { type: "object", description: "L'intent à appliquer (voir list_actions)." },
+				intent: { type: "object", description: "The intent to apply (see list_actions)." },
 			},
 			required: ["arena", "token", "intent"],
 		},
@@ -53,7 +53,7 @@ const TOOLS = [
 	{
 		name: "end_turn",
 		description:
-			"Termine ton tour. Quand tous les agents ont terminé, la simulation avance d'un tour.",
+			"End your turn. When all agents have finished, the simulation advances one turn.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -65,7 +65,7 @@ const TOOLS = [
 	},
 	{
 		name: "get_map",
-		description: "Carte statique de Paris (992 quartiers : zones, adjacence, profils).",
+		description: "Static map of Paris (992 quarters: zones, adjacency, profiles).",
 		inputSchema: { type: "object", properties: {} },
 	},
 ] as const;
@@ -89,7 +89,7 @@ async function callTool(
 		const response = await fetch(`${origin}/api/map`);
 		return response.json();
 	}
-	if (!arena) return { error: "arena manquant" };
+	if (!arena) return { error: "missing arena" };
 
 	if (name === "get_state") {
 		const response = await stub().fetch(`https://arena/${arena}/state?token=${encodeURIComponent(token)}`);
@@ -110,7 +110,7 @@ async function callTool(
 		});
 		return response.json();
 	}
-	return { error: `outil inconnu : ${name}` };
+	return { error: `unknown tool: ${name}` };
 }
 
 export async function handleMcp(request: Request, env: Env): Promise<Response> {

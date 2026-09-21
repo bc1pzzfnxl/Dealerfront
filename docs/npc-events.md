@@ -1,94 +1,94 @@
-# NPC & Events — Leurre, PNJ notables et choix à conséquences
+# NPC & Events — Decoy, notable NPCs and choices with consequences
 
-> Statut : **implémenté (P26)** — pool de 3 événements à choix, un à la fois, effets traçables. — leurre, informateur, contact corrompu, rival et choix tranchés ; périmètre MVP acté.
-> Le **moteur d'agent** (cerveau, vie, QI, rôles, servir/trahir) est spécifié dans **`factions.md`** ; ce fichier couvre ses **usages notables** et les **événements à choix**.
-> ✅ **Arbitrage GDD §14D acté** : les agents/rivaux sont **inclus dès le MVP** (le GDD les plaçait en post-MVP).
+> Status: **implemented (P26)** — pool of 3 choice events, one at a time, traceable effects. — decoy, informant, corrupt contact, rival and choices decided; MVP scope locked.
+> The **agent engine** (brain, life, IQ, roles, serve/betray) is specified in **`factions.md`**; this file covers its **notable uses** and the **choice events**.
+> ✅ **GDD §14D arbitration locked**: agents/rivals are **included from the MVP** (the GDD placed them post-MVP).
 
-## Objectif
+## Objective
 
-Décrire la couche « RPG légère / choix à conséquences » incluse dès le MVP : un leurre payant, des PNJ notables récurrents et des événements à choix dont les effets sont traçables et cohérents avec la causalité pure (aucun choix « scripté bon/mauvais »). Ces mécaniques enrichissent l'anticipation sans introduire de combat direct ni de méta-progression.
+Describe the "light RPG / choices with consequences" layer included from the MVP: a paid decoy, recurring notable NPCs and choice events whose effects are traceable and consistent with pure causality (no "scripted good/bad" choice). These mechanics enrich anticipation without introducing direct combat or meta-progression.
 
-## Règles
+## Rules
 
-### A. Leurre / distraction
+### A. Decoy / distraction
 
-- Le joueur peut générer un événement détournant l'attention d'une patrouille (fausse alerte, altercation provoquée, embouteillage déclenché).
-- **Coût** : une **petite somme d'argent sale** + un risque de **Heat globale différée** — jamais gratuit (éviter un bouton « annule le danger »).
-- **Découvrable** : la police peut **découvrir le leurre** ; si elle le découvre, le dossier monte (**+Heat globale**) : la police « sait » qu'on l'a bernée.
-- C'est une **action du système d'ordres** (`command.md`).
+- The player can generate an event that diverts a patrol's attention (false alarm, provoked altercation, triggered traffic jam).
+- **Cost**: a **small amount of dirty money** + a risk of **deferred global Heat** — never free (avoid a "cancels the danger" button).
+- **Discoverable**: the police can **discover the decoy**; if they do, the case rises (**+global Heat**): the police "know" they were fooled.
+- It is an **order-system action** (`command.md`).
 
-### B. PNJ notables (couche RPG légère)
+### B. Notable NPCs (light RPG layer)
 
-- **Informateur potentiel** — peut **dénoncer** le joueur (Heat locale) ou être **acheté en une fois** ; l'achat **réduit son risque de dénonciation pour le reste du run** (il n'est pas retourné en allié).
-- **Contact corrompu** (agent véreux) — **réduit temporairement la Heat globale** dans une zone ; **paiement récurrent** ; **risque qu'il soit arrêté ou muté** en cours de run (perte de l'avantage + conséquence sur le dossier).
-- **Rival de quartier** — **consomme l'opportunité** d'une zone négligée (clients, façades) ; **peut recourir à la violence selon son profil** (les profils agressifs recoupent les tueurs à gage d'`factions.md`).
-- Les PNJ notables sont des **agents** au sens d'`factions.md` (QI, mémoire, relation, servir/trahir).
+- **Potential informant** — can **report** the player (local Heat) or be **bought once**; the purchase **reduces their reporting risk for the rest of the run** (they are not turned into an ally).
+- **Corrupt contact** (dirty agent) — **temporarily reduces global Heat** in a zone; **recurring payment**; **risk of being arrested or transferred** mid-run (loss of the advantage + consequence on the case).
+- **Quarter rival** — **consumes the opportunity** of a neglected zone (clients, fronts); **can resort to violence depending on their profile** (aggressive profiles overlap with the hitmen of `factions.md`).
+- Notable NPCs are **agents** in the sense of `factions.md` (IQ, memory, relation, serve/betray).
 
-### C. Choix à conséquences intra-run
+### C. In-run choices with consequences
 
-- **5+ événements à choix par run** (fréquence élevée), chacun avec un effet **traçable**, immédiat ou différé, sur Heat/opportunité/relations.
-- Exemples : accepter une livraison risquée mais lucrative, dénoncer ou couvrir un PNJ pris en flagrant délit, choisir entre deux façades concurrentes.
-- **Aucun choix n'est scripté bon/mauvais** : chacun a un coût et un bénéfice réels dans le système.
+- **5+ choice events per run** (high frequency), each with a **traceable** effect, immediate or deferred, on Heat/opportunity/relations.
+- Examples: accept a risky but lucrative delivery, report or cover an NPC caught red-handed, choose between two competing fronts.
+- **No choice is scripted good/bad**: each has a real cost and benefit in the system.
 
-### D. Périmètre MVP
+### D. MVP scope
 
-- **Tous les rôles sont au MVP** : vendeurs, guetteurs, tueurs à gage, informateur, contact corrompu, rival (`factions.md`).
-- La violence (tueurs à gage, rival agressif) est **tracée** et pèse sur le score (`scoring.md`).
+- **All roles are in the MVP**: dealers, watchers, hitmen, informant, corrupt contact, rival (`factions.md`).
+- Violence (hitmen, aggressive rival) is **traced** and weighs on the score (`scoring.md`).
 
-## Paramètres chiffrés
+## Numeric parameters
 
-| Paramètre | Valeur | Statut |
+| Parameter | Value | Status |
 |---|---|---|
-| Coût du leurre (argent sale) | petite somme, **TBD** | TBD |
-| Chance de découverte du leurre | **TBD** | TBD |
-| Heat globale si leurre découvert | **TBD** | TBD |
-| Coût d'achat de l'informateur | **TBD** | TBD |
-| Réduction du risque de dénonciation (informateur acheté) | **TBD** | TBD |
-| Réduction de Heat globale (contact corrompu) | **TBD** | TBD |
-| Paiement récurrent du contact | **TBD** (montant + fréquence) | TBD |
-| Chance d'arrestation/mutation du contact | **TBD** | TBD |
-| Vitesse de consommation d'opportunité (rival) | **TBD** | TBD |
-| Profils de rival (pacifique / agressif) | **TBD** (répartition) | TBD |
-| Nombre d'événements à choix par run | **5+** | fixé |
-| Taille du pool d'événements à choix | **TBD** | TBD |
-| Nombre de PNJ notables actifs simultanément | **8–12** (`factions.md`) | fixé |
+| Decoy cost (dirty money) | small amount, **TBD** | TBD |
+| Decoy discovery chance | **TBD** | TBD |
+| Global Heat if decoy discovered | **TBD** | TBD |
+| Informant purchase cost | **TBD** | TBD |
+| Reporting risk reduction (bought informant) | **TBD** | TBD |
+| Global Heat reduction (corrupt contact) | **TBD** | TBD |
+| Recurring contact payment | **TBD** (amount + frequency) | TBD |
+| Contact arrest/transfer chance | **TBD** | TBD |
+| Opportunity consumption rate (rival) | **TBD** | TBD |
+| Rival profiles (peaceful / aggressive) | **TBD** (distribution) | TBD |
+| Number of choice events per run | **5+** | fixed |
+| Choice event pool size | **TBD** | TBD |
+| Number of simultaneously active notable NPCs | **8–12** (`factions.md`) | fixed |
 
-## Cas limites
+## Edge cases
 
-- **Leurre trop fort** : s'il annule systématiquement le danger, il viole l'esprit de risque → coût + découverte doivent être dissuasifs.
-- **Rival violent** : selon son profil, il peut recourir à la violence (tracée, pénalité de score) ; les profils pacifiques consomment seulement l'opportunité.
-- **Contact corrompu arrêté** : événement prévu (perte de l'avantage + conséquence sur le dossier) → valeurs **TBD**.
-- **Choix à conséquence différée** : le joueur doit comprendre a posteriori l'effet du choix en fin de run (`scoring.md`, R6).
-- **Cumul de PNJ hostiles** : risque de spirale injuste → **garde-fou** (plafond de hostiles simultanés + cooldowns) **TBD**.
-- **Cohérence factions.md** : un PNJ notable suit le même moteur (mémoire, relation, QI) que tout agent ; pas d'exception.
+- **Decoy too strong**: if it systematically cancels the danger, it violates the spirit of risk → cost + discovery must be dissuasive.
+- **Violent rival**: depending on their profile, they can resort to violence (traced, score penalty); peaceful profiles only consume opportunity.
+- **Corrupt contact arrested**: planned event (loss of the advantage + consequence on the case) → values **TBD**.
+- **Choice with deferred consequence**: the player must understand the choice's effect a posteriori at the end of the run (`scoring.md`, R6).
+- **Accumulation of hostile NPCs**: risk of an unfair spiral → **safeguard** (cap of simultaneous hostiles + cooldowns) **TBD**.
+- **factions.md consistency**: a notable NPC follows the same engine (memory, relation, IQ) as any agent; no exception.
 
-## Dépendances
+## Dependencies
 
-- `pillars.md` — R2 (pas de méta), R3 (causalité), R6 (feedback a posteriori).
-- `factions.md` — moteur d'agent (QI, mémoire, relation, servir/trahir, rôles).
-- `police-ai.md` — coûts et effets sur la Pression police.
-- `city-sim.md` — les PNJ/événements s'inscrivent dans les zones et événements urbains.
-- `command.md` — le leurre et les interactions sont des actions.
-- `scoring.md` — choix, relations et violence intégrés au récap causal.
-- `art-direction.md` — violet/mauve = interaction à choix disponible.
+- `pillars.md` — R2 (no meta), R3 (causality), R6 (a posteriori feedback).
+- `factions.md` — agent engine (IQ, memory, relation, serve/betray, roles).
+- `police-ai.md` — costs and effects on police Pressure.
+- `city-sim.md` — NPCs/events fit into the zones and urban events.
+- `command.md` — the decoy and interactions are actions.
+- `scoring.md` — choices, relations and violence integrated into the causal recap.
+- `art-direction.md` — purple/mauve = choice interaction available.
 
-## Critères de validation
+## Validation criteria
 
-- [ ] Aucun choix n'est « gratuit » : chacun a un coût et un bénéfice mesurables.
-- [ ] Le leurre n'est jamais un bouton « annule le danger » dominant (découverte + Heat globale).
-- [ ] Les PNJ notables ont un état mémorisé et influencent réellement le run.
-- [ ] Les effets des choix (dont la violence) sont traçables dans le récap de fin de run.
-- [ ] Aucune mécanique de cette spec ne crée de progression persistante entre runs (R2).
-- [ ] Tous les rôles listés sont effectivement présents au MVP.
+- [ ] No choice is "free": each has a measurable cost and benefit.
+- [ ] The decoy is never a dominant "cancels the danger" button (discovery + global Heat).
+- [ ] Notable NPCs have a memorized state and genuinely influence the run.
+- [ ] The effects of choices (including violence) are traceable in the end-of-run recap.
+- [ ] No mechanic in this spec creates persistent progression between runs (R2).
+- [ ] All listed roles are actually present in the MVP.
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Coût du leurre | Argent sale + Heat globale différée |
-| 2 | Découverte du leurre | Découvrable → +Heat globale (dossier) |
-| 3 | Informateur | Achat ponctuel (réduit le risque de dénonciation du run) |
-| 4 | Contact corrompu | Réduction de Heat globale + risque d'arrestation/mutation |
-| 5 | Rival | Consomme l'opportunité + violence selon le profil |
-| 6 | Choix à conséquences | 5+ par run |
-| 7 | Périmètre MVP | Tous les rôles au MVP (acte l'écart avec GDD §14D) |
+| 1 | Decoy cost | Dirty money + deferred global Heat |
+| 2 | Decoy discovery | Discoverable → +global Heat (case) |
+| 3 | Informant | One-time purchase (reduces the run's reporting risk) |
+| 4 | Corrupt contact | Global Heat reduction + risk of arrest/transfer |
+| 5 | Rival | Consumes opportunity + violence depending on profile |
+| 6 | Choices with consequences | 5+ per run |
+| 7 | MVP scope | All roles in the MVP (locks the deviation from GDD §14D) |

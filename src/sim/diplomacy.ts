@@ -1,49 +1,49 @@
 /**
- * Diplomatie — relations par paire, pactes, trahisons. Voir docs/factions.md.
- * Déterministe : toute décision d'IA provient d'un Rng injecté (côté World).
+ * Diplomacy — pairwise relations, pacts, betrayals. See docs/factions.md.
+ * Deterministic: every AI decision comes from an injected Rng (World side).
  */
 
 export const DIPLOMACY = {
-	/** Relation initiale entre deux factions (0–100). */
+	/** Initial relation between two factions (0–100). */
 	initialRelation: 60,
-	/** Retour lent de la relation vers sa valeur initiale (par tick). */
+	/** Slow return of the relation toward its initial value (per tick). */
 	relationDrift: 0.02,
-	/** Chute de relation par attaque contre une faction. */
+	/** Relation drop per attack against a faction. */
 	attackRelationHit: 25,
-	/** Chute de relation en cas de trahison (attaque d'un allié). */
+	/** Relation drop on betrayal (attacking an ally). */
 	betrayalRelationHit: 50,
-	/** Durée d'un pacte (ticks). */
+	/** Duration of a pact (ticks). */
 	pactDuration: 1500,
-	/** Délai maximum de réponse à une demande de pacte (ticks). */
+	/** Maximum response delay to a pact offer (ticks). */
 	offerWait: 200,
-	/** Cooldown avant de pouvoir re-proposer (ticks). */
+	/** Cooldown before re-proposing (ticks). */
 	proposeCooldown: 300,
-	/** Relation minimale pour accepter un pacte. */
+	/** Minimum relation to accept a pact. */
 	acceptRelation: 55,
-	/** Le proposeur doit rester sous ce ratio de puissance pour être accepté (anti-bloc). */
+	/** The proposer must stay below this power ratio to be accepted (anti-bloc). */
 	acceptPowerRatio: 1.5,
-	/** Relation en dessous de laquelle un allié peut trahir. */
+	/** Relation below which an ally may betray. */
 	betrayRelation: 20,
-	/** Durée de la pénalité de traître (ticks) et multiplicateur de défense. */
+	/** Duration of the traitor penalty (ticks) and defense multiplier. */
 	traitorTicks: 300,
 	traitorDefense: 0.5,
-	/** Probabilité (par décision IA) de proposer un pacte. */
+	/** Probability (per AI decision) of proposing a pact. */
 	aiOfferChance: 0.02,
 	/**
-	 * Coalition anti-leader : probabilité (∝ domination du leader) qu'une décision IA
-	 * vise en priorité un quartier du leader. Nulle à parité → pas de dogpile.
+	 * Anti-leader coalition: probability (∝ leader's domination) that an AI
+	 * decision targets a leader's quarter first. Zero at parity → no dogpile.
 	 */
 	leaderFocus: 0.25,
-	/** La coalition anti-leader ne se déclenche qu'au-delà de cette part de carte. */
+	/** The anti-leader coalition only triggers beyond this map share. */
 	coalitionFloor: 0.4,
 } as const;
 
-/** Embargo : blocus marché (malus de revenu sale de la cible). */
+/** Embargo: market blockade (dirty revenue penalty for the target). */
 export const EMBARGO = {
 	duration: 3000,
-	/** Part du revenu sale perdue par la cible. */
+	/** Share of dirty revenue lost by the target. */
 	salePenalty: 0.35,
-	/** Chute de relation à la déclaration. */
+	/** Relation drop on declaration. */
 	relationHit: 40,
 } as const;
 

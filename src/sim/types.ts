@@ -1,9 +1,9 @@
 /**
- * Types partagés du cœur de simulation.
- * Source : docs/city-sim.md, docs/procgen.md.
+ * Shared types of the simulation core.
+ * Source: docs/city-sim.md, docs/procgen.md.
  */
 
-/** Types de zones urbaines (city-sim.md), déduits du type IRIS pour Paris. */
+/** Urban zone types (city-sim.md), derived from the IRIS type for Paris. */
 const ZONE_TYPES = [
 	"residential",
 	"commercial",
@@ -17,35 +17,35 @@ const ZONE_TYPES = [
 
 export type ZoneType = (typeof ZONE_TYPES)[number];
 
-/** Libellés français des zones (IHM). */
+/** Zone labels (UI). */
 export const ZONE_LABELS: Record<ZoneType, string> = {
-	residential: "Résidentiel",
+	residential: "Residential",
 	commercial: "Commercial",
-	nightlife: "Vie nocturne",
-	industrial: "Industriel",
-	park: "Parc",
+	nightlife: "Nightlife",
+	industrial: "Industrial",
+	park: "Park",
 	police: "Police",
-	laundry: "Laverie",
-	vacant: "Terrain vague",
+	laundry: "Laundromat",
+	vacant: "Vacant lot",
 };
 
 /**
- * Carte jouable : une vraie ville (Paris IRIS).
- * Zones, adjacence, départs et profils économiques par quartier.
+ * Playable map: a real city (Paris IRIS).
+ * Zones, adjacency, spawns and economic profiles per quarter.
  */
 export interface CityGrid {
-	/** Zone par quartier (longueur = nombre de quartiers). */
+	/** Zone per quarter (length = number of quarters). */
 	readonly zones: readonly ZoneType[];
-	/** Alias de `zones` (compatibilité historique). */
+	/** Alias of `zones` (legacy compatibility). */
 	readonly modules: readonly ZoneType[];
-	/** Quartiers adjacents (partage de frontière, pas seulement un coin). */
+	/** Adjacent quarters (shared border, not just a corner). */
 	readonly neighbors: readonly (readonly number[])[];
-	/** Quartiers de départ proposés aux factions. */
+	/** Starting quarters offered to factions. */
 	readonly spawns: readonly number[];
-	/** Demande locale (clientele) : multiplicateur de vente/recrutement (≈0,5–1,4). */
+	/** Local demand (clientele): sales/recruitment multiplier (≈0.5–1.4). */
 	readonly demand: Float32Array;
-	/** Richesse locale : multiplicateur de prix et de blanchiment (≈0,6–1,4). */
+	/** Local wealth: price and laundering multiplier (≈0.6–1.4). */
 	readonly wealth: Float32Array;
-	/** Taille relative du quartier (≈0,7–1,5) : résistance au siège. */
+	/** Relative quarter size (≈0.7–1.5): siege resistance. */
 	readonly size: Float32Array;
 }

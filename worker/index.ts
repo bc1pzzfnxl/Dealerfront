@@ -1,9 +1,9 @@
 /**
- * Worker API — hébergé sur Cloudflare Workers (plan gratuit).
- * - `/api/health` : santé.
- * - `/api/map` : carte statique (zones, adjacence, profils) pour les agents.
- * - `/api/arena*` : arènes agent vs agent (Durable Objects) + spectateur WS.
- * Voir docs/arena.md.
+ * Worker API — hosted on Cloudflare Workers (free plan).
+ * - `/api/health`: health.
+ * - `/api/map`: static map (zones, adjacency, profiles) for agents.
+ * - `/api/arena*`: agent vs agent arenas (Durable Objects) + WS spectator.
+ * See docs/arena.md.
  */
 
 import { PARIS_MAP } from "../src/sim/maps/paris";
@@ -20,7 +20,7 @@ function json(data: unknown, status = 200): Response {
 	return Response.json(data, { status, headers: CORS });
 }
 
-/** Carte statique servie une fois aux agents (zones, voisins, profils). */
+/** Static map served once to agents (zones, neighbors, profiles). */
 function mapPayload() {
 	return {
 		count: PARIS_MAP.modules.length,
@@ -54,10 +54,10 @@ export default {
 
 		if (pathname === "/api/map") return json(mapPayload());
 
-		// Serveur MCP (agents LLM) : JSON-RPC Streamable HTTP.
+		// MCP server (LLM agents): JSON-RPC Streamable HTTP.
 		if (pathname === "/mcp" || pathname === "/mcp/") return handleMcp(request, env);
 
-		// Création d'une arène : on génère un id, on l'initialise, on l'enregistre.
+		// Create an arena: generate an id, initialize it, register it.
 		if (pathname === "/api/arena" && request.method === "POST") {
 			const config = (await request.json()) as ArenaConfig;
 			const id = crypto.randomUUID().slice(0, 8);
@@ -83,7 +83,7 @@ export default {
 		if (arenaMatch) {
 			const id = arenaMatch[1]!;
 			const response = await handleArena(request, env, id);
-			// Après une action/un tour, on met à jour le lobby.
+			// After an action/turn, update the lobby.
 			if (request.method === "POST") {
 				const stub = env.ARENA.get(env.ARENA.idFromName(id));
 				const view = await (await stub.fetch(`https://arena/${id}/view`)).json();

@@ -1,226 +1,226 @@
-# UI/UX — Interface god-view (DealerFront)
+# UI/UX — God-view interface (DealerFront)
 
-> Statut : **v1 (DealerFront)** — réécrite pour le mode cartel : overlays de contrôle, couleurs de faction, HUD multi-ressources.
+> Status: **v1 (DealerFront)** — rewritten for cartel mode: control overlays, faction colors, multi-resource HUD.
 
-## Objectif
+## Objective
 
-Définir une interface **de commandement à distance** : lire la situation d'un coup d'œil (possession, contrôle, pression) et donner des ordres par quartier, **sans micro ni personnage**.
+Define a **remote command** interface: read the situation at a glance (possession, control, pressure) and give orders per quarter, **without micro or a character**.
 
-## Règles
+## Rules
 
-### Caméra
+### Camera
 
-- **God view large** : caméra libre (pan + zoom), **iso fixe**, dézoom important (on voit la ville). Plus de caméra suiveuse serrée.
-- Navigation : glisser (**pan**), molette (**zoom**) — assurée par MapLibre.
+- **Wide god view**: free camera (pan + zoom), **fixed iso**, significant zoom-out (you see the city). No more tight follow camera.
+- Navigation: drag (**pan**), wheel (**zoom**) — handled by MapLibre.
 
-### Lecture de la carte
+### Reading the map
 
-| Information | Rendu | Interdit |
+| Information | Rendering | Forbidden |
 |---|---|---|
-| **Possession** (faction) | **Aplat translucide coloré** + contour sur les quartiers, **couleur de faction** (`art-direction.md`) | Couleur décorative |
-| **Contrôle du quartier** | Nombre 0–100 (ou jauge fine) affiché sur le quartier sélectionné/survolé, dégradé de remplissage | — |
-| **Bâtiments** | **Icônes** par type (Labo, Point de vente, Façade, Planque, Atelier, Contre-espionnage, Dépôt) | — |
-| **Neutre** | Gris (pas d'aplat de faction), garnison affichée au survol | — |
-| **Police** | Postes visibles + indicateur de **Pression** ; zones sous raid en rouge | — |
-| **Alertes** (attaque entrante) | Bordure rouge + direction, son | — |
+| **Possession** (faction) | **Colored translucent fill** + outline on quarters, **faction color** (`art-direction.md`) | Decorative color |
+| **Quarter Control** | Number 0–100 (or thin gauge) shown on the selected/hovered quarter, fill gradient | — |
+| **Buildings** | **Icons** per type (Lab, Storefront, Front, Safehouse, Workshop, Counter-intel, Depot) | — |
+| **Neutral** | Gray (no faction fill), garrison shown on hover | — |
+| **Police** | Visible stations + **Pressure** indicator; zones under raid in red | — |
+| **Alerts** (incoming attack) | Red border + direction, sound | — |
 
-### Commandement
+### Command
 
-- **Sélection** : clic quartier, **glisser-rectangle** pour sélection multiple.
-- **Menu d'ordres contextuel** : Attaquer / Renforcer / Construire / Convertir / (Tueur) — `command.md`.
-- **Prévisualisation** avant validation : Influence engagée, pertes estimées, quartiers concernés.
-- **Panneau global** : tech (branches), corruption police, diplomatie (factions), journal.
+- **Selection**: quarter click, **drag-rectangle** for multi-select.
+- **Contextual order menu**: Attack / Reinforce / Build / Convert / (Hitman) — `command.md`.
+- **Preview** before confirming: committed Influence, estimated losses, affected quarters.
+- **Global panel**: tech (branches), police corruption, diplomacy (factions), log.
 
 ### HUD
 
-- **Ressources** : Produit, Cash sale, Cash propre, **Influence** (+ max).
-- **Pression police** + état.
-- **Liste des factions** : contrôle %, statut (pacte/embargo/traître), leader.
-- **Milestones** : seuil de contrôle %, seuil de Cash propre.
-- **Journal** : événements récents (captures, raids, trahisons).
-- **Carte** : fond muet, aplats de faction, contours de sélection/heat, convois.
+- **Resources**: Product, Dirty cash, Clean cash, **Influence** (+ max).
+- **Police Pressure** + state.
+- **Faction list**: control %, status (pact/embargo/traitor), leader.
+- **Milestones**: control % threshold, Clean cash threshold.
+- **Log**: recent events (captures, raids, betrayals).
+- **Map**: muted basemap, faction fills, selection/heat outlines, convoys.
 
-### Écrans (MVP = 3)
+### Screens (MVP = 3)
 
-| Écran | Contenu |
+| Screen | Content |
 |---|---|
-| **Sélection de ville** | Paris (992 quartiers IRIS) |
-| **Vue de jeu** | Carte god-view + overlays + HUD + commandement |
-| **Récap de fin** | Score, contrôle final, cause, chaîne causale |
+| **City selection** | Paris (992 IRIS quarters) |
+| **Game view** | God-view map + overlays + HUD + command |
+| **End recap** | Score, final control, cause, causal chain |
 
-## Paramètres chiffrés
+## Numeric parameters
 
-| Paramètre | Valeur | Statut |
+| Parameter | Value | Status |
 |---|---|---|
-| Zoom (tuiles visibles) | large : ~90–200 | à équilibrer |
-| Couleur par faction | 6 couleurs (voir `art-direction.md`) | fixé |
-| Prévisualisation | obligatoire avant attaque | fixé |
-| Durée du récap | **TBD** | TBD |
+| Zoom (visible tiles) | wide: ~90–200 | to balance |
+| Color per faction | 6 colors (see `art-direction.md`) | fixed |
+| Preview | required before attack | fixed |
+| Recap duration | **TBD** | TBD |
 
-## Cas limites
+## Edge cases
 
-- **Superposition de couleurs** : un quartier contesté doit rester lisible (contour = attaquant, remplissage = propriétaire).
-- **Sélection énorme** : borner la taille de sélection pour préserver la lisibilité (`TBD`).
-- **Alertes multiples** : prioriser les attaques entrantes (pas de spam visuel).
-- **Mode daltonien** : distinguer les factions par **couleur + motif/contour** (`art-direction.md`).
+- **Color overlap**: a contested quarter must remain readable (outline = attacker, fill = owner).
+- **Huge selection**: bound the selection size to preserve readability (`TBD`).
+- **Multiple alerts**: prioritize incoming attacks (no visual spam).
+- **Colorblind mode**: distinguish factions by **color + pattern/outline** (`art-direction.md`).
 
-## Dépendances
+## Dependencies
 
 - `pillars.md` — P5/P6, R4/R6.
-- `command.md` — ordres et prévisualisation.
+- `command.md` — orders and preview.
 - `territory.md`, `combat.md`, `economy.md`, `tech.md`, `factions.md`, `police-ai.md`.
-- `art-direction.md` — palette de factions.
-- `scoring.md` / `win-conditions.md` — récap.
+- `art-direction.md` — faction palette.
+- `scoring.md` / `win-conditions.md` — recap.
 
-## Critères de validation
+## Validation criteria
 
-- [ ] On lit la possession et le contrôle sans ouvrir de menu.
-- [ ] On peut donner un ordre par quartier et par lot avec prévisualisation.
-- [ ] Le HUD n'est pas un dashboard illisible (hiérarchie claire).
-- [ ] Le récap explique la fin de partie sans documentation externe.
+- [ ] Possession and control are readable without opening a menu.
+- [ ] You can give a per-quarter and batch order with preview.
+- [ ] The HUD is not an unreadable dashboard (clear hierarchy).
+- [ ] The recap explains the endgame without external documentation.
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Caméra | god view large (pan/zoom, iso fixe) |
-| 2 | Possession | aplat coloré + contour (couleur = info) |
-| 3 | Commandement | sélection + ordres contextuels + prévisualisation |
-| 4 | HUD | ressources, pression, factions, journal |
-| 5 | Écrans | 3 (sélection, jeu, récap) |
+| 1 | Camera | wide god view (pan/zoom, fixed iso) |
+| 2 | Possession | colored fill + outline (color = info) |
+| 3 | Command | selection + contextual orders + preview |
+| 4 | HUD | resources, pressure, factions, log |
+| 5 | Screens | 3 (selection, game, recap) |
 
 ---
 
-## Implémentation (P7) — état en vigueur
+## Implementation (P7) — state in force
 
-> Section **faisant foi** pour `src/App.tsx`, `src/render/*`. Le rendu carte est **mapcn / MapLibre** (`src/render/WorldMap.tsx`).
+> **Authoritative** section for `src/App.tsx`, `src/render/*`. The map rendering is **mapcn / MapLibre** (`src/render/WorldMap.tsx`).
 
-### Écrans (3)
+### Screens (3)
 
-- **Sélection de ville** : carte **Paris** (992 quartiers IRIS) + rappel de l'objectif, clic = lancer.
-- **Vue de jeu** : carte god-view + overlays + HUD.
-- **Récap de fin** : cause, Cash propre, contrôle, **score + rang**, quartiers pris, gangs éliminés, raids/saisies, durée.
+- **City selection**: **Paris** map (992 IRIS quarters) + objective reminder, click = start.
+- **Game view**: god-view map + overlays + HUD.
+- **End recap**: cause, Clean cash, control, **score + rank**, quarters taken, gangs eliminated, raids/seizures, duration.
 
-### Lecture de la carte
+### Reading the map
 
-- **Possession** : aplat **par faction** (`fill-color` par `feature-state`), **opacité ∝ Contrôle**.
-- **Quartier attaqué** : **contour** à la **couleur de l'attaquant** (le plus fort), dessiné sur la carte.
-- **Bâtiments** : affichés dans le panneau Quartier (label + effet) ; le quartier construit porte la couleur de sa faction.
-- **Sélection** : contour **blanc** épais. **Heat local** : contour **orange** ∝ heat. **Convois** : points animés colorés par faction.
-- **Police** : **vignette d'ambiance** dont l'intensité suit la Pression ; passe en **rouge pulsant** quand le joueur est visé et en alerte (raid récent ou `P ≥ 70`).
+- **Possession**: fill **per faction** (`fill-color` via `feature-state`), **opacity ∝ Control**.
+- **Attacked quarter**: **outline** in the **attacker's color** (the strongest), drawn on the map.
+- **Buildings**: shown in the Quarter panel (label + effect); the built quarter carries its faction color.
+- **Selection**: thick **white** outline. **Local heat**: **orange** outline ∝ heat. **Convoys**: animated dots colored by faction.
+- **Police**: **ambience vignette** whose intensity follows Pressure; turns **pulsing red** when the player is targeted and on alert (recent raid or `P ≥ 70`).
 
 ### HUD
 
-- **Cartel** : Membres, Contrôle, Quartiers, Produit, Cash sale, Cash propre, Production, **Objectif** (seuil de contrôle + Cash propre).
-- **Police** : jauge de Pression, palier, cible, raids, bouton **Corrompre**.
-- **Factions** : symbole + couleur, tag **leader**, contrôle %, Cash propre.
-- **Journal**, **temps restant**, boutons Pause / Nouvelle seed / **Daltonien**.
+- **Cartel**: Members, Control, Quarters, Product, Dirty cash, Clean cash, Production, **Objective** (control threshold + Clean cash).
+- **Police**: Pressure gauge, tier, target, raids, **Corrupt** button.
+- **Factions**: symbol + color, **leader** tag, control %, Clean cash.
+- **Log**, **time left**, Pause / New seed / **Colorblind** buttons.
 
-### Mode daltonien
+### Colorblind mode
 
-- Bascule : les factions passent en **valeurs de gris distinctes** (plus de teinte), complétées par un **symbole** par faction dans la légende. Préférence persistée (`localStorage`).
+- Toggle: factions switch to **distinct gray values** (no more hue), complemented by a **symbol** per faction in the legend. Preference persisted (`localStorage`).
 
-### Écarts avec la cible
+### Deviations from the target
 
-- **Sélection multiple** (glisser-rectangle) et **prévisualisation chiffrée** avant attaque : non implémentées (sélection au clic).
-- **Alertes sonores** et **marqueurs de pacte/embargo** : non implémentés (pas de diplomatie).
-- Le zoom/pan est géré par MapLibre (glisser = caméra).
+- **Multi-select** (drag-rectangle) and **numeric preview** before attack: not implemented (click selection).
+- **Sound alerts** and **pact/embargo markers**: not implemented (no diplomacy).
+- Zoom/pan is handled by MapLibre (drag = camera).
 
 ---
 
-## Implémentation (P9) — disposition du HUD (zones, sans scroll)
+## Implementation (P9) — HUD layout (zones, no scroll)
 
-> Section **faisant foi** pour `src/App.tsx` et `src/styles.css`. Le HUD est une **grille plein écran** en surcouche (`pointer-events` seulement sur les panneaux) ; il **ne scrolle pas** en jeu.
+> **Authoritative** section for `src/App.tsx` and `src/styles.css`. The HUD is a **full-screen grid** overlay (`pointer-events` only on the panels); it **does not scroll** in game.
 
-### Triage par zone
+### Triage by zone
 
-| Zone | Contenu | Rôle |
+| Zone | Content | Role |
 |---|---|---|
-| **Barre haute** (`topbar`) | Marque + carte, **ressources** (Membres, Produit, Cash sale, Cash propre), **Contrôle**, Quartiers, Production, **objectif** (seuil + Cash propre) et **temps restant** | Toujours visible, lecture d'un coup d'œil |
-| **Colonne gauche** (`panel-left`) | **Quartier** sélectionné (profil, logistique, heat) + **ordres** (bâtir / attaquer / raid / descente / sabotage / interception / tueur) | Panneau d'**action** contextuel |
-| **Colonne droite** (`panel-right`) | **Police** (Pression, cible, raids, corruption), **Tech** (3 branches), **Diplomatie** (relations, pactes, factions fusionnées) | Panneau de **pilotage** |
-| **Barre basse** (`panel-bottom`) | **Journal** + rappel des touches + boutons (Pause / Nouvelle seed / Daltonien) + tick | Ambiance / contrôle |
+| **Top bar** (`topbar`) | Brand + map, **resources** (Members, Product, Dirty cash, Clean cash), **Control**, Quarters, Production, **objective** (threshold + Clean cash) and **time left** | Always visible, at-a-glance reading |
+| **Left column** (`panel-left`) | Selected **quarter** (profile, logistics, heat) + **orders** (build / attack / raid / bust / sabotage / interception / hitman) | Contextual **action** panel |
+| **Right column** (`panel-right`) | **Police** (Pressure, target, raids, corruption), **Tech** (3 branches), **Diplomacy** (relations, pacts, merged factions) | **Steering** panel |
+| **Bottom bar** (`panel-bottom`) | **Log** + key reminders + buttons (Pause / New seed / Colorblind) + tick | Mood / control |
 
-### Règles
+### Rules
 
-- La **légende de faction a fusionné** avec la Diplomatie (symbole + couleur + contrôle % + relation + action Pacte/Trahir) pour supprimer un panneau.
-- Les **statistiques du cartel** (ex-carte « Cartel ») sont passées dans la **barre haute**.
-- Les contrôles de carte (zoom) sont en bas-droite.
-- Vérifié **sans scroll** en 1600×900 et 1366×768 ; `overflow-y: auto` reste en secours sur les colonnes si l'écran est très petit.
+- The **faction legend merged** with Diplomacy (symbol + color + control % + relation + Pact/Betray action) to remove a panel.
+- The **cartel stats** (ex-"Cartel" card) moved into the **top bar**.
+- The map controls (zoom) are bottom-right.
+- Verified **without scroll** at 1600×900 and 1366×768; `overflow-y: auto` remains as a fallback on the columns if the screen is very small.
 
 ---
 
-## Implémentation (P10) — guidage du joueur
+## Implementation (P10) — player guidance
 
-> Objectif : **simple mécaniquement, profond tactiquement** — le jeu suggère, le joueur décide.
+> Objective: **mechanically simple, tactically deep** — the game suggests, the player decides.
 
-- **Conseiller contextuel** (haut du panneau gauche) : une seule consigne, priorisée
-  (objectif → amorçage **Labo → Point de vente → Façade** → quartiers vides → expansion → blanchiment).
-- **Bâtiment conseillé** : la touche `Q` et le bouton surligné suivent la **priorité d'amorçage**,
-  puis la **composition cible** (`chooseBuildType`) — mêmes règles que l'IA.
-- **Effets lisibles** : chaque bâtiment expose son effet (`BUILDING_EFFECT_LABELS`) en infobulle et
-  sous le menu ; le quartier aménagé affiche l'effet en cours.
-- **Aperçu d'attaque** : Membres engagés (20 %), Contrôle et **défense ×N** de la cible avant validation.
-- **Refus explicité** : « Non adjacent — choisissez un voisin » ou « Membres insuffisants (min 400) »,
-  jamais d'échec silencieux.
+- **Contextual advisor** (top of the left panel): a single instruction, prioritized
+  (objective → bootstrap **Lab → Storefront → Front** → empty quarters → expansion → laundering).
+- **Recommended building**: the `Q` key and the highlighted button follow the **bootstrap priority**,
+  then the **target composition** (`chooseBuildType`) — same rules as the AI.
+- **Readable effects**: each building exposes its effect (`BUILDING_EFFECT_LABELS`) in a tooltip and
+  under the menu; the developed quarter shows the current effect.
+- **Attack preview**: committed Members (20%), Control and target **defense ×N** before confirming.
+- **Explicit refusal**: "Not adjacent — choose a neighbor" or "Insufficient Members (min 400)",
+  never a silent failure.
 
 ### Onboarding (P10)
 
-- **Aide** affichée à la première partie (rouvrable via le bouton **Aide**) : but, boucle économique en 4 étapes, conquête, police, touches.
-- **Panneau « Boucle »** (barre basse) : `Recrutement → Membres`, `Labo → Produit`, `Point de vente → Cash sale`, `Façade → Cash propre`, avec compteurs et **étape manquante mise en évidence**.
-- **Conseiller** réordonné : capturer un 2ᵉ quartier → Labo → Point de vente → Façade → aménager → étendre → blanchir ; il indique la **ressource manquante** quand un bâtiment est hors de portée.
-- **Contraste** : texte secondaire éclairci (`--muted`), coût des bâtiments lisible, boutons désactivés **lisibles** (bordure pointillée au lieu d'une opacité qui écrase le texte), coût en ambre quand il manque des fonds.
+- **Help** shown on the first game (reopenable via the **Help** button): goal, 4-step economic loop, conquest, police, keys.
+- **"Loop" panel** (bottom bar): `Recruitment → Members`, `Lab → Product`, `Storefront → Dirty cash`, `Front → Clean cash`, with counters and the **missing step highlighted**.
+- **Advisor** reordered: capture a 2nd quarter → Lab → Storefront → Front → develop → expand → launder; it indicates the **missing resource** when a building is out of reach.
+- **Contrast**: secondary text lightened (`--muted`), building cost readable, disabled buttons **readable** (dotted border instead of opacity that crushes the text), cost in amber when funds are short.
 
 ---
 
-## Implémentation (P14) — Information, vision et renseignement
+## Implementation (P14) — Information, vision and intel
 
-> La couleur de possession n'est plus universelle : l'information est **limitée**.
+> Possession color is no longer universal: information is **limited**.
 
-- **Vision de frontière** : le joueur connaît **ses quartiers + leurs voisins**, plus le rayon des **Contre-espionnages** qu'il possède, plus les zones **reconnaissées**.
-- **Zone inconnue** : aplat **gris sombre**, ni propriétaire, ni contrôle, ni bâtiment, ni contour d'attaque ; l'infobulle affiche « Inconnu — reconnaissance requise ».
-- **Code couleur de la base** : nos quartiers = **couleur pleine et lumineuse** ; connus mais adverses = **discrets** ; inconnus = **masqués**.
-- **Renseignement** :
-  - **Reconnaître** (bouton sur un quartier inconnu) : coûte **1 500 Cash sale**, révèle un carré de rayon 2 pendant **60 s**, cooldown **30 s**.
-  - **Contre-espionnage** : révèle en permanence un rayon de 2 autour de lui (en plus de son effet anti-tueur).
+- **Border vision**: the player knows **their quarters + their neighbors**, plus the radius of the **Counter-intels** they own, plus **scouted** zones.
+- **Unknown zone**: **dark gray** fill, no owner, no control, no building, no attack outline; the tooltip shows "Unknown — reconnaissance required".
+- **Base color code**: our quarters = **full, bright color**; known but hostile = **discreet**; unknown = **masked**.
+- **Intel**:
+  - **Reconnoiter** (button on an unknown quarter): costs **1,500 Dirty cash**, reveals a radius-2 square for **60 s**, cooldown **30 s**.
+  - **Counter-intel**: permanently reveals a radius of 2 around it (in addition to its anti-hitman effect).
 
-### Diplomatie et information (P15)
+### Diplomacy and information (P15)
 
-- Le panneau **Diplomatie** ne montre **plus** les % de contrôle des rivaux non renseignés : il affiche `?` (inconnu) ou `~X %` (partiellement connu via la vision/reconnaissance).
+- The **Diplomacy** panel **no longer** shows the control % of non-intel rivals: it displays `?` (unknown) or `~X%` (partially known via vision/reconnaissance).
 
-### P16 — retour à l'information complète
+### P16 — return to full information
 
-- Le **fog / renseignement** (P14) est **abandonné** : possession, contrôle et bâtiments sont **visibles pour tous** (lisibilité type OpenFront). Les mécaniques de vision/reconnaissance ont été retirées.
+- The **fog / intel** (P14) is **abandoned**: possession, control and buildings are **visible to all** (OpenFront-style readability). The vision/reconnaissance mechanics have been removed.
 
 ---
 
-## Implémentation (P25) — Game feel & UI iconique
+## Implementation (P25) — Game feel & iconic UI
 
-> Décision : **une action = un retour visuel**. Aucune action du joueur ne doit rester muette.
-> Références : OpenFront / Territorial.io (commandes contextuelles, raccourcis, feedback), théorie du game feel (juice), motion design (Emil/Jakub).
+> Decision: **one action = one visual response**. No player action must remain silent.
+> References: OpenFront / Territorial.io (contextual commands, shortcuts, feedback), game feel theory (juice), motion design (Emil/Jakub).
 
-### Juice du monde (carte)
+### World juice (map)
 
-- **Flash de capture** : contour blanc flouté sur les quartiers pris (`feature-state.flash`, ~0,7 s), tiré de `capturedAt`.
-- **Siège** : contour **pointillé animé** à la couleur de l'attaquant sur les cibles d'assaut (`feature-state.siege`).
-- **Convois** : la route (ligne à 35 %) et le point mobile sont visibles ; en `prefers-reduced-motion`, le point avance par pas.
-- **Heat local** : contour orange (inchangé).
+- **Capture flash**: blurred white outline on taken quarters (`feature-state.flash`, ~0.7 s), derived from `capturedAt`.
+- **Siege**: **animated dotted** outline in the attacker's color on assault targets (`feature-state.siege`).
+- **Convoys**: the route (line at 35%) and the moving dot are visible; under `prefers-reduced-motion`, the dot advances in steps.
+- **Local heat**: orange outline (unchanged).
 
 ### UI
 
-- **Icônes (lucide, `currentColor`)** : bâtiments (Logement=Users, Labo=FlaskConical, Vente=Store, Façade=Landmark, Planque=Shield, Dépôt=Warehouse, Atelier=Factory, Guetteur=Eye), ressources, opérations. Plus de libellés longs.
-- **Barre de commandement** (panneau gauche, quartier non possédé) : grille d'icônes Assaut/Raid/Descente/Sabotage/Interception/Tueur, **coût + raccourci** affichés dans le bouton, raison d'indisponibilité en infobulle.
-- **Barre haute compacte** : icônes de ressource + deux **barres d'objectif** (Contrôle, Cash propre) ; minuteur en **urgence** sous 3 min.
-- **Journal-feed** : 3 entrées colorées (gain / perte / info) avec animation d'entrée courte.
-- **Sélection de ville** : pitch + rappel visuel de la boucle (Produire → Vendre → Blanchir) + CTA unique.
-- **Récap** : victoire (accent vert) distinguée de la défaite (rouge).
+- **Icons (lucide, `currentColor`)**: buildings (Housing=Users, Lab=FlaskConical, Storefront=Store, Front=Landmark, Safehouse=Shield, Depot=Warehouse, Workshop=Factory, Watcher=Eye), resources, operations. No more long labels.
+- **Command bar** (left panel, non-owned quarter): icon grid Assault/Raid/Bust/Sabotage/Interception/Hitman, **cost + shortcut** shown in the button, unavailability reason in a tooltip.
+- **Compact top bar**: resource icons + two **objective bars** (Control, Clean cash); timer in **urgency** under 3 min.
+- **Log feed**: 3 colored entries (gain / loss / info) with a short entry animation.
+- **City selection**: pitch + visual loop reminder (Produce → Sell → Launder) + single CTA.
+- **Recap**: victory (green accent) distinguished from defeat (red).
 
 ### Micro-interactions (frequency gate)
 
-- Boutons : `scale(0.97)` au `:active`, transitions 160 ms. **Rien** sur les raccourcis clavier (jamais animés).
-- `prefers-reduced-motion` coupe flash/siège/journal/transitions (accessibilité, non optionnel).
+- Buttons: `scale(0.97)` on `:active`, 160 ms transitions. **Nothing** on keyboard shortcuts (never animated).
+- `prefers-reduced-motion` cuts flash/siege/log/transitions (accessibility, non-optional).
 
-### Graines de multi (sans réseau)
+### Multiplayer seeds (no network)
 
-- `World.briefing()` : structure **sérialisable** JSON (objectif, progression, rang) — réutilisable par un futur lobby/partage.
-- `GameEvent` et `Floater` sont purs et sérialisables (replay/partage différés).
+- `World.briefing()`: JSON **serializable** structure (objective, progression, rank) — reusable by a future lobby/share.
+- `GameEvent` and `Floater` are pure and serializable (replay/share deferred).

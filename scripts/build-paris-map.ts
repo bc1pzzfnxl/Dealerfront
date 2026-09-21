@@ -1,13 +1,13 @@
 /**
- * Génère la carte « vraie ville » Paris (IRIS) pour DealerFront.
+ * Generates the "real city" Paris map (IRIS) for DealerFront.
  *
- * Source : IRIS 2024 (INSEE / IGN) via OpenDataSoft (992 quartiers du 75).
- * Produit :
- *   - src/sim/maps/paris.ts          → données de simulation (zones, adjacence, spawns)
- *   - src/sim/maps/paris-iris.geojson → géométrie d'affichage (allégée, property `i`)
+ * Source: IRIS 2024 (INSEE / IGN) via OpenDataSoft (992 quarters of the 75).
+ * Produces:
+ *   - src/sim/maps/paris.ts          → simulation data (zones, adjacency, spawns)
+ *   - src/sim/maps/paris-iris.geojson → display geometry (slimmed, property `i`)
  *
- * Usage : bun run scripts/build-paris-map.ts   (cache : data/paris-iris-src.geojson)
- * Déterministe : mêmes entrées → mêmes sorties.
+ * Usage: bun run scripts/build-paris-map.ts   (cache: data/paris-iris-src.geojson)
+ * Deterministic: same inputs → same outputs.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -41,7 +41,11 @@ interface Collection {
 	features: Feature[];
 }
 
-/** Poids zone par type IRIS. Habitat = cœur urbain, activité = industrie/commerce. */
+/** Source IRIS labels are French; strip accents so they can be keyed in English. */
+const profileKey = (type: string) =>
+	type.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/** Zone weights per IRIS type. Housing = urban core, activity = industry/commerce. */
 const WEIGHTS: Record<string, readonly Weighted<ZoneType>[]> = {
 	"iris d'habitat": [
 		{ value: "residential", weight: 55 },
@@ -52,7 +56,7 @@ const WEIGHTS: Record<string, readonly Weighted<ZoneType>[]> = {
 		{ value: "police", weight: 4 },
 		{ value: "vacant", weight: 8 },
 	],
-	"iris d'activité": [
+	"iris d'activite": [
 		{ value: "commercial", weight: 30 },
 		{ value: "industrial", weight: 25 },
 		{ value: "nightlife", weight: 15 },
@@ -77,8 +81,8 @@ const BUILT: readonly ZoneType[] = [
 ];
 
 /**
- * Richesse réelle approximative par arrondissement (revenu médian INSEE).
- * Les quartiers populaires recrutent plus, les riches vendent plus cher.
+ * Approximate real wealth by arrondissement (INSEE median income).
+ * Working-class quarters recruit more, wealthy ones sell for more.
  */
 const ARRONDISSEMENT_WEALTH: Record<number, number> = {
 	1: 1.25,
@@ -103,10 +107,10 @@ const ARRONDISSEMENT_WEALTH: Record<number, number> = {
 	20: 0.65,
 };
 
-/** Demande (clientele) par type IRIS. */
+/** Demand (clientele) per IRIS type. */
 const TYPE_DEMAND: Record<string, number> = {
 	"iris d'habitat": 1.1,
-	"iris d'activité": 0.9,
+	"iris d'activite": 0.9,
 	"iris divers": 0.65,
 };
 
@@ -123,7 +127,7 @@ const clamp = (value: number, min: number, max: number) =>
 	Math.max(min, Math.min(max, value));
 const round3 = (value: number) => Math.round(value * 1000) / 1000;
 
-/** Ramène une série à une moyenne de 1 (localiser redistribue le total). */
+/** Scales a series to a mean of 1 (localizing redistributes the total). */
 function normalize(values: Float32Array, min: number, max: number): void {
 	let sum = 0;
 	for (const value of values) sum += value;
@@ -133,7 +137,7 @@ function normalize(values: Float32Array, min: number, max: number): void {
 	}
 }
 
-/** Aire d'un anneau (formule du lacet), en degrés² — sert de proxy de taille. */
+/** Area of a ring (shoelace formula), in degrees² — used as a size proxy. */
 function ringArea(ring: Position[]): number {
 	let a = 0;
 	for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -156,33 +160,33 @@ function ringsOf(geometry: Feature["geometry"]): Polygon[] {
 
 async function main(): Promise<void> {
 	if (!existsSync(SOURCE)) {
-		console.log(`Téléchargement IRIS 75 → ${SOURCE}`);
+		console.log(`Downloading IRIS 75 → ${SOURCE}`);
 		mkdirSync(dirname(SOURCE), { recursive: true });
 		const response = await fetch(URL);
-		if (!response.ok) throw new Error(`Téléchargement IRIS échoué (${response.status})`);
+		if (!response.ok) throw new Error(`IRIS download failed (${response.status})`);
 		await Bun.write(SOURCE, response);
 	}
 	const collection = JSON.parse(readFileSync(SOURCE, "utf8")) as Collection;
 	const features = collection.features;
-	console.log(`${features.length} quartiers IRIS`);
+	console.log(`${features.length} IRIS quarters`);
 
-	// 1. Zones déterministes par quartier (seed = code IRIS).
+	// 1. Deterministic zones per quarter (seed = IRIS code).
 	const codes = features.map((f) => f.properties.iris_code[0]!);
 	const centroids = features.map(
 		(f) => [f.properties.geo_point_2d.lon, f.properties.geo_point_2d.lat] as Position,
 	);
 	const zones: ZoneType[] = features.map((f, i) => {
 		const rng = createRng(Number(codes[i]!) >>> 0);
-		const weights = WEIGHTS[f.properties.iris_type] ?? WEIGHTS["iris divers"]!;
+		const weights = WEIGHTS[profileKey(f.properties.iris_type)] ?? WEIGHTS["iris divers"]!;
 		return pickWeighted(rng, weights);
 	});
 
-	// 1b. Profils : demande (type IRIS) et richesse (arrondissement réel).
+	// 1b. Profiles: demand (IRIS type) and wealth (real arrondissement).
 	const demand = new Float32Array(features.length);
 	const wealth = new Float32Array(features.length);
 	features.forEach((feature, i) => {
 		const code = codes[i]!;
-		const typeDemand = TYPE_DEMAND[feature.properties.iris_type] ?? 0.7;
+		const typeDemand = TYPE_DEMAND[profileKey(feature.properties.iris_type)] ?? 0.7;
 		const arrondissement = Number(/(\d+)/.exec(feature.properties.com_arm_name[0] ?? "")?.[1] ?? 0);
 		const arrondissementWealth = ARRONDISSEMENT_WEALTH[arrondissement] ?? 0.9;
 		demand[i] = round3(clamp(typeDemand + (hash01(`${code}d`) - 0.5) * 0.4, 0.4, 1.4));
@@ -190,25 +194,25 @@ async function main(): Promise<void> {
 			clamp(arrondissementWealth + (hash01(`${code}w`) - 0.5) * 0.2, 0.5, 1.4),
 		);
 	});
-	// Localiser redistribue, ne change pas le total : moyenne ramenée à 1.
+	// Localizing redistributes, doesn't change the total: mean scaled to 1.
 	normalize(demand, 0.4, 1.4);
 	normalize(wealth, 0.5, 1.4);
 
-	// 1c. Taille : racine de l'aire, normalisée (moyenne 1, bornée 0,7–1,5).
-	// Un grand quartier oppose plus de « Contrôle » à vider au siège.
+	// 1c. Size: square root of area, normalized (mean 1, bounded 0.7–1.5).
+	// A large quarter offers more Control to drain during a siege.
 	const size = new Float32Array(features.length);
 	features.forEach((feature, i) => {
 		size[i] = Math.sqrt(featureArea(feature.geometry));
 	});
 	normalize(size, 0.7, 1.5);
 
-	// 2. Adjacence : quartiers partageant ≥ 2 sommets (frontière commune).
+	// 2. Adjacency: quarters sharing ≥ 2 vertices (common border).
 	const neighbors = adjacent(features);
 
-	// 3. Spawns : 4 quartiers bâtis les plus éloignés (échantillonnage glouton).
+	// 3. Spawns: 4 built quarters farthest apart (greedy sampling).
 	const spawns = pickSpawns(centroids, zones);
 
-	// 4. Sorties.
+	// 4. Outputs.
 	mkdirSync(dirname(SIM_OUT), { recursive: true });
 	writeFileSync(SIM_OUT, emitSim(centroids, zones, neighbors, spawns, demand, wealth, size));
 	writeFileSync(GEO_OUT, emitGeo(features));
@@ -216,7 +220,7 @@ async function main(): Promise<void> {
 	console.log(`→ ${GEO_OUT}`);
 }
 
-/** Adjacence par sommets partagés (au moins deux → frontière, pas un coin). */
+/** Adjacency by shared vertices (at least two → border, not a corner). */
 function adjacent(features: Feature[]): number[][] {
 	const vertex = new Map<string, Set<number>>();
 	const key = (p: Position) => `${p[0]!.toFixed(6)},${p[1]!.toFixed(6)}`;
@@ -253,7 +257,7 @@ function adjacent(features: Feature[]): number[][] {
 	return out.map((list) => list.sort((x, y) => x - y));
 }
 
-/** Échantillonnage glouton du plus loin-possible parmi les zones bâties. */
+/** Greedy farthest-point sampling among built zones. */
 function pickSpawns(centroids: Position[], zones: ZoneType[], count = 4): number[] {
 	const candidates = zones
 		.map((zone, i) => ({ zone, i }))
@@ -289,8 +293,8 @@ function emitSim(
 	const arr = (items: unknown[]) => `[${items.map((x) => JSON.stringify(x)).join(",")}]`;
 	const floats = (items: Float32Array) => `Float32Array.from([${items.join(",")}])`;
 	return `/**
- * Paris — carte « vraie ville » (992 quartiers IRIS). GÉNÉRÉ, ne pas éditer.
- * Voir scripts/build-paris-map.ts et docs/procgen.md.
+ * Paris — "real city" map (992 IRIS quarters). GENERATED, do not edit.
+ * See scripts/build-paris-map.ts and docs/procgen.md.
  */
 
 import type { CityGrid, ZoneType } from "../types";
@@ -303,7 +307,7 @@ export const PARIS_DEMAND: Float32Array = ${floats(demand)};
 export const PARIS_WEALTH: Float32Array = ${floats(wealth)};
 export const PARIS_SIZE: Float32Array = ${floats(size)};
 
-/** Carte jouable Paris (992 quartiers IRIS), rendue avec mapcn/MapLibre. */
+/** Playable Paris map (992 IRIS quarters), rendered with mapcn/MapLibre. */
 export const PARIS_MAP: CityGrid = {
 	zones: PARIS_ZONES,
 	modules: PARIS_ZONES,

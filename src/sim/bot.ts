@@ -1,6 +1,6 @@
 /**
- * Bot — politique de jeu minimale et déterministe, pour l'équilibrage.
- * Le hasard provient uniquement d'un Rng injecté (jamais Math.random).
+ * Bot — minimal, deterministic play policy, for balancing.
+ * Randomness comes only from an injected Rng (never Math.random).
  */
 
 import { chooseBuildType, missingEconomyStep } from "./buildings";
@@ -9,18 +9,18 @@ import type { Rng } from "./rng";
 import { TECH_BRANCHES, TECH } from "./tech";
 import type { World } from "./world";
 
-/** Cadence de décision du bot (en ticks). */
+/** Bot decision cadence (in ticks). */
 export const AUTOPLAY_EVERY = 20;
 
 export function autoPlay(world: World, rng: Rng): void {
 	const player = world.player;
 	if (player.members < 300) return;
 
-	// Construire : on comble le plus grand déficit de la composition cible.
+	// Build: fill the biggest deficit of the target composition.
 	if (rng() < 0.5) {
 		const counts = world.buildingCounts(player.id);
 		const owned = world.modulesOwned(player.id);
-		// Amorçage zone-agnostique : la chaîne passe avant le reste.
+		// Zone-agnostic bootstrap: the chain comes before the rest.
 		const bootstrap = missingEconomyStep(counts, (candidate) => world.playerCanAfford(candidate));
 		for (let i = 0; i < world.territory.count; i += 1) {
 			if (world.territory.owner[i] !== player.id) continue;
@@ -32,7 +32,7 @@ export function autoPlay(world: World, rng: Rng): void {
 				(candidate) =>
 					world.playerCanBuild(i, candidate) &&
 					(bootstrap === null || candidate === bootstrap),
-				{ atelier: TECH.maxLevel },
+				{ workshop: TECH.maxLevel },
 			);
 			if (type !== null) {
 				world.playerBuild(i, type);
@@ -41,7 +41,7 @@ export function autoPlay(world: World, rng: Rng): void {
 		}
 	}
 
-	// Attaquer un quartier adjacent.
+	// Attack an adjacent quarter.
 	const targets: number[] = [];
 	for (let i = 0; i < world.territory.count; i += 1) {
 		if (world.playerCanAttack(i)) targets.push(i);
@@ -50,7 +50,7 @@ export function autoPlay(world: World, rng: Rng): void {
 		world.playerAttack(targets[Math.floor(rng() * targets.length)]!);
 	}
 
-	// Corruption défensive si la police vise le joueur (on garde des munitions).
+	// Defensive corruption if the police target the player (we keep ammo).
 	if (
 		world.police.target === player.id &&
 		world.police.pressure >= 70 &&
@@ -59,12 +59,12 @@ export function autoPlay(world: World, rng: Rng): void {
 		world.playerCorrupt();
 	}
 
-	// Monter une branche de tech quand un Atelier le permet.
+	// Level up a tech branch when a Workshop allows it.
 	for (const branch of TECH_BRANCHES) {
 		if (world.playerUpgradeTech(branch)) break;
 	}
 
-	// Diplomatie : répond aux offres, sinon propose un pacte.
+	// Diplomacy: respond to offers, otherwise propose a pact.
 	for (const offer of world.playerOffers()) {
 		if (world.relationBetween(offer.from, player.id) >= DIPLOMACY.acceptRelation) {
 			world.playerRespondToOffer(offer.from, true);
@@ -78,7 +78,7 @@ export function autoPlay(world: World, rng: Rng): void {
 		}
 	}
 
-	// Tueur à gage occasionnel.
+	// Occasional hitman.
 	if (rng() < 0.25) {
 		for (let i = 0; i < world.territory.count; i += 1) {
 			if (world.playerCanHitman(i)) {

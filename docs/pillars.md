@@ -1,73 +1,73 @@
-# Pillars — Vision et règles non négociables (mode DealerFront)
+# Pillars — Vision and non-negotiable rules (DealerFront mode)
 
-> Statut : **v3 (DealerFront)** — passage d'un dealer incarné à un **god-view cartel**. Remplace la vision « un seul personnage ».
+> Status: **v3 (DealerFront)** — shift from an embodied dealer to a **god-view cartel**. Replaces the "single character" vision.
 
-## Objectif
+## Objective
 
-Fixer l'identité du jeu et les invariants qui s'appliquent à **tous** les systèmes. En cas de conflit, ces piliers priment.
+Fix the game's identity and the invariants that apply to **all** systems. In case of conflict, these pillars prevail.
 
 ## Vision / Pitch
 
-Jeu de **stratégie/gestion solo**, vue **carte réelle** (Paris, quartiers IRIS) jouable en navigateur. Tu incarnes **le cartel** (God view) : tu ne contrôles plus un personnage, tu **commandes de loin**. Objectif : **rester le dernier cartel en jeu** (battle royale), face à **5 gangs IA** et à la **police**.
+**Solo strategy/management** game, **real map** view (Paris, IRIS quarters) playable in the browser. You play **the cartel** (God view): you no longer control a character, you **command from afar**. Objective: **stay the last cartel in play** (battle royale), against **5 AI gangs** and the **police**.
 
-**Inspirations** : OpenFront (contrôle territorial temps réel, alliances, traîtres), gestion sous pression (Heat, police), Frostpunk (diegetic UI).
+**Inspirations**: OpenFront (real-time territorial control, alliances, traitors), management under pressure (Heat, police), Frostpunk (diegetic UI).
 
-## Les piliers
+## The pillars
 
-### 1. Une partie = une histoire fermée
-Aucune progression méta, aucun lien entre les runs. Chaque partie se suffit à elle-même.
+### 1. One game = one closed story
+No meta progression, no link between runs. Each game stands on its own.
 
-### 2. Difficulté honnête
-Jamais cachée, jamais adaptative (pas de rubber-banding). La difficulté de base est **fixée à la génération** (ville, factions, contrôle du neutre) et **lisible**. Elle évolue ensuite **par causalité pure** (prises de quartiers, Heat, police).
+### 2. Honest difficulty
+Never hidden, never adaptive (no rubber-banding). Base difficulty is **set at generation** (city, factions, neutral control) and **readable**. It then evolves **through pure causality** (quarter captures, Heat, police).
 
-### 3. Simulation réaliste et traçable
-Tout comportement (IA, police, économie) résulte d'un **système de règles cohérent et auditable**. Le joueur peut comprendre pourquoi il a perdu un quartier ou s'est fait liquider.
+### 3. Realistic and traceable simulation
+Every behavior (AI, police, economy) results from a **consistent and auditable rule system**. The player can understand why they lost a quarter or got liquidated.
 
-### 4. Gestion ET conquête, à égalité
-Boucle **équilibrée** : l'**économie** (produire, vendre, blanchir) finance l'**armée** (Influence, tech) et la **conquête** (quartiers) nourrit l'**économie**. Ni jeu de construction passif, ni pur wargame.
+### 4. Management AND conquest, on equal footing
+**Balanced** loop: the **economy** (produce, sell, launder) funds the **army** (Influence, tech) and **conquest** (quarters) feeds the **economy**. Neither a passive builder nor a pure wargame.
 
-### 5. Commandement de cartel (God view)
-**Plus d'immersion RP ni de personnage unique.** On observe et on commande à distance : sélection de quartiers, ordres de faction, conquête. La profondeur vient de la **planification** (où frapper, quoi construire, quand blanchir, quand corrompre).
+### 5. Cartel command (God view)
+**No more RP immersion or single character.** You observe and command from afar: quarter selection, faction orders, conquest. Depth comes from **planning** (where to strike, what to build, when to launder, when to corrupt).
 
-### 6. La couleur est de l'information (factions)
-Exception assumée au N&B strict : la **couleur marque la possession** (factions) et les signaux fonctionnels. Le monde reste N&B ; la couleur ne décore jamais.
+### 6. Color is information (factions)
+Deliberate exception to strict B&W: **color marks possession** (factions) and functional signals. The world stays B&W; color never decorates.
 
-## Règles non négociables (transverses)
+## Non-negotiable rules (cross-cutting)
 
-| # | Règle | Conséquence |
+| # | Rule | Consequence |
 |---|---|---|
-| R1 | **Pas de rubber-banding** | Le jeu n'adapte jamais les règles/IA à la performance du joueur. |
-| R2 | **Pas de méta-progression** | Aucun lien entre les parties. |
-| R3 | **Causalité pure** | Toute tension (Pression police, pertes de quartiers) a une cause en jeu traçable. |
-| R4 | **Difficulté de base lisible** | Communiquée par observation du monde, jamais par un chiffre caché. |
-| R5 | **N&B fonctionnel** | Le monde est en niveaux de gris ; la couleur est **informative** (factions, alertes). |
-| R6 | **Feedback a posteriori** | Explications de fin de run, pas de pop-ups intrusifs. |
-| R7 | **Pas d'omniscience IA** | Les gangs IA agissent sur ce qu'ils perçoivent/mémorisent, pas sur la vérité absolue. |
-| R8 | **Fin causale** | La partie se termine par une cause (victoire, liquidation, faillite), jamais un simple minuteur. |
+| R1 | **No rubber-banding** | The game never adapts rules/AI to player performance. |
+| R2 | **No meta-progression** | No link between games. |
+| R3 | **Pure causality** | Every tension (police Pressure, quarter losses) has a traceable in-game cause. |
+| R4 | **Readable base difficulty** | Communicated by observing the world, never by a hidden number. |
+| R5 | **Functional B&W** | The world is grayscale; color is **informative** (factions, alerts). |
+| R6 | **A posteriori feedback** | End-of-run explanations, no intrusive pop-ups. |
+| R7 | **No AI omniscience** | AI gangs act on what they perceive/remember, not on absolute truth. |
+| R8 | **Causal ending** | The game ends for a cause (victory, liquidation, bankruptcy), never a simple timer. |
 
-## Cas limites
+## Edge cases
 
-- **Conflit pilier / fun** : une mécanique qui viole R1/R2/R3 est rejetée ou reformulée.
-- **Lisibilité de la possession** : la couleur de faction ne doit jamais masquer la lisibilité du terrain (aplats translucides, contours).
-- **God view vs gestion** : on doit pouvoir jouer **sans** micro (ordres par lot/quartier).
+- **Pillar / fun conflict**: a mechanic that violates R1/R2/R3 is rejected or reformulated.
+- **Possession readability**: faction color must never hide terrain readability (translucent fills, outlines).
+- **God view vs management**: one must be able to play **without** micro (batch/quarter orders).
 
-## Dépendances
+## Dependencies
 
-- Référencé par **toutes** les specs. Mise en œuvre : `territory.md` (R3), `combat.md`, `factions.md` (R7), `police-ai.md` (R1/R3), `art-direction.md` (R5/R6), `ui-ux.md`.
+- Referenced by **all** specs. Implementation: `territory.md` (R3), `combat.md`, `factions.md` (R7), `police-ai.md` (R1/R3), `art-direction.md` (R5/R6), `ui-ux.md`.
 
-## Critères de validation
+## Validation criteria
 
-- [ ] Aucune mécanique ne contredit R1–R8.
-- [ ] Le jeu est jouable **sans personnage** (god view, ordres de quartier).
-- [ ] La possession est lisible par la couleur sans casser le N&B du terrain.
-- [ ] Chaque hausse de tension est traçable causalement.
+- [ ] No mechanic contradicts R1–R8.
+- [ ] The game is playable **without a character** (god view, quarter orders).
+- [ ] Possession is readable by color without breaking the terrain's B&W.
+- [ ] Every tension increase is causally traceable.
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Modèle joueur | **God view cartel** (fin du dealer incarné) |
-| 2 | Boucle | Économie ↔ conquête à égalité |
-| 3 | Couleur | Autoriser la couleur comme **information de faction** |
-| 4 | Piliers conservés | R1–R4, run fermé, causalité |
-| 5 | Piliers remplacés | « un seul personnage » → **commandement de cartel** |
+| 1 | Player model | **God-view cartel** (end of the embodied dealer) |
+| 2 | Loop | Economy ↔ conquest on equal footing |
+| 3 | Color | Allow color as **faction information** |
+| 4 | Pillars kept | R1–R4, closed run, causality |
+| 5 | Pillars replaced | "single character" → **cartel command** |

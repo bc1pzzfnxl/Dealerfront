@@ -1,42 +1,42 @@
 /**
- * Police — faction non jouable anti-leader. Voir docs/police-ai.md.
- * Sa **Pression** monte avec la domination du leader (part de contrôle) et
- * l'activité criminelle ; elle retombe sinon. Elle est **corruptible**.
+ * Police — non-playable anti-leader faction. See docs/police-ai.md.
+ * Its **Pressure** rises with the leader's domination (control share) and
+ * criminal activity; it falls otherwise. It is **corruptible**.
  */
 
 export const POLICE = {
 	max: 100,
-	/** Montée / tick ∝ excès de part de contrôle du leader au-delà d'une part « juste ». */
+	/** Rise / tick ∝ the leader's control share above a "fair" share. */
 	excessWeight: 0.02,
-	/** Montée / tick ∝ signal de crime cumulé (captures récentes). */
+	/** Rise / tick ∝ accumulated crime signal (recent captures). */
 	crimeWeight: 0.0015,
-	/** Décroissance du signal de crime (par tick). */
+	/** Crime signal decay (per tick). */
 	crimeDecay: 0.985,
-	/** Décroissance passive de la Pression (par tick). */
+	/** Passive Pressure decay (per tick). */
 	baseDecay: 0.002,
 	/**
-	 * Plancher de domination. En battle royale, le leader détient par nature une
-	 * part importante : on ne mesure plus l'excès contre `1/nb factions` mais
-	 * contre un **seuil de domination écrasante** (~80 % de la carte). En dessous,
-	 * aucune pression plancher ; au-dessus, la police s'acharne. Comme dominer
-	 * est nécessaire pour conclure, le seuil est haut : la police punit la
-	 * domination *totale*, pas l'avance.
+	 * Domination floor. In a battle royale, the leader naturally holds a large
+	 * share: excess is no longer measured against `1/nb factions` but against a
+	 * **crushing domination threshold** (~80% of the map). Below it, no floor
+	 * pressure; above it, the police hound you. Since dominating is required to
+	 * finish, the threshold is high: the police punish *total* domination, not
+	 * a lead.
 	 */
 	dominationFloor: 60,
-	/** Part de carte au-delà de laquelle un leader est « écrasant ». */
+	/** Map share beyond which a leader is "crushing". */
 	dominationShare: 0.8,
-	/** Paliers. */
+	/** Tiers. */
 	raidThreshold: 40,
 	multiThreshold: 70,
 	liquidation: 95,
-	/** Raid : Contrôle retiré par quartier, cooldown, nb de quartiers visés. */
+	/** Raid: Control removed per quarter, cooldown, nb of targeted quarters. */
 	raidControl: 25,
 	raidCooldown: 600,
 	raidsSingle: 1,
 	raidsMulti: 3,
-	/** Saisie de Cash propre au palier « crackdown ». */
+	/** Clean cash seizure at the "crackdown" tier. */
 	seizureRatio: 0.1,
-	/** Corruption : coût croissant (Cash propre), effet, fenêtre, risque. */
+	/** Corruption: increasing cost (Clean cash), effect, window, risk. */
 	corruptionBaseCost: 3000,
 	corruptionCostGrowth: 1.8,
 	corruptionMaxCost: 1_000_000,
@@ -47,14 +47,14 @@ export const POLICE = {
 	corruptionBurnBacklash: 10,
 } as const;
 
-/** Noms de contact corrompu (saveur ; le contact peut être « grillé »). */
+/** Corrupt contact names (flavor; the contact can be "burned"). */
 export const CONTACT_NAMES = [
-	"Le Serpent",
-	"La Comptable",
-	"Le Vieux",
-	"Marraine",
-	"L'Intendant",
-	"Le Frisé",
+	"The Serpent",
+	"The Accountant",
+	"The Old Man",
+	"The Godmother",
+	"The Steward",
+	"Curly",
 ] as const;
 
 export type PoliceTier = "surveillance" | "raid" | "crackdown" | "liquidation";
@@ -68,25 +68,25 @@ export function policeTier(pressure: number): PoliceTier {
 
 export const POLICE_TIER_LABELS: Record<PoliceTier, string> = {
 	surveillance: "Surveillance",
-	raid: "Raid ciblé",
-	crackdown: "Raid multiple + saisie",
+	raid: "Targeted raid",
+	crackdown: "Multiple raid + seizure",
 	liquidation: "Liquidation",
 };
 
 export interface PoliceState {
 	pressure: number;
-	/** Faction actuellement visée (leader au plus fort Contrôle), -1 si aucune. */
+	/** Currently targeted faction (leader with the highest Control), -1 if none. */
 	target: number;
-	/** Ticks avant le prochain raid. */
+	/** Ticks until the next raid. */
 	cooldown: number;
-	/** Ticks restants de corruption active. */
+	/** Remaining ticks of active corruption. */
 	window: number;
-	/** Signal de crime cumulé (décroît chaque tick). */
+	/** Accumulated crime signal (decays each tick). */
 	crime: number;
-	/** Dernier tick où un raid a eu lieu, -1 sinon. */
+	/** Last tick a raid took place, -1 otherwise. */
 	lastRaidTick: number;
-	/** Nombre de raids déclenchés. */
+	/** Number of raids triggered. */
 	raids: number;
-	/** Nombre de liquidations (joueur ou IA). */
+	/** Number of liquidations (player or AI). */
 	liquidations: number;
 }

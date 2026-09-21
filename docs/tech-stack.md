@@ -1,68 +1,68 @@
-# Tech Stack — Cadrage technique (DealerFront)
+# Tech Stack — Technical framing (DealerFront)
 
-> Statut : **v2 (DealerFront)** — solo, core déterministe, style intents → executions. Prépare un multi éventuel sans le livrer.
+> Status: **v2 (DealerFront)** — solo, deterministic core, intents → executions style. Prepares for a possible multiplayer without shipping it.
 
-## Objectif
+## Objective
 
-Fixer les choix techniques structurants du mode god-view : simulation de contrôle territorial, économie, factions IA, rendu large, et **déterminisme** (reproductibilité, tests).
+Fix the structuring technical choices of god-view mode: territorial control simulation, economy, AI factions, wide rendering, and **determinism** (reproducibility, tests).
 
-## Choix retenus
+## Chosen options
 
-- **Runtime** : **solo** = **client-side** (pas de serveur de jeu). **Arène agent vs agent** = **serveur** : 1 **Durable Object** par partie (autoritaire, plan gratuit), API **HTTP + MCP** (`/mcp`), spectateur **WebSocket**. Cloudflare Workers sert l'API statique/utilitaires (`/api/*`). Voir `arena.md` et `../MCP.md`.
-- **Core de simulation** : **TypeScript déterministe**, **pur** (aucune dépendance React/DOM), à pas fixe **10 Hz**. Isolé pour pouvoir tourner dans un **Web Worker** plus tard.
-- **Style d'architecture** : **`intents → executions`** (inspiré d'OpenFront) : les actions du joueur et des IA deviennent des **intents**, convertis en **executions** qui sont les seules à muter l'état. Découple UI et simulation, facilite les tests et un éventuel multi.
-- **Rendu** : **mapcn / MapLibre** sur la **carte réelle** (Paris IRIS) — fond muet, aplats de possession/faction par `feature-state`. JSON statique, PWA-friendly.
-- **UI** : **React + TypeScript**.
-- **Déterminisme** : carte générée/versionnée + PRNG seedé pour la simulation ; même seed → même déroulé, IA comprise.
-- **Perf** : mises à jour ciblées (`feature-state` par quartier, caches `recount`/`owned`/BFS), rendu symbolique (aplats + points) plutôt que modèles détaillés.
+- **Runtime**: **solo** = **client-side** (no game server). **Agent-vs-agent arena** = **server**: 1 **Durable Object** per game (authoritative, free plan), **HTTP + MCP** API (`/mcp`), **WebSocket** spectator. Cloudflare Workers serves the static/utility API (`/api/*`). See `arena.md` and `../MCP.md`.
+- **Simulation core**: **deterministic TypeScript**, **pure** (no React/DOM dependency), at a fixed **10 Hz** step. Isolated so it can run in a **Web Worker** later.
+- **Architecture style**: **`intents → executions`** (inspired by OpenFront): player and AI actions become **intents**, converted into **executions** that are the only ones to mutate state. Decouples UI and simulation, eases testing and possible multiplayer.
+- **Rendering**: **mapcn / MapLibre** on the **real map** (Paris IRIS) — muted basemap, possession/faction fills via `feature-state`. Static JSON, PWA-friendly.
+- **UI**: **React + TypeScript**.
+- **Determinism**: generated/versioned map + seeded PRNG for the simulation; same seed → same run, AI included.
+- **Perf**: targeted updates (`feature-state` per quarter, `recount`/`owned`/BFS caches), symbolic rendering (fills + dots) rather than detailed models.
 
-## Paramètres chiffrés
+## Numeric parameters
 
-| Paramètre | Valeur | Statut |
+| Parameter | Value | Status |
 |---|---|---|
-| Tick de simulation | 10 Hz (100 ms) | fixé |
-| Carte | Paris IRIS — 992 quartiers réels | fixé |
-| Factions | 4 | fixé |
-| Rendu | mapcn (Map / MapGeoJSON / MapArc / MapControls) sur MapLibre | fixé |
-| Déterminisme | carte versionnée + simulation seedée | fixé |
-| Web Worker | non au MVP, prévu | différé |
-| Multi (Workers + DO) | **Arène agent vs agent** | v1 (voir `arena.md`) |
-| Budget perf (agents/quartiers) | **TBD** | TBD |
+| Simulation tick | 10 Hz (100 ms) | fixed |
+| Map | Paris IRIS — 992 real quarters | fixed |
+| Factions | 4 | fixed |
+| Rendering | mapcn (Map / MapGeoJSON / MapArc / MapControls) on MapLibre | fixed |
+| Determinism | versioned map + seeded simulation | fixed |
+| Web Worker | not at MVP, planned | deferred |
+| Multiplayer (Workers + DO) | **Agent-vs-agent arena** | v1 (see `arena.md`) |
+| Perf budget (agents/quarters) | **TBD** | TBD |
 
-## Cas limites
+## Edge cases
 
-- **Beaucoup d'unités/États** : privilégier les overlays et l'instancing ; éviter les modèles détaillés par quartier.
-- **Déterminisme vs 60 FPS** : la simulation (10 Hz) est **indépendante** du rendu (accumulateur à pas fixe) — conserve la reproductibilité.
-- **Extraction multi (faite)** : le core est sans dépendance navigateur ; l'arène le fait tourner dans un **Durable Object** (Cloudflare), piloté par des agents externes via `applyIntent`.
-- **Sérialisation** : intents/executions et logs d'événements **sérialisables** (replay, validation).
+- **Many units/states**: prefer overlays and instancing; avoid detailed per-quarter models.
+- **Determinism vs 60 FPS**: the simulation (10 Hz) is **independent** of rendering (fixed-step accumulator) — preserves reproducibility.
+- **Multiplayer extraction (done)**: the core has no browser dependency; the arena runs it in a **Durable Object** (Cloudflare), driven by external agents via `applyIntent`.
+- **Serialization**: intents/executions and event logs **serializable** (replay, validation).
 
-## Dépendances
+## Dependencies
 
-- `territory.md`, `combat.md`, `economy.md` — charge de simulation.
-- `factions.md` — IA (charge).
-- `ui-ux.md`, `art-direction.md` — rendu et overlays.
-- `procgen.md` — déterminisme, validation.
+- `territory.md`, `combat.md`, `economy.md` — simulation load.
+- `factions.md` — AI (load).
+- `ui-ux.md`, `art-direction.md` — rendering and overlays.
+- `procgen.md` — determinism, validation.
 
-## Critères de validation
+## Validation criteria
 
-- [x] La simulation tient à 10 Hz avec 6 factions sur 992 quartiers.
-- [ ] Le rendu god-view est fluide (overlays, instancing).
-- [x] Une seed rejouée reproduit le déroulé et l'IA (carte identique).
-- [ ] Le core est sans dépendance navigateur (Worker-ready).
+- [x] The simulation holds at 10 Hz with 6 factions over 992 quarters.
+- [ ] God-view rendering is smooth (overlays, instancing).
+- [x] A replayed seed reproduces the run and the AI (identical map).
+- [ ] The core has no browser dependency (Worker-ready).
 
-## Décisions tranchées (log)
+## Decisions made (log)
 
-| # | Question | Décision |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Solo/multi | **Solo** au MVP, multi différé |
-| 2 | Serveur de jeu | Aucun (tout client-side) |
-| 3 | Architecture sim | **intents → executions**, core déterministe 10 Hz |
-| 4 | Rendu | mapcn / MapLibre sur carte réelle, fond muet |
-| 5 | Worker/DO | prévu mais différé |
+| 1 | Solo/multi | **Solo** at MVP, multiplayer deferred |
+| 2 | Game server | None (all client-side) |
+| 3 | Sim architecture | **intents → executions**, deterministic 10 Hz core |
+| 4 | Rendering | mapcn / MapLibre on real map, muted basemap |
+| 5 | Worker/DO | planned but deferred |
 
 
-### Carte réelle (v3)
+### Real map (v3)
 
-- **Paris IRIS** : 992 quartiers réels, zones déduites du type IRIS, profils marché (`demand`/`wealth`), adjacence par arêtes partagées (`scripts/build-paris-map.ts`).
-- **Rendu** : **mapcn** (`Map`/`MapGeoJSON`/`MapArc`/`MapControls`) sur MapLibre ; possession + Contrôle + heat par `feature-state`, convois en points animés.
-- **Ancien mode supprimé** : grille procédurale 16×16/24×24 et rendu 3D isométrique (Three.js / R3F) retirés.
+- **Paris IRIS**: 992 real quarters, zones derived from the IRIS type, market profiles (`demand`/`wealth`), adjacency by shared edges (`scripts/build-paris-map.ts`).
+- **Rendering**: **mapcn** (`Map`/`MapGeoJSON`/`MapArc`/`MapControls`) on MapLibre; possession + Control + heat via `feature-state`, convoys as animated dots.
+- **Old mode removed**: procedural 16×16/24×24 grid and isometric 3D rendering (Three.js / R3F) removed.

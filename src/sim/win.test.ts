@@ -1,6 +1,6 @@
 /**
- * Fin de partie — battle royale : dernier survivant, faillite, classement.
- * Voir docs/win-conditions.md et docs/scoring.md.
+ * End of game — battle royale: last survivor, bankruptcy, standings.
+ * See docs/win-conditions.md and docs/scoring.md.
  */
 
 import { describe, expect, it } from "vitest";
@@ -18,7 +18,7 @@ function giveNeutral(world: World, factionId: number, count: number): void {
 	}
 }
 
-/** Élimine toutes les factions IA (0 quartier) pour ne laisser que le joueur. */
+/** Eliminates all AI factions (0 quarters) to leave only the player. */
 function eliminateRivals(world: World): void {
 	for (let i = 0; i < world.territory.count; i += 1) {
 		const owner = world.territory.owner[i]!;
@@ -29,26 +29,26 @@ function eliminateRivals(world: World): void {
 	}
 }
 
-describe("fin de partie (battle royale)", () => {
-	it("aucune victoire tant qu'il reste un rival", () => {
+describe("end of game (battle royale)", () => {
+	it("no victory while a rival remains", () => {
 		const world = new World(1);
 		giveNeutral(world, 0, Math.ceil(world.territory.count * 0.6));
-		world.player.cashPropre = 5_000_000;
+		world.player.cleanCash = 5_000_000;
 		world.step();
 		expect(world.aliveCount()).toBeGreaterThan(1);
 		expect(world.outcome).toBeNull();
 	});
 
-	it("victoire au dernier cartel en jeu", () => {
+	it("victory for the last cartel standing", () => {
 		const world = new World(1);
 		eliminateRivals(world);
 		world.step();
 		expect(world.aliveCount()).toBe(1);
 		expect(world.outcome).toBe("victory");
-		expect(world.endReason).toContain("Dernier cartel");
+		expect(world.endReason).toContain("Last cartel");
 	});
 
-	it("défaite quand le joueur n'a plus de quartier", () => {
+	it("defeat when the player has no quarter left", () => {
 		const world = new World(1);
 		for (let i = 0; i < world.territory.count; i += 1) {
 			if (world.territory.owner[i]! >= 0) {
@@ -58,29 +58,29 @@ describe("fin de partie (battle royale)", () => {
 		}
 		world.step();
 		expect(world.outcome).toBe("defeat");
-		expect(world.endReason).toContain("éliminé");
+		expect(world.endReason).toContain("eliminated");
 	});
 
-	it("déclare la faillite après une fenêtre à zéro", () => {
+	it("declares bankruptcy after a window at zero", () => {
 		const world = new World(1);
-		world.player.cashSale = 0;
-		world.player.cashPropre = 0;
+		world.player.dirtyCash = 0;
+		world.player.cleanCash = 0;
 		for (let i = 0; i < 320 && world.outcome === null; i += 1) world.step();
 		expect(world.outcome).toBe("defeat");
-		expect(world.endReason).toContain("Faillite");
+		expect(world.endReason).toContain("Bankruptcy");
 	});
 
-	it("réarme la fenêtre de faillite si la trésorerie remonte", () => {
+	it("resets the bankruptcy window if cash recovers", () => {
 		const world = new World(1);
-		world.player.cashSale = 0;
+		world.player.dirtyCash = 0;
 		for (let i = 0; i < 100; i += 1) {
 			world.step();
-			if (i === 50) world.player.cashSale = 500;
+			if (i === 50) world.player.dirtyCash = 500;
 		}
 		expect(world.outcome).toBeNull();
 	});
 
-	it("classe par quartiers contrôlés puis Membres", () => {
+	it("ranks by controlled quarters then Members", () => {
 		const world = new World(1);
 		giveNeutral(world, 1, 10);
 		world.step();
@@ -89,7 +89,7 @@ describe("fin de partie (battle royale)", () => {
 		expect(world.summary(1).rank).toBe(1);
 	});
 
-	it("le briefing expose survivants, rang et progression", () => {
+	it("the briefing exposes survivors, rank and progress", () => {
 		const world = new World(1);
 		world.step();
 		const briefing = world.briefing();

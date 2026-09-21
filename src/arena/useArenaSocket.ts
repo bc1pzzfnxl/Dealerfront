@@ -1,6 +1,6 @@
 /**
- * Connexion spectateur à une arène : reçoit les snapshots par WebSocket et
- * hydrate un `World` **miroir** (jamais `step()`), pour réutiliser tout le rendu.
+ * Spectator connection to an arena: receives snapshots over WebSocket and
+ * hydrates a **mirror** `World` (never `step()`), to reuse all rendering.
  */
 
 import { useEffect, useRef, useState } from "react";

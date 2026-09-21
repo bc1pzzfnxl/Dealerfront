@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import { World } from "../world";
 import { PARIS_MAP, PARIS_NEIGHBORS, PARIS_ZONES } from "./paris";
 
-/** Garde-fous de la carte Paris (données générées) + run d'intégration. */
-describe("carte Paris (IRIS)", () => {
-	it("a 992 quartiers nommés et une zone valide", () => {
+/** Paris map guardrails (generated data) + integration run. */
+describe("Paris map (IRIS)", () => {
+	it("has 992 named quarters and a valid zone", () => {
 		expect(PARIS_ZONES).toHaveLength(992);
 		expect(PARIS_MAP.neighbors).toHaveLength(992);
 		expect(PARIS_ZONES.every((zone) => typeof zone === "string")).toBe(true);
 	});
 
-	it("adjacence symétrique, sans boucle ni quartier isolé", () => {
+	it("symmetric adjacency, no self-loop or isolated quarter", () => {
 		PARIS_NEIGHBORS.forEach((neighbors, index) => {
 			expect(neighbors.length).toBeGreaterThan(0);
 			for (const neighbor of neighbors) {
@@ -20,14 +20,14 @@ describe("carte Paris (IRIS)", () => {
 		});
 	});
 
-	it("départs valides et constructibles", () => {
+	it("valid, buildable spawns", () => {
 		expect(PARIS_MAP.spawns.length).toBeGreaterThanOrEqual(4);
 		for (const spawn of PARIS_MAP.spawns) {
 			expect(PARIS_ZONES[spawn]).toBeDefined();
 		}
 	});
 
-	it("simule une partie sur la carte réelle", () => {
+	it("simulates a game on the real map", () => {
 		const world = new World(0);
 		expect(world.territory.count).toBe(992);
 		for (let i = 0; i < 1500; i += 1) world.step();
@@ -36,8 +36,8 @@ describe("carte Paris (IRIS)", () => {
 	});
 });
 
-describe("taille des quartiers", () => {
-	it("chaque quartier a une taille normalisée et variable", () => {
+describe("quarter size", () => {
+	it("each quarter has a normalized, variable size", () => {
 		expect(PARIS_MAP.size.length).toBe(PARIS_MAP.modules.length);
 		let min = Number.POSITIVE_INFINITY;
 		let max = 0;
