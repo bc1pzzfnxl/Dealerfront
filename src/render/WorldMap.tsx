@@ -31,6 +31,8 @@ const CONVOY_SOURCE = "convoys";
 const CONVOY_SPEED = 0.045;
 /** Durée du flash de capture (ticks, 10 Hz). */
 const CAPTURE_FLASH_TICKS = 16;
+/** Durée de la pulsation de construction (ticks, 10 Hz). */
+const BUILD_FLASH_TICKS = 14;
 
 interface IrisProps {
 	i: number;
@@ -229,6 +231,7 @@ function EffectStates({
 	const prevControl = useRef<Uint8Array | null>(null);
 	const prevHeat = useRef<Uint8Array | null>(null);
 	const prevFlash = useRef<Uint8Array | null>(null);
+	const prevBuilt = useRef<Uint8Array | null>(null);
 	const prevBuilding = useRef<Int8Array | null>(null);
 	const prevSiege = useRef<string>("");
 
@@ -238,6 +241,7 @@ function EffectStates({
 		prevControl.current = null;
 		prevHeat.current = null;
 		prevFlash.current = null;
+		prevBuilt.current = null;
 		prevBuilding.current = null;
 		prevBuildings.current = "";
 		prevAttacked.current = new Set();
@@ -363,6 +367,46 @@ function EffectStates({
 				},
 			});
 		}
+		// Animation de construction : pulsation verte à la livraison du chantier.
+		if (!map.getLayer("iris-built")) {
+			map.addLayer({
+				id: "iris-built",
+				type: "fill",
+				source: SOURCE_ID,
+				paint: {
+					"fill-color": "#8fd8a5",
+					"fill-opacity": [
+						"interpolate",
+						["linear"],
+						["coalesce", ["feature-state", "built"], 0],
+						0,
+						0,
+						1,
+						0.55,
+					] as never,
+				},
+			});
+		}
+		if (!map.getLayer("iris-built-line")) {
+			map.addLayer({
+				id: "iris-built-line",
+				type: "line",
+				source: SOURCE_ID,
+				paint: {
+					"line-color": "#b7f0c8",
+					"line-width": 2.6,
+					"line-opacity": [
+						"interpolate",
+						["linear"],
+						["coalesce", ["feature-state", "built"], 0],
+						0,
+						0,
+						1,
+						0.95,
+					] as never,
+				},
+			});
+		}
 		// Icônes de bâtiment : MapLibre n'autorise `feature-state` qu'en *paint*,
 		// pas en layout (icon-image) ni en filter. On passe donc par une source
 		// GeoJSON de points portant le type de bâtiment en propriété.
@@ -479,6 +523,7 @@ function EffectStates({
 		const control = prevControl.current ?? (prevControl.current = new Uint8Array(count));
 		const heatCache = prevHeat.current ?? (prevHeat.current = new Uint8Array(count));
 		const flash = prevFlash.current ?? (prevFlash.current = new Uint8Array(count));
+		const built = prevBuilt.current ?? (prevBuilt.current = new Uint8Array(count));
 		const building = prevBuilding.current ?? (prevBuilding.current = new Int8Array(count).fill(-2));
 		for (let i = 0; i < count; i += 1) {
 			const nextOwner = territory.owner[i]!;
@@ -486,24 +531,29 @@ function EffectStates({
 			const nextHeat = Math.round(heat[i] ?? 0);
 			const age = tick - territory.capturedAt[i]!;
 			const nextFlash = age >= 0 && age < CAPTURE_FLASH_TICKS ? 1 : 0;
+			const builtAge = tick - territory.builtAt[i]!;
+			const nextBuilt = builtAge >= 0 && builtAge < BUILD_FLASH_TICKS ? 1 : 0;
 			const nextBuilding = territory.building[i]!;
 			if (
 				owner[i] !== nextOwner ||
 				control[i] !== nextControl ||
 				heatCache[i] !== nextHeat ||
 				flash[i] !== nextFlash ||
+				built[i] !== nextBuilt ||
 				building[i] !== nextBuilding
 			) {
 				owner[i] = nextOwner;
 				control[i] = nextControl;
 				heatCache[i] = nextHeat;
 				flash[i] = nextFlash;
+				built[i] = nextBuilt;
 				building[i] = nextBuilding;
 				map.setFeatureState({ source: SOURCE_ID, id: i }, {
 					faction: nextOwner,
 					control: nextControl,
 					heat: nextHeat,
 					flash: nextFlash,
+					built: nextBuilt,
 					building: BUILDING_TYPES[nextBuilding] ?? "",
 				});
 			}

@@ -726,12 +726,21 @@ button:not(:disabled):active {
 
 /* ---------- Monde ---------- */
 
+/* Voile jour/nuit : assombrit légèrement la carte la nuit (opacité pilotée par l'heure). */
+.night-overlay {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: #0a1024;
+	mix-blend-mode: multiply;
+	transition: opacity 1200ms linear;
+}
+
 .vignette {
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
-	opacity: calc(0.55 + var(--pressure, 0) * 0.45);
-	background:
+	opacity: calc(0.55 + var(--pressure, 0) * 0.45);	background:
 		radial-gradient(ellipse at center, rgba(14, 16, 19, 0) 50%, rgba(14, 16, 19, 0.35) 100%),
 		radial-gradient(ellipse at center, rgba(224, 160, 48, 0) 45%, rgba(224, 160, 48, 0.3) 100%);
 	background-blend-mode: normal;
@@ -1507,5 +1516,8 @@ code.unknown {
 @media (prefers-reduced-motion: reduce) {
 	.event-card {
 		animation: none;
+	}
+	.night-overlay {
+		transition: none;
 	}
 }

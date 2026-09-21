@@ -1638,6 +1638,8 @@ export class World {
 			if (this.territory.pending[i] !== NO_BUILDING && this.territory.owner[i] !== NEUTRAL) {
 				this.territory.building[i] = this.territory.pending[i]!;
 				this.territory.builtAt[i] = this.tick;
+				const type = BUILDING_TYPES[this.territory.building[i]!];
+				if (type) this.float(i, `${BUILDINGS[type].label} prêt`, "gain");
 				completed = true;
 			}
 			this.territory.pending[i] = NO_BUILDING;

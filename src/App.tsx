@@ -397,6 +397,8 @@ function App() {
 	const mm = Math.floor((hour - hh) * 60);
 	const gameTime = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 	const isNight = hour < 6 || hour >= 21;
+	/** Profondeur de la nuit (0 en plein jour, 1 vers 2 h) — voile visuel. */
+	const nightOpacity = ((1 + Math.cos((2 * Math.PI * (hour - 2)) / 24)) / 2) * 0.45;
 
 	/** Priorité stratégique d'amorçage : Labo → Point de vente → Façade. */
 	const advisedType: BuildingType | null =
@@ -534,6 +536,10 @@ function App() {
 					onProjector={(project) => {
 						projectorRef.current = project;
 					}}
+				/>
+				<div
+					className="night-overlay"
+					style={{ opacity: nightOpacity } as React.CSSProperties}
 				/>
 				<div
 					className={`vignette${alert ? " alert" : ""}`}
