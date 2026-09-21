@@ -51,6 +51,7 @@ Hébergement : **Cloudflare Workers** (API/utilitaires) + **assets statiques** (
 - **Cœur de simulation pur et déterministe** : jamais de `Math.random()` (PRNG seedé), pas d'accès DOM/React, temps via pas fixe (10 Hz).
 - **Piliers non négociables** ([`docs/pillars.md`](./docs/pillars.md)) : pas de rubber-banding, pas de méta, causalité pure, N&B fonctionnel, **couleur = information de faction**, pas d'omniscience IA.
 - **God view** : on commande des **quartiers** (ordres de faction), pas un personnage.
+- **L'argent est roi de la guerre** : le Cash sale/propre achète la guerre (entretien, armement, mercenaires, rachat de quartier, contrat contre un gang, corruption). Les **Membres** peuvent s'acheter en **mercenaires** (coût croissant, plafonné par le cap).
 - **Langue** : docs et commentaires *de design* en **français** ; code et identifiants en **anglais**.
 - **Commentaires** : uniquement si non évidents.
 - **Cloudflare** : `wrangler.jsonc` (JSONC), `compatibility_date` à jour, `nodejs_compat`, observabilité ; secrets via `wrangler secret put` ; pas d'état de requête en global ; `await`/`waitUntil` sur toute promesse.

@@ -707,6 +707,12 @@ function App() {
 				<section className="card panel-left">
 					<p className="advisor">{advisor}</p>
 					{notice ? <p className="notice">{notice}</p> : null}
+					{!player.upkeepPaid && world.upkeepPerTick(player.id) > 0 ? (
+						<p className="notice danger">
+							<strong>Entretien impayé</strong> — production ÷2 et guetteurs aveugles. Vendez
+							du Produit ({world.upkeepPerTick(player.id).toFixed(0)} sale/s requis).
+						</p>
+					) : null}
 					{world.buildingCount(player.id, "contre") > 0 && !world.playerGuardsPaid() ? (
 						<p className="notice danger">
 							<strong>Guetteurs impayés</strong> — renseignement aveugle (plus d'alerte de
@@ -811,6 +817,19 @@ function App() {
 					>
 						Armement{" "}
 						<code>{world.armamentCost().toLocaleString("fr-FR")} propre</code>
+					</button>
+
+					<button
+						type="button"
+						className="expand-btn"
+						disabled={!world.playerCanHireMercenaries()}
+						title={`Mercenaires : +${world.mercMembers()} Membres immédiats. Coût croissant en Cash sale.`}
+						onClick={() => {
+							if (world.playerHireMercenaries()) setVersion((value) => value + 1);
+						}}
+					>
+						Mercenaires{" "}
+						<code>{world.mercCost().toLocaleString("fr-FR")} sale</code>
 					</button>
 
 					<label
@@ -1231,6 +1250,24 @@ function App() {
 											>
 												Embargo
 											</button>
+											<button
+												type="button"
+												className="tech-up"
+												disabled={
+													!world.playerCanFundContract(faction.id) ||
+													world.police.target < 0 ||
+													world.police.target === faction.id
+												}
+												title={`Payer ${faction.name} pour frapper le leader. Coût ${world.contractCost().toLocaleString("fr-FR")} Cash propre (croissant).`}
+												onClick={() => {
+													const leader = world.police.target;
+													if (leader >= 0 && world.playerFundContract(faction.id, leader)) {
+														setVersion((value) => value + 1);
+													}
+												}}
+											>
+												Contrat
+											</button>
 										</span>
 									)}
 								</div>
@@ -1255,6 +1292,14 @@ function App() {
 								</code>
 							</div>
 						))}
+						<div className="loop-row" title="Coût d'entretien de tous vos bâtiments (Cash sale/s)">
+							<span>
+								Entretien <em>{world.buildingCount(player.id, "labo") + world.buildingCount(player.id, "vente") + world.buildingCount(player.id, "facade")} bât.</em>
+							</span>
+							<code className={player.upkeepPaid ? undefined : "lack"}>
+								−{(world.upkeepPerTick(player.id) * SIM_HZ).toFixed(0)}/s
+							</code>
+						</div>
 						<label className="slider-row" title="Part de la capacité des façades blanchie">
 							<span>Blanchiment</span>
 							<input
@@ -1424,6 +1469,30 @@ function App() {
 							par un chemin de quartiers possédés (sinon −65 % de capacité) : les{" "}
 							<strong>convois</strong> sont visibles et <strong>interceptables</strong>.
 						</p>
+						<h3>L'argent est roi de la guerre</h3>
+						<p>
+							<strong>Entretien :</strong> chaque bâtiment coûte du Cash sale/s. S'il n'est pas
+							payé, la <strong>production ÷2</strong> et les <strong>guetteurs aveuglent</strong>.
+							Un gros empire coûte cher à faire tourner.
+						</p>
+						<ul className="help-buildings">
+							<li>
+								<strong>Armement</strong> — Cash propre → <strong>+20 % d'attaque</strong> pendant
+								40 s (répétable, coût croissant).
+							</li>
+							<li>
+								<strong>Mercenaires</strong> — Cash sale → <strong>+400 Membres</strong> immédiats
+								(coût croissant).
+							</li>
+							<li>
+								<strong>Racheter</strong> — Cash propre → un <strong>quartier neutre adjacent</strong>{" "}
+								sans combattre (coût croissant avec votre empire).
+							</li>
+							<li>
+								<strong>Contrat</strong> — Cash propre → payer un gang pour qu'il{" "}
+								<strong>attaque le leader</strong>.
+							</li>
+						</ul>
 						<h3>Police locale</h3>
 						<p>
 							Le crime <strong>chauffe</strong> les quartiers : les raids visent les plus chauds, et

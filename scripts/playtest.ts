@@ -195,6 +195,42 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 	check("acheter de l'armement", ok && world.attackBonus(world.player.id) > before, `bonus ${before.toFixed(2)} → ${world.attackBonus(world.player.id).toFixed(2)}`);
 }
 
+// ---------- 9c. Mercenaires ----------
+{
+	const world = new World(1);
+	boost(world);
+	world.player.members = 0;
+	const ok = world.playerCanHireMercenaries() && world.playerHireMercenaries();
+	check("mercenaires (sale → Membres)", ok && world.player.members > 0, `+${Math.round(world.player.members)} membres`);
+}
+
+// ---------- 9d. Rachat de quartier ----------
+{
+	const world = new World(1);
+	boost(world);
+	const target = firstNeutral(world);
+	world.territory.owner[target] = NEUTRAL;
+	const adjacent = world.neighbors(target).some((n) => world.territory.owner[n] === world.player.id);
+	// On force l'adjacence en donnant un voisin au joueur si besoin.
+	if (!adjacent) {
+		const n = world.neighbors(target)[0];
+		if (n !== undefined) {
+			world.territory.owner[n] = world.player.id;
+			world.territory.control[n] = 100;
+		}
+	}
+	const ok = world.playerCanBuy(target) && world.playerBuy(target);
+	check("racheter un quartier (propre → territoire)", ok && world.ownerAt(target) === world.player.id);
+}
+
+// ---------- 9e. Contrat contre un gang ----------
+{
+	const world = new World(1);
+	boost(world);
+	const ok = world.playerCanFundContract(1) && world.playerFundContract(1, 2);
+	check("contrat (payer un gang)", ok && world.factions[1]!.contractTarget === 2);
+}
+
 // ---------- 10. Partie complète (bot) ----------
 {
 	let finished = 0;

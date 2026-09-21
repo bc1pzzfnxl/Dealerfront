@@ -68,6 +68,26 @@ export const BUILDING_EFFECTS = {
 	planqueDefense: 1.5,
 } as const;
 
+/**
+ * Entretien : **Cash sale par tick** et par bâtiment. Les gros empires coûtent
+ * cher à faire tourner — s'il n'est pas payé, la production tourne au ralenti
+ * (×0,5) et les **guetteurs aveuglent**. C'est le puits récurrent qui empêche
+ * l'argent de dormir.
+ */
+export const BUILDING_UPKEEP: Record<BuildingType, number> = {
+	logement: 0.5,
+	labo: 1,
+	vente: 1,
+	facade: 1.5,
+	planque: 1,
+	depot: 1,
+	atelier: 2,
+	contre: 1.5,
+};
+
+/** Multiplicateur de production quand l'entretien n'est pas payé. */
+export const UNPAID_UPKEEP_FACTOR = 0.5;
+
 /** Coût d'une **conversion** (bâti existant réutilisé) : 50 % du coût plein. */
 export const CONVERSION_COST = 0.5;
 

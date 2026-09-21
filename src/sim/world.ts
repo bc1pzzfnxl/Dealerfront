@@ -20,6 +20,8 @@ import {
 	type BuildingType,
 	NO_BUILDING,
 	ZONE_BUILDINGS,
+	BUILDING_UPKEEP,
+	UNPAID_UPKEEP_FACTOR,
 	buildingCostGrowth,
 	zoneBuildBonus,
 	zoneTimeFactor,
@@ -54,13 +56,6 @@ const ATTACK_LOSS = 8;
 const DEFENDER_LOSS = 4;
 
 /**
- * Soldes des guetteurs : le renseignement se **paie**. Chaque Guetteur coûte du
- * Cash sale par tick ; si la faction ne peut pas payer, ses guetteurs
- * **aveuglent** (plus d'alerte de descente, plus de contre-sabotage).
- */
-const GUARD_UPKEEP = 1.5;
-
-/**
  * Trésorerie de guerre : acheter de l'**armement** (Cash propre) donne un bonus
  * d'attaque **temporaire**. L'argent est roi de la guerre : on investit avant
  * une offensive. Coût croissant, niveau cumulable, fenêtre limitée.
@@ -79,6 +74,26 @@ const ARMAMENT = {
  * l'attaquer. Seulement sur un quartier **neutre adjacent**. Coût croissant avec
  * l'empire → arbitrage permanent tech vs expansion.
  */
+/**
+ * Mercenaires : convertir du **Cash sale** en **Membres** immédiats (main-d'œuvre
+ * de guerre). Coût croissant ; plafonné par le cap de Membres.
+ */
+const MERC = {
+	costSale: 4000,
+	members: 400,
+	costGrowth: 1.4,
+} as const;
+
+/**
+ * Contrat : payer un gang pour qu'il **attaque un rival** (Cash propre). Le gang
+ * concentre son offensive sur la cible pendant la durée du contrat.
+ */
+const CONTRACT = {
+	costClean: 6000,
+	costGrowth: 1.5,
+	durationTicks: 600,
+} as const;
+
 const BUY = {
 	baseCostClean: 4000,
 	perOwned: 0.15,
@@ -568,6 +583,10 @@ export class World {
 		player.armamentLevel = Math.min(ARMAMENT.maxLevel, player.armamentLevel + 1);
 		player.armamentUntil = this.tick + ARMAMENT.durationTicks;
 		player.armamentUses += 1;
+		const armAnchor = this.playerAnchor();
+		if (armAnchor >= 0) {
+			this.float(armAnchor, `⚔ armement +${Math.round(ARMAMENT.bonusPerLevel * 100)} %`, "gain");
+		}
 		this.pushLog(
 			`Armement +${Math.round(ARMAMENT.bonusPerLevel * 100)} % (${ARMAMENT.durationTicks / 10} s)`,
 		);
@@ -580,7 +599,67 @@ export class World {
 		return this.player.guardsPaid;
 	}
 
-	/** Coût de rachat d'un quartier neutre adjacent (Cash propre, croissant). */
+	/** Coût de la prochaine embauche de mercenaires (Cash sale, croissant). */
+	mercCost(): number {
+		return Math.round(MERC.costSale * MERC.costGrowth ** this.player.mercUses);
+	}
+
+	mercMembers(): number {
+		return MERC.members;
+	}
+
+	playerCanHireMercenaries(): boolean {
+		if (this.outcome !== null) return false;
+		return this.player.cashSale >= this.mercCost();
+	}
+
+	/** Embauche des mercenaires : Cash sale → Membres immédiats. */
+	playerHireMercenaries(): boolean {
+		if (!this.playerCanHireMercenaries()) return false;
+		const player = this.player;
+		const cost = this.mercCost();
+		player.cashSale -= cost;
+		const before = player.members;
+		player.members = Math.min(this.maxMembers(player.id), player.members + MERC.members);
+		player.mercUses += 1;
+		const gained = Math.round(player.members - before);
+		const anchor = this.playerAnchor();
+		if (anchor >= 0) this.float(anchor, `+${gained} mercenaires`, "gain");
+		this.pushLog(`Mercenaires : +${gained} Membres (−${cost.toLocaleString("fr-FR")} sale)`);
+		this.events.push("capture");
+		return true;
+	}
+
+	/** Coût du prochain contrat contre un gang (Cash propre, croissant). */
+	contractCost(): number {
+		return Math.round(CONTRACT.costClean * CONTRACT.costGrowth ** this.player.contractUses);
+	}
+
+	playerCanFundContract(targetId: number): boolean {
+		if (this.outcome !== null) return false;
+		if (targetId === this.player.id) return false;
+		if (this.factions[targetId]?.eliminated) return false;
+		if (this.hasPact(this.player.id, targetId)) return false;
+		return this.player.cashPropre >= this.contractCost();
+	}
+
+	/** Paie un gang pour qu'il attaque un rival pendant la durée du contrat. */
+	playerFundContract(targetId: number, enemyId: number): boolean {
+		if (!this.playerCanFundContract(targetId)) return false;
+		if (enemyId === targetId || this.factions[enemyId]?.eliminated) return false;
+		this.player.cashPropre -= this.contractCost();
+		this.player.contractUses += 1;
+		const target = this.factions[targetId]!;
+		target.contractTarget = enemyId;
+		target.contractUntil = this.tick + CONTRACT.durationTicks;
+		const contractAnchor = this.playerAnchor();
+		if (contractAnchor >= 0) this.float(contractAnchor, `🤝 contrat : ${target.name}`, "gain");
+		this.pushLog(
+			`Contrat : ${target.name} payé pour frapper ${this.factions[enemyId]!.name}`,
+		);
+		this.events.push("pact");
+		return true;
+	}
 	buyCost(module: number): number {
 		const size = this.city.size?.[module] ?? 1;
 		return Math.round(
@@ -1888,7 +1967,9 @@ export class World {
 				faction.members + Math.max(0, this.productionPerTick(faction.id)),
 			);
 			const labos =
-				(this.laboWeight[faction.id] ?? 0) * this.sabotageFactor(faction.id, "labo");
+				(this.laboWeight[faction.id] ?? 0) *
+				this.sabotageFactor(faction.id, "labo") *
+				this.upkeepFactor(faction.id);
 			if (labos > 0) faction.produit += labos * BUILDING_EFFECTS.produitPerLabo;
 		}
 	}
@@ -1898,7 +1979,8 @@ export class World {
 		for (const faction of this.factions) {
 			const demand = this.retailDemand[faction.id] ?? 0;
 			const supply = SUPPLY_FLOOR + (1 - SUPPLY_FLOOR) * (this.retailSupply[faction.id] ?? 1);
-			const ventes = demand * supply * this.sabotageFactor(faction.id, "vente");
+			const ventes =
+				demand * supply * this.sabotageFactor(faction.id, "vente") * this.upkeepFactor(faction.id);
 			if (ventes === 0) continue;
 			const capacity = ventes * BUILDING_EFFECTS.produitPerVente;
 			// Produit maison d'abord ; le complément vient d'un fournisseur extérieur.
@@ -1918,7 +2000,8 @@ export class World {
 			const facades =
 				(this.launderWealth[faction.id] ?? 0) *
 				(SUPPLY_FLOOR + (1 - SUPPLY_FLOOR) * (this.launderSupply[faction.id] ?? 1)) *
-				this.sabotageFactor(faction.id, "facade");
+				this.sabotageFactor(faction.id, "facade") *
+				this.upkeepFactor(faction.id);
 			if (facades === 0 || faction.cashSale <= 0 || faction.launderRatio <= 0) continue;
 			const capacity = facades * BUILDING_EFFECTS.cashPerFacade * faction.launderRatio;
 			const laundered = Math.min(faction.cashSale, capacity);
@@ -2305,6 +2388,9 @@ export class World {
 	}
 
 	private pickAiTarget(factionId: number): number | null {
+		const faction = this.factions[factionId]!;
+		// Contrat payé : on concentre l'offensive sur la cible désignée.
+		const contract = faction.contractUntil > this.tick ? faction.contractTarget : -1;
 		const leader = this.police.target;
 		// Anti-snowball : une fraction des décisions vise le leader, ∝ à sa domination.
 		const focusChance =
@@ -2332,6 +2418,8 @@ export class World {
 		let bestLeaderScore = Number.POSITIVE_INFINITY;
 		let bestWeak: number | null = null;
 		let bestWeakScore = Number.POSITIVE_INFINITY;
+		let bestContract: number | null = null;
+		let bestContractScore = Number.POSITIVE_INFINITY;
 		for (let i = 0; i < this.territory.count; i += 1) {
 			if (!this.canAttack(factionId, i)) continue;
 			const owner = this.territory.owner[i]!;
@@ -2349,7 +2437,12 @@ export class World {
 				bestWeakScore = score;
 				bestWeak = i;
 			}
+			if (owner === contract && score < bestContractScore) {
+				bestContractScore = score;
+				bestContract = i;
+			}
 		}
+		if (bestContract !== null) return bestContract;
 		if (focusLeader && bestLeader !== null) return bestLeader;
 		// Priorité à l'élimination : on achève le rival le plus faible s'il est à portée.
 		if (bestWeak !== null && this.rng() < 0.6) return bestWeak;
@@ -2600,23 +2693,38 @@ export class World {
 		};
 	}
 
-	/** Entretien : soldes des guetteurs + expiration de l'armement. */
+	/** Entretien : chaque bâtiment coûte du Cash sale/tick. Impayé → ralenti. */
 	private payUpkeep(): void {
 		for (const faction of this.factions) {
 			if (faction.armamentUntil <= this.tick) faction.armamentLevel = 0;
-			const guards = this.buildingCount(faction.id, "contre");
-			const cost = guards * GUARD_UPKEEP;
-			if (cost <= 0) {
+			const counts = this.counts[faction.id]!;
+			let upkeep = 0;
+			for (const type of BUILDING_TYPES) upkeep += counts[type]! * BUILDING_UPKEEP[type];
+			faction.upkeep = upkeep;
+			if (upkeep <= 0) {
+				faction.upkeepPaid = true;
 				faction.guardsPaid = true;
 				continue;
 			}
-			if (faction.cashSale >= cost) {
-				faction.cashSale -= cost;
+			if (faction.cashSale >= upkeep) {
+				faction.cashSale -= upkeep;
+				faction.upkeepPaid = true;
 				faction.guardsPaid = true;
 			} else {
+				faction.upkeepPaid = false;
 				faction.guardsPaid = false;
 			}
 		}
+	}
+
+	/** Multiplicateur de production : 1 si l'entretien est payé, sinon 0,5. */
+	private upkeepFactor(factionId: number): number {
+		return this.factions[factionId]!.upkeepPaid ? 1 : UNPAID_UPKEEP_FACTOR;
+	}
+
+	/** Entretien courant d'une faction (Cash sale/tick) — pour l'UI. */
+	upkeepPerTick(factionId = this.player.id): number {
+		return this.factions[factionId]?.upkeep ?? 0;
 	}
 
 	private updateTreasury(): void {

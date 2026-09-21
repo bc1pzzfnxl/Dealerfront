@@ -123,6 +123,9 @@ Le Cash **sale** et **propre** ne sont pas que des scores : ils **achètent la g
 
 - **Soldes des guetteurs** (`GUARD_UPKEEP = 1,5` sale/tick par Guetteur) : le renseignement se paie. Guetteurs **impayés = aveugles** (plus d'alerte de descente, plus de contre-sabotage, plus de réduction de tueur). Un cartel pauvre est sourd.
 - **Trésorerie d'armement** (`ARMAMENT`) : acheter de l'armement en **Cash propre** donne `+20 %` d'attaque pendant **40 s**, cumulable jusqu'à **×6**, coût **croissant** (`3000 × 1,5^n`) — puits permanent. On investit avant une offensive : l'argent décide du tempo militaire.
+- **Entretien** (`BUILDING_UPKEEP`) : chaque bâtiment coûte du **Cash sale/tick** (Logement 0,5 ; Labo/Vente/Planque/Dépôt 1 ; Façade/Guetteur 1,5 ; Atelier 2). S'il n'est pas couvert, `upkeepPaid = false` → **production ×0,5** (`UNPAID_UPKEEP_FACTOR`) et **guetteurs aveugles**. Les gros empires coûtent cher à faire tourner.
+- **Mercenaires** (`MERC`) : **Cash sale → Membres** immédiats (`+400`), coût croissant (`4000 × 1,4^n`), plafonné par le cap de Membres. *(Dérogation au pilier « les Membres ne s'achètent pas » : c'est un levier de guerre, borné par le cap.)*
+- **Contrat** (`CONTRACT`) : **Cash propre** → payer un gang pour qu'il **attaque le leader** pendant 60 s. Coût croissant (`6000 × 1,5^n`).
 - **Rachat de quartier** (`BUY`) : convertir du **Cash propre** en **territoire** sans combattre. Cible = quartier **neutre adjacent**. Coût `4000 × taille × (1 + 0,15 × quartiers possédés)`, recharge 10 s, contrôle établi 25. Arbitrage permanent **tech vs expansion** : le même Cash propre achète l'armement, la tech **ou** la carte.
 
 ### 6. Objectif économique

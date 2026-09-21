@@ -36,6 +36,10 @@ export interface Faction {
 	corruptionUses: number;
 	/** Les guetteurs sont-ils payés ce tick ? (sinon le renseignement est aveugle). */
 	guardsPaid: boolean;
+	/** L'entretien des bâtiments est-il payé ce tick ? (sinon production ×0,5). */
+	upkeepPaid: boolean;
+	/** Coût d'entretien courant (Cash sale/tick), recalculé par tick. */
+	upkeep: number;
 	/** Fin de la fenêtre d'armement achetée (tick) — bonus d'attaque temporaire. */
 	armamentUntil: number;
 	/** Niveau d'armement acheté (0 = aucun). */
@@ -44,6 +48,13 @@ export interface Faction {
 	armamentUses: number;
 	/** Cooldown de rachat de quartier (ticks). */
 	buyCooldown: number;
+	/** Nombre d'embauches de mercenaires (coût croissant). */
+	mercUses: number;
+	/** Contrat en cours : gang ciblé (id) et fin de contrat (tick). */
+	contractTarget: number;
+	contractUntil: number;
+	/** Nombre de contrats payés (coût croissant). */
+	contractUses: number;
 	/** Quartiers pris (toute capture, neutre comprise). */
 	captures: number;
 	/** Quartiers perdus. */
@@ -106,10 +117,16 @@ export function createFactions(count: number, startMembers: number): Faction[] {
 			launderRatio: 0.5,
 			corruptionUses: 0,
 			guardsPaid: true,
+			upkeepPaid: true,
+			upkeep: 0,
 			armamentUntil: 0,
 			armamentLevel: 0,
 			armamentUses: 0,
 			buyCooldown: 0,
+			mercUses: 0,
+			contractTarget: -1,
+			contractUntil: 0,
+			contractUses: 0,
 			captures: 0,
 			quartersLost: 0,
 			eliminations: 0,

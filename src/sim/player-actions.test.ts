@@ -626,7 +626,9 @@ describe("embargo", () => {
 		};
 		const normal = sale(false);
 		expect(normal).toBeGreaterThan(0);
-		expect(sale(true)).toBeCloseTo(normal * (1 - EMBARGO.salePenalty));
+		// L'embargo réduit le revenu (à l'entretien près).
+		expect(sale(true)).toBeLessThan(normal);
+		expect(sale(true)).toBeCloseTo(normal * (1 - EMBARGO.salePenalty), 0);
 	});
 
 	it("rompt un pacte existant en le traitant comme une trahison", () => {
@@ -962,7 +964,9 @@ describe("butin (bâtiments objectifs)", () => {
 
 		expect(world.ownerAt(target)).toBe(player.id);
 		expect(player.cashSale).toBeCloseTo(BUILDINGS.vente.costSale! * 0.2);
-		expect(victim.cashSale).toBeCloseTo(10_000 - BUILDINGS.vente.costSale! * 0.2);
+		// Le butin est prélevé (à l'entretien près pendant les ticks de siège).
+		expect(victim.cashSale).toBeLessThan(10_000 - BUILDINGS.vente.costSale! * 0.2 + 100);
+		expect(victim.cashSale).toBeGreaterThan(10_000 - BUILDINGS.vente.costSale! * 0.2 - 100);
 	});
 });
 
@@ -1115,5 +1119,32 @@ describe("rachat de quartier (Cash propre → territoire)", () => {
 		world.player.cashPropre = 1_000_000;
 		world.territory.owner[ADJACENT] = 1;
 		expect(world.playerCanBuy(ADJACENT)).toBe(false);
+	});
+});
+
+describe("mercenaires (Cash sale → Membres)", () => {
+	it("embauche des Membres contre du Cash sale, coût croissant", () => {
+		const world = new World(1);
+		const player = world.player;
+		player.cashSale = 1_000_000;
+		player.members = 0;
+		const cost = world.mercCost();
+		expect(world.playerCanHireMercenaries()).toBe(true);
+		expect(world.playerHireMercenaries()).toBe(true);
+		expect(player.members).toBeGreaterThan(0);
+		expect(player.cashSale).toBe(1_000_000 - cost);
+		expect(world.mercCost()).toBeGreaterThan(cost);
+	});
+});
+
+describe("contrat contre un gang (Cash propre)", () => {
+	it("paie un gang pour concentrer son offensive sur un rival", () => {
+		const world = new World(1);
+		const player = world.player;
+		player.cashPropre = 1_000_000;
+		expect(world.playerCanFundContract(1)).toBe(true);
+		expect(world.playerFundContract(1, 2)).toBe(true);
+		expect(world.factions[1]!.contractTarget).toBe(2);
+		expect(world.factions[1]!.contractUntil).toBeGreaterThan(world.tick);
 	});
 });
