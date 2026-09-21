@@ -488,6 +488,40 @@ kbd {
 	color: var(--muted);
 }
 
+/* ---------- Arène (agents IA) ---------- */
+.arena-screen {
+	display: flex;
+	flex-direction: column;
+	gap: 0.8rem;
+	width: min(60rem, 100%);
+	height: 100vh;
+	margin: 0 auto;
+	padding: 1.4rem 1rem;
+	overflow-y: auto;
+}
+
+.arena-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.arena-head h1 {
+	margin: 0;
+	font-size: 1.15rem;
+}
+
+.arena-card {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.arena-endpoints .line code {
+	font-size: 0.72rem;
+	overflow-wrap: anywhere;
+}
+
 .expand-btn {
 	display: flex;
 	align-items: center;

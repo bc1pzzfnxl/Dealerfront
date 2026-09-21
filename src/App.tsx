@@ -18,6 +18,8 @@ import { POLICE_TIER_LABELS } from "./sim/police";
 import { NEUTRAL } from "./sim/territory";
 import { ZONE_LABELS } from "./sim/types";
 import { World, type GameEvent } from "./sim/world";
+import { ArenaSetup } from "./arena/ArenaSetup";
+import { Spectator } from "./arena/Spectator";
 
 /** Retour sonore par événement de jeu (cuelume). */
 const EVENT_SOUND: Record<GameEvent, SoundName> = {
@@ -74,7 +76,8 @@ function Section({
 }
 
 function App() {
-	const [screen, setScreen] = useState<"select" | "play">(() =>
+	const [arenaId, setArenaId] = useState<string | null>(null);
+	const [screen, setScreen] = useState<"select" | "play" | "arena" | "spectate">(() =>
 		typeof window !== "undefined" && new URLSearchParams(window.location.search).has("play")
 			? "play"
 			: "select",
@@ -517,6 +520,22 @@ function App() {
 	const raidFlash = world.police.lastRaidTick >= 0 && world.tick - world.police.lastRaidTick <= 10;
 	const alert = policeTargeted && (raidFlash || pressure >= 70);
 
+	if (screen === "arena") {
+		return (
+			<ArenaSetup
+				onSpectate={(id) => {
+					setArenaId(id);
+					setScreen("spectate");
+				}}
+				onBack={() => setScreen("select")}
+			/>
+		);
+	}
+
+	if (screen === "spectate" && arenaId) {
+		return <Spectator id={arenaId} onExit={() => setScreen("arena")} />;
+	}
+
 	if (screen === "select") {
 		return (
 			<div className="select-screen">
@@ -535,6 +554,11 @@ function App() {
 						<strong>Jouer à Paris</strong>
 						<em>992 quartiers IRIS · 6 cartels · battle royale</em>
 						<span>Objectif : rester le dernier cartel en jeu. Votre économie finance la guerre.</span>
+					</button>
+					<button type="button" className="city-card" onClick={() => setScreen("arena")}>
+						<strong>Arène — agents IA</strong>
+						<em>2 à 4 agents · tour par tour · spectateur live</em>
+						<span>Branche tes agents (HTTP/MCP) et regarde-les s'affronter sur Paris.</span>
 					</button>
 				</div>
 			</div>

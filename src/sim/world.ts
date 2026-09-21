@@ -221,6 +221,52 @@ const ENCIRCLE_SHARE = 0.35;
 export interface WorldOptions {
 	/** Carte jouée (défaut : Paris). */
 	map?: CityGrid;
+	/** Nombre de factions (défaut : 6). */
+	factionCount?: number;
+	/**
+	 * Factions **contrôlées par un agent** (aucune IA dessus). En solo : `[0]`
+	 * (le joueur). En arène : toutes les factions sont contrôlées.
+	 */
+	controlled?: readonly number[];
+}
+
+/**
+ * Instantané sérialisable du monde — **contrat de l'arène** (serveur ↔ agents ↔
+ * spectateur). `applySnapshot` recharge tout et recalcule les caches dérivés.
+ */
+export interface WorldSnapshot {
+	tick: number;
+	playerId: number;
+	outcome: Outcome;
+	endReason: string;
+	territory: {
+		owner: number[];
+		control: number[];
+		building: number[];
+		construction: number[];
+		pending: number[];
+		builtAt: number[];
+		capturedAt: number[];
+		sabotageUntil: number[];
+	};
+	factions: Faction[];
+	attacks: Attack[];
+	pacts: Pact[];
+	offers: PactOffer[];
+	embargoes: Embargo[];
+	police: PoliceState;
+	heat: number[];
+	relations: number[][];
+	proposalCooldown: number[][];
+	contactIndex: number;
+	log: string[];
+	pending: PendingEvent | null;
+	/** État du PRNG (déterminisme après restauration). */
+	rngState: number;
+	/** Cadence IA et compteur de faillite (déterminisme). */
+	aiCooldowns: number[];
+	brokeTicks: number;
+	outcomeRecorded: boolean;
 }
 
 export interface FactionSummary {
@@ -385,7 +431,8 @@ export class World {
 		this.territory = createTerritory(this.city.modules.length);
 		this.heat = new Float32Array(this.city.modules.length);
 		this.policeZone = this.buildPoliceZone();
-		this.factions = createFactions(FACTION_COUNT, START_MEMBERS);
+		this.factions = createFactions(options?.factionCount ?? FACTION_COUNT, START_MEMBERS);
+		this.controlled = new Set(options?.controlled ?? [0]);
 		this.rng = createRng((seed ^ 0x9e3779b9) >>> 0);
 		this.contactIndex = seed % CONTACT_NAMES.length;
 
@@ -437,8 +484,105 @@ export class World {
 		this.recount();
 	}
 
+	/** Faction « active » pour les méthodes `player*` (défaut : 0). */
+	private playerId = 0;
+	/** Factions pilotées par un agent (jamais par l'IA). */
+	readonly controlled: Set<number>;
+
+	/** Bascule la faction active (arène : chaque agent agit à son tour). */
+	setPlayer(factionId: number): void {
+		if (factionId >= 0 && factionId < this.factions.length) this.playerId = factionId;
+	}
+
+	activePlayerId(): number {
+		return this.playerId;
+	}
+
 	get player(): Faction {
-		return this.factions[0]!;
+		return this.factions[this.playerId]!;
+	}
+
+	/** Sérialise tout l'état (contrat arène). */
+	snapshot(): WorldSnapshot {
+		return {
+			tick: this.tick,
+			playerId: this.playerId,
+			outcome: this.outcome,
+			endReason: this.endReason,
+			territory: {
+				owner: Array.from(this.territory.owner),
+				control: Array.from(this.territory.control),
+				building: Array.from(this.territory.building),
+				construction: Array.from(this.territory.construction),
+				pending: Array.from(this.territory.pending),
+				builtAt: Array.from(this.territory.builtAt),
+				capturedAt: Array.from(this.territory.capturedAt),
+				sabotageUntil: Array.from(this.territory.sabotageUntil),
+			},
+			factions: this.factions.map((faction) => ({
+				...faction,
+				tech: { ...faction.tech },
+			})),
+			attacks: this.attacks.map((attack) => ({ ...attack })),
+			pacts: this.pacts.map((pact) => ({ ...pact })),
+			offers: this.offers.map((offer) => ({ ...offer })),
+			embargoes: this.embargoes.map((embargo) => ({ ...embargo })),
+			police: { ...this.police },
+			heat: Array.from(this.heat),
+			relations: this.relations.map((row) => [...row]),
+			proposalCooldown: this.proposalCooldown.map((row) => [...row]),
+			contactIndex: this.contactIndex,
+			log: [...this.log],
+			pending: this.pending ? { ...this.pending } : null,
+			rngState: this.rng.state(),
+			aiCooldowns: [...this.aiCooldowns],
+			brokeTicks: this.brokeTicks,
+			outcomeRecorded: this.outcomeRecorded,
+		};
+	}
+
+	/** Recharge un instantané et recalcule les caches dérivés. */
+	applySnapshot(snap: WorldSnapshot): void {
+		this.tick = snap.tick;
+		this.playerId = snap.playerId;
+		this.outcome = snap.outcome;
+		this.endReason = snap.endReason;
+		this.territory.owner.set(snap.territory.owner);
+		this.territory.control.set(snap.territory.control);
+		this.territory.building.set(snap.territory.building);
+		this.territory.construction.set(snap.territory.construction);
+		this.territory.pending.set(snap.territory.pending);
+		this.territory.builtAt.set(snap.territory.builtAt);
+		this.territory.capturedAt.set(snap.territory.capturedAt);
+		this.territory.sabotageUntil.set(snap.territory.sabotageUntil);
+		for (let i = 0; i < this.factions.length && i < snap.factions.length; i += 1) {
+			const source = snap.factions[i]!;
+			Object.assign(this.factions[i]!, source, { tech: { ...source.tech } });
+		}
+		this.attacks.length = 0;
+		this.attacks.push(...snap.attacks.map((attack) => ({ ...attack })));
+		this.pacts.length = 0;
+		this.pacts.push(...snap.pacts.map((pact) => ({ ...pact })));
+		this.offers.length = 0;
+		this.offers.push(...snap.offers.map((offer) => ({ ...offer })));
+		this.embargoes.length = 0;
+		this.embargoes.push(...snap.embargoes.map((embargo) => ({ ...embargo })));
+		Object.assign(this.police, snap.police);
+		this.heat.set(snap.heat);
+		this.relations = snap.relations.map((row) => [...row]);
+		this.proposalCooldown = snap.proposalCooldown.map((row) => [...row]);
+		this.contactIndex = snap.contactIndex;
+		this.log.length = 0;
+		this.log.push(...snap.log);
+		this.pending = snap.pending ? { ...snap.pending } : null;
+		this.rng.setState(snap.rngState);
+		this.aiCooldowns.length = 0;
+		this.aiCooldowns.push(...snap.aiCooldowns);
+		this.brokeTicks = snap.brokeTicks;
+		this.outcomeRecorded = snap.outcomeRecorded;
+		this.supplySignature = -1;
+		this.recount();
+		this.updateSupply();
 	}
 
 	/** Zones sous surveillance policière (poste ou quartier voisin d'un poste). */
@@ -2202,7 +2346,8 @@ export class World {
 	}
 
 	private think(): void {
-		for (let i = 1; i < this.factions.length; i += 1) {
+		for (let i = 0; i < this.factions.length; i += 1) {
+			if (this.controlled.has(i)) continue;
 			this.aiCooldowns[i] = (this.aiCooldowns[i] ?? 0) - 1;
 			if ((this.aiCooldowns[i] ?? 0) > 0) continue;
 			this.aiCooldowns[i] = AI_INTERVAL;

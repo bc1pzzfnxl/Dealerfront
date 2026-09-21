@@ -38,6 +38,7 @@ Hébergement : **Cloudflare Workers** (API/utilitaires) + **assets statiques** (
 | `bun run sim:mass` | Simulation massive d'équilibrage (bot, 200 seeds × 15 000 ticks ; `SEEDS`/`TICKS` en env) |
 | `bun run sim:bench` | 100 parties → SQLite (`data/sim.sqlite`) + export JSON dashboard (`SEEDS`/`CADENCE`/`TICKS`) |
 | `bun run scripts/playtest.ts` | **Audit de jouabilité** : exerce toutes les actions joueur + 8 parties complètes |
+| `bun run scripts/agent-example.ts <arena> <token> [url]` | **Agent de référence** (template HTTP) pour une arène |
 | `bun run dashboard:dev` | **Dashboard d'équilibrage local** (`http://localhost:5174`, racine = le dashboard) — lancer `sim:bench` d'abord |
 | `bun run dashboard:build` | Build du dashboard (`dist-dashboard/`, **hors git et hors déploiement**) |
 | `bun run cf-typegen` | Régénérer `worker-configuration.d.ts` |
@@ -112,3 +113,4 @@ bun run typecheck && bun run test && bun run build
 - **Économie localisée (P27)** : **bonus de bâtiment par zone** (`ZONE_BUILD_BONUS` : résidentiel→logement, commercial→vente, laverie→façade, industriel→labo/atelier, police→contre, parc→planque) + **coût croissant par type** (`×1,35^n`). **Cycle jour/nuit** (`TICKS_PER_HOUR = 120`, jour = 4,8 min) : **heures de pointe** par zone (`ZONE_RUSH`, facteur `1 + amplitude·cos`, moyenne 1/jour) → commercial le jour, nightlife la nuit. Icônes de bâtiment sur la carte (source GeoJSON `buildings`), pulsation verte à la livraison d'un chantier, jauge de conquête (fill contenu). Détails dans `docs/economy.md`.
 - **Performance** : cœur sim optimisé via comptages sans allocation par tick et caches (`recount`, `owned`, `underAttack`, `supplySignature`). Rendu : **`feature-state` incrémental** (seuls les quartiers changés sont mis à jour), convois recalculés par tick. Logistique : BFS uniquement quand propriété/bâtiments changent.
 - **Aucune base de données** (solo, sans méta).
+- **Arène agent vs agent (P28)** : mode **serveur** — 2 à 4 agents IA s'affrontent **sans joueur humain**, un humain **regarde en direct** + **stats de fin**. La sim tourne dans un **Durable Object par partie** (autoritaire, **plan gratuit**), pilotée par les agents **tour par tour au rythme des agents** (pas de timeout, actions illimitées par tour). Interface **HTTP + MCP** (`/mcp`). Contrat : `World.snapshot()`/`applySnapshot()` (RNG inclus) + `applyIntent` (`src/sim/intents.ts`). Écran **Arène** dans l'UI. Agent de référence : `scripts/agent-example.ts`. Détails dans `docs/arena.md`.

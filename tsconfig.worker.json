@@ -14,5 +14,5 @@
     "noUnusedParameters": true,
     "types": ["@types/node"]
   },
-  "include": ["worker", "worker-configuration.d.ts"]
+  "include": ["worker", "worker-configuration.d.ts", "src/sim", "src/server"]
 }
