@@ -185,6 +185,33 @@ export function zoneBuildBonus(zone: ZoneType, type: BuildingType): number {
 	return ZONE_BUILD_BONUS[zone]?.[type] ?? 1;
 }
 
+/**
+ * Heures de pointe : chaque zone a une **heure d'activité** pour son bâtiment
+ * phare. Le rendement suit `1 + amplitude × cos(2π(h − pic)/24)` : maximum au
+ * pic, minimum 12 h plus tard, moyenne **1** sur la journée (équilibre préservé).
+ * Ajoute un rythme jour/nuit : on peut planifier ses ventes/raids.
+ */
+export const ZONE_RUSH: Partial<
+	Record<ZoneType, { type: BuildingType; peakHour: number; amplitude: number }>
+> = {
+	// Commerces : affluence en journée.
+	commercial: { type: "vente", peakHour: 13, amplitude: 0.4 },
+	// Vie nocturne : c'est la nuit que ça vend.
+	nightlife: { type: "vente", peakHour: 23, amplitude: 0.5 },
+	// Habitations : recrutement le soir, quand les gens rentrent.
+	residential: { type: "logement", peakHour: 19, amplitude: 0.3 },
+	// Friches : production clandestine de nuit.
+	industrial: { type: "labo", peakHour: 2, amplitude: 0.2 },
+	// Laveries : blanchiment aux heures ouvrables.
+	laundry: { type: "facade", peakHour: 11, amplitude: 0.15 },
+};
+
+export function zoneTimeFactor(zone: ZoneType, type: BuildingType, hour: number): number {
+	const rush = ZONE_RUSH[zone];
+	if (!rush || rush.type !== type) return 1;
+	return 1 + rush.amplitude * Math.cos((2 * Math.PI * (hour - rush.peakHour)) / 24);
+}
+
 /** Zones « bâties » : c'est là qu'on peut convertir un bâti existant. */
 export const BUILT_ZONES: readonly ZoneType[] = [
 	"residential",

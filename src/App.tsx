@@ -392,10 +392,11 @@ function App() {
 	const policeTierLabel = POLICE_TIER_LABELS[world.policeLevel()];
 	const summary = world.summary();
 	const alive = world.aliveCount();
-	const gameTime = (() => {
-		const seconds = Math.floor(world.tick / SIM_HZ);
-		return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-	})();
+	const hour = world.hourOfDay();
+	const hh = Math.floor(hour);
+	const mm = Math.floor((hour - hh) * 60);
+	const gameTime = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+	const isNight = hour < 6 || hour >= 21;
 
 	/** Priorité stratégique d'amorçage : Labo → Point de vente → Façade. */
 	const advisedType: BuildingType | null =
@@ -715,6 +716,18 @@ function App() {
 							Chantiers {world.activeConstructions(player.id)}/{world.buildCrews()} · file{" "}
 							{world.queueLength()}/{world.queueCap()}
 						</span>
+						{selected !== null && selectedBuilding
+							? (() => {
+									const factor = world.rushFactorAt(selected, selectedBuilding);
+									if (Math.abs(factor - 1) < 0.02) return null;
+									const peak = factor > 1;
+									return (
+										<span className={`rush-tag ${peak ? "peak" : "off"}`}>
+											{peak ? "Pointe" : "Creux"} ×{factor.toFixed(2)}
+										</span>
+									);
+								})()
+							: null}
 					</div>
 
 					<label
@@ -1230,7 +1243,10 @@ function App() {
 							</button>
 						</div>
 						<p className="hud-foot" title={`API ${api}`}>
-							tick {world.tick} · {gameTime}
+							<span className={`clock${isNight ? " night" : ""}`}>
+								{isNight ? "Nuit" : "Jour"} {gameTime}
+							</span>{" "}
+							· tick {world.tick}
 						</p>
 					</div>
 				</footer>
@@ -1278,6 +1294,13 @@ function App() {
 							vente, <strong>laverie</strong> le blanchiment, <strong>friche industrielle</strong> les
 							labos/ateliers, <strong>police</strong> le contre-espionnage, <strong>parc</strong> la
 							planque. Les boutons favorisés sont marqués <strong>×1,5</strong>.
+						</p>
+						<p>
+							<strong>Heures de pointe :</strong> le rendement suit l'heure (horloge en bas à
+							droite). Le <strong>commercial</strong> vend le jour (pic 13 h), la{" "}
+							<strong>nightlife</strong> la nuit (pic 23 h), le <strong>résidentiel</strong> recrute
+							le soir, les <strong>labos</strong> tournent la nuit. La pastille « Pointe / Creux »
+							affiche le multiplicateur du quartier sélectionné.
 						</p>
 						<h3>Guerre de quartiers</h3>
 						<p>

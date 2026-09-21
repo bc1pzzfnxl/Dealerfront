@@ -88,6 +88,23 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 | parc | Planque (défense) | ×1,50 |
 | terrain vague | aucun (construction neuve) | ×1,00 |
 
+### 5bis. Cycle jour/nuit & heures de pointe
+
+- **Horloge in-game** : `TICKS_PER_HOUR = 120` (12 s réelles à 10 Hz) → un jour = 4,8 min ; départ à 8 h.
+- Chaque zone a une **heure de pointe** pour son bâtiment phare. Le rendement suit
+  `facteur(h) = 1 + amplitude × cos(2π (h − pic) / 24)` — maximum au pic, minimum 12 h plus tard, **moyenne 1 sur la journée** (équilibre global préservé).
+
+| Zone | Bâtiment | Heure de pointe | Amplitude |
+|---|---|---|---|
+| commercial | Point de vente | 13 h | ±0,40 |
+| nightlife | Point de vente | 23 h | ±0,50 |
+| résidentiel | Logement | 19 h | ±0,30 |
+| industriel | Labo | 2 h | ±0,20 |
+| laverie | Façade | 11 h | ±0,15 |
+
+- **Effet** : un point de vente en nightlife vend ~1,5× à 23 h et ~0,5× à 11 h. Rythme les ventes et invite à planifier (vendre en pointe, attaquer en creux).
+- **UI** : horloge `Jour/Nuit HH:MM`, et pour le quartier sélectionné une pastille « Pointe ×1,40 » / « Creux ×0,60 ».
+
 ### 5. Rendements et formules
 
 - **Production de Produit** : `2 Produit/tick × N_labos` (à équilibrer).

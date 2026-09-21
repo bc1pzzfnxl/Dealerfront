@@ -22,7 +22,9 @@ import {
 	ZONE_BUILDINGS,
 	buildingCostGrowth,
 	zoneBuildBonus,
+	zoneTimeFactor,
 } from "./buildings";
+import { START_HOUR, TICKS_PER_HOUR } from "./constants";
 import { PARIS_MAP } from "./maps/paris";
 import { createRng, type Rng } from "./rng";
 import { createFactions, FACTION_COUNT, type Faction } from "./factions";
@@ -457,6 +459,17 @@ export class World {
 	zoneBonusAt(module: number, type: BuildingType): number {
 		const zone = this.city.modules[module];
 		return zone ? zoneBuildBonus(zone, type) : 1;
+	}
+
+	/** Heure in-game (0–24, fractionnaire) — cycle jour/nuit. */
+	hourOfDay(): number {
+		return (START_HOUR + this.tick / TICKS_PER_HOUR) % 24;
+	}
+
+	/** Facteur d'heure de pointe pour un bâtiment dans un quartier (1 = neutre). */
+	rushFactorAt(module: number, type: BuildingType): number {
+		const zone = this.city.modules[module];
+		return zone ? zoneTimeFactor(zone, type, this.hourOfDay()) : 1;
 	}
 
 	attackBonus(factionId: number): number {
@@ -2172,6 +2185,7 @@ export class World {
 	}
 
 	private recount(): void {
+		const hour = this.hourOfDay();
 		for (let f = 0; f < this.factions.length; f += 1) {
 			const c = this.counts[f]!;
 			const sab = this.sabotaged[f]!;
@@ -2214,7 +2228,8 @@ export class World {
 			if (!type) continue;
 			this.counts[owner]![type] += 1;
 			// Bonus de zone : le bâtiment produit plus dans une zone favorable.
-			const bonus = zoneBuildBonus(zone, type);
+			// Heures de pointe : le rendement suit l'heure in-game (moyenne 1/jour).
+			const bonus = zoneBuildBonus(zone, type) * zoneTimeFactor(zone, type, hour);
 			if (type === "logement") {
 				this.housingDemand[owner] = (this.housingDemand[owner] ?? 0) + demand * bonus;
 			}

@@ -449,6 +449,28 @@ kbd {
 	padding-top: 0.15rem;
 }
 
+/* Heures de pointe : le rendement du bâtiment suit l'heure in-game. */
+.rush-tag {
+	float: right;
+	padding: 0 0.3rem;
+	border-radius: 4px;
+	font-weight: 700;
+}
+
+.rush-tag.peak {
+	background: rgba(143, 216, 165, 0.18);
+	color: #8fd8a5;
+}
+
+.rush-tag.off {
+	background: rgba(143, 152, 163, 0.15);
+	color: #8f97a3;
+}
+
+.clock.night {
+	color: #9db4d8;
+}
+
 /* Lot : ligne unique coût + action (pas de bloc verbeux). */
 .batch-card {
 	padding-top: 0.4rem;

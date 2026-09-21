@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BUILDING_INDEX, zoneBuildBonus } from "./buildings";
+import { BUILDING_INDEX, zoneBuildBonus, zoneTimeFactor } from "./buildings";
+import { TICKS_PER_HOUR } from "./constants";
 import { NEUTRAL } from "./territory";
 import type { ZoneType } from "./types";
 import { World } from "./world";
@@ -88,5 +89,31 @@ describe("bonus de zone", () => {
 	it("les terrains vagues n'ont aucun bonus", () => {
 		expect(zoneBuildBonus("vacant", "labo")).toBe(1);
 		expect(zoneBuildBonus("vacant", "logement")).toBe(1);
+	});
+});
+
+describe("heures de pointe", () => {
+	it("la nuit bonifie la vie nocturne, pas le jour", () => {
+		expect(zoneTimeFactor("nightlife", "vente", 23)).toBeGreaterThan(1);
+		expect(zoneTimeFactor("nightlife", "vente", 11)).toBeLessThan(1);
+	});
+
+	it("le commercial vend en journée", () => {
+		expect(zoneTimeFactor("commercial", "vente", 13)).toBeGreaterThan(
+			zoneTimeFactor("commercial", "vente", 1),
+		);
+	});
+
+	it("moyenne ~1 sur la journée (équilibre préservé)", () => {
+		let sum = 0;
+		for (let h = 0; h < 24; h += 1) sum += zoneTimeFactor("nightlife", "vente", h);
+		expect(sum / 24).toBeCloseTo(1, 1);
+	});
+
+	it("l'horloge avance avec les ticks", () => {
+		const world = new World(1);
+		const start = world.hourOfDay();
+		for (let i = 0; i < TICKS_PER_HOUR; i += 1) world.step();
+		expect(world.hourOfDay()).toBeCloseTo((start + 1) % 24, 3);
 	});
 });
