@@ -52,6 +52,26 @@ const MAX_DAMAGE_PER_TICK = 5;
 const ATTACK_LOSS = 8;
 /** Pertes infligées au défenseur par tick de siège (attrition mutuelle). */
 const DEFENDER_LOSS = 4;
+
+/**
+ * Soldes des guetteurs : le renseignement se **paie**. Chaque Guetteur coûte du
+ * Cash sale par tick ; si la faction ne peut pas payer, ses guetteurs
+ * **aveuglent** (plus d'alerte de descente, plus de contre-sabotage).
+ */
+const GUARD_UPKEEP = 1.5;
+
+/**
+ * Trésorerie de guerre : acheter de l'**armement** (Cash propre) donne un bonus
+ * d'attaque **temporaire**. L'argent est roi de la guerre : on investit avant
+ * une offensive. Coût croissant, niveau cumulable, fenêtre limitée.
+ */
+const ARMAMENT = {
+	costClean: 3000,
+	costGrowth: 1.5,
+	maxLevel: 3,
+	bonusPerLevel: 0.25,
+	durationTicks: 400,
+} as const;
 const CONTROL_REGEN = 1.2;
 /** Assauts simultanés max par faction : pas de « clique-partout ». */
 const MAX_ASSAULTS = 3;
@@ -511,7 +531,40 @@ export class World {
 	}
 
 	attackBonus(factionId: number): number {
-		return TECH.attackPerLevel * this.factions[factionId]!.tech.armement;
+		const faction = this.factions[factionId]!;
+		const tech = TECH.attackPerLevel * faction.tech.armement;
+		const war = faction.armamentUntil > this.tick ? ARMAMENT.bonusPerLevel * faction.armamentLevel : 0;
+		return tech + war;
+	}
+
+	/** Coût du prochain achat d'armement (Cash propre, croissant). */
+	armamentCost(): number {
+		return Math.round(ARMAMENT.costClean * ARMAMENT.costGrowth ** this.player.armamentUses);
+	}
+
+	playerCanBuyArmement(): boolean {
+		if (this.outcome !== null) return false;
+		return this.player.cashPropre >= this.armamentCost();
+	}
+
+	/** Achète un palier d'armement (bonus d'attaque temporaire). */
+	playerBuyArmement(): boolean {
+		if (!this.playerCanBuyArmement()) return false;
+		const player = this.player;
+		player.cashPropre -= this.armamentCost();
+		player.armamentLevel = Math.min(ARMAMENT.maxLevel, player.armamentLevel + 1);
+		player.armamentUntil = this.tick + ARMAMENT.durationTicks;
+		player.armamentUses += 1;
+		this.pushLog(
+			`Armement +${Math.round(ARMAMENT.bonusPerLevel * 100)} % (${ARMAMENT.durationTicks / 10} s)`,
+		);
+		this.events.push("tech");
+		return true;
+	}
+
+	/** Les guetteurs du joueur sont-ils payés ? */
+	playerGuardsPaid(): boolean {
+		return this.player.guardsPaid;
 	}
 
 	private defenseBonus(factionId: number): number {
@@ -1196,6 +1249,8 @@ export class World {
 
 	/** Un Guetteur (contre-espionnage) couvre-t-il ce quartier (rayon 1) ? */
 	private guardedBy(owner: number, module: number): number {
+		// Guetteurs impayés → aveugles.
+		if (!this.factions[owner]?.guardsPaid) return 0;
 		let guards = 0;
 		if (
 			this.territory.owner[module] === owner &&
@@ -1757,6 +1812,7 @@ export class World {
 		this.produce();
 		this.sell();
 		this.launder();
+		this.payUpkeep();
 		this.regenerateControl();
 		this.advanceConstruction();
 		this.resolveAttacks();
@@ -2496,6 +2552,25 @@ export class World {
 			rank: summary.rank,
 			done: this.outcome === "victory",
 		};
+	}
+
+	/** Entretien : soldes des guetteurs + expiration de l'armement. */
+	private payUpkeep(): void {
+		for (const faction of this.factions) {
+			if (faction.armamentUntil <= this.tick) faction.armamentLevel = 0;
+			const guards = this.buildingCount(faction.id, "contre");
+			const cost = guards * GUARD_UPKEEP;
+			if (cost <= 0) {
+				faction.guardsPaid = true;
+				continue;
+			}
+			if (faction.cashSale >= cost) {
+				faction.cashSale -= cost;
+				faction.guardsPaid = true;
+			} else {
+				faction.guardsPaid = false;
+			}
+		}
 	}
 
 	private updateTreasury(): void {

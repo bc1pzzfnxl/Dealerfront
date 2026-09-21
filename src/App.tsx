@@ -707,6 +707,12 @@ function App() {
 				<section className="card panel-left">
 					<p className="advisor">{advisor}</p>
 					{notice ? <p className="notice">{notice}</p> : null}
+					{world.buildingCount(player.id, "contre") > 0 && !world.playerGuardsPaid() ? (
+						<p className="notice danger">
+							<strong>Guetteurs impayés</strong> — renseignement aveugle (plus d'alerte de
+							descente). Vendez du Produit pour les payer.
+						</p>
+					) : null}
 					{world.bankruptcyTicksLeft() > 0 ? (
 						<p className="notice danger">
 							<strong>Faillite dans {Math.ceil(world.bankruptcyTicksLeft() / SIM_HZ)} s</strong> —
@@ -792,6 +798,19 @@ function App() {
 						}}
 					>
 						Étendre <kbd>E</kbd>
+					</button>
+
+					<button
+						type="button"
+						className="expand-btn"
+						disabled={!world.playerCanBuyArmement()}
+						title={`Trésorerie de guerre : +25 % d'attaque pendant 40 s (cumulable ×3). Coût croissant en Cash propre.`}
+						onClick={() => {
+							if (world.playerBuyArmement()) setVersion((value) => value + 1);
+						}}
+					>
+						Armement{" "}
+						<code>{world.armamentCost().toLocaleString("fr-FR")} propre</code>
 					</button>
 
 					<label

@@ -117,6 +117,13 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
 - **Chantiers directs** : plus de **file d'attente**. Un build démarre immédiatement s'il reste une **équipe** (2 max) et est refusé sinon (« équipes occupées »). Le lot (`Aménager`) lance directement ce que les équipes permettent.
 - **Coût croissant** des bâtiments (inspiré OpenFront City/Factory/Port) : `coût(n) = coût_base × 1,35^n` où `n` = nombre de bâtiments **du même type** déjà possédés (conversion = ×0,5). Le coût est calculé par faction et par type ; un lot tient compte des bâtiments déjà prévus. Force la **diversification** plutôt que le spam d'un seul type.
 
+### 5ter. L'argent est roi de la guerre (puits stratégiques)
+
+Le Cash **sale** et **propre** ne sont pas que des scores : ils **achètent la guerre**.
+
+- **Soldes des guetteurs** (`GUARD_UPKEEP = 1,5` sale/tick par Guetteur) : le renseignement se paie. Guetteurs **impayés = aveugles** (plus d'alerte de descente, plus de contre-sabotage, plus de réduction de tueur). Un cartel pauvre est sourd.
+- **Trésorerie d'armement** (`ARMAMENT`) : acheter de l'armement en **Cash propre** donne `+25 %` d'attaque pendant **40 s**, cumulable **×3**, coût **croissant** (`3000 × 1,5^n`). On investit avant une offensive — l'argent décide du tempo militaire.
+
 ### 6. Objectif économique
 
 - **Victoire** : **dernier cartel en jeu** (`win-conditions.md`) — l'économie finance la guerre, elle n'est plus la condition de victoire.

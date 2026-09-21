@@ -1067,3 +1067,18 @@ describe("temps de conquête ∝ taille du quartier", () => {
 		expect(capture(1.5)).toBeGreaterThan(capture(0.7));
 	});
 });
+
+describe("trésorerie de guerre (armement payant)", () => {
+	it("acheter de l'armement augmente le bonus d'attaque", () => {
+		const world = new World(1);
+		const player = world.player;
+		player.cashPropre = 1_000_000;
+		const before = world.attackBonus(player.id);
+		const cost = world.armamentCost();
+		expect(world.playerBuyArmement()).toBe(true);
+		expect(world.attackBonus(player.id)).toBeGreaterThan(before);
+		expect(player.cashPropre).toBe(1_000_000 - cost);
+		// Le coût du prochain achat est plus élevé.
+		expect(world.armamentCost()).toBeGreaterThan(cost);
+	});
+});

@@ -186,6 +186,15 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 	check("événement à choix", !!pending && chosen && world.player.cashSale > before, `+${world.player.cashSale - before} sale`);
 }
 
+// ---------- 9b. Trésorerie de guerre (armement payant) ----------
+{
+	const world = new World(1);
+	boost(world);
+	const before = world.attackBonus(world.player.id);
+	const ok = world.playerCanBuyArmement() && world.playerBuyArmement();
+	check("acheter de l'armement", ok && world.attackBonus(world.player.id) > before, `bonus ${before.toFixed(2)} → ${world.attackBonus(world.player.id).toFixed(2)}`);
+}
+
 // ---------- 10. Partie complète (bot) ----------
 {
 	let finished = 0;

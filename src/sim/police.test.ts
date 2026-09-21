@@ -181,3 +181,24 @@ describe("heat & blanchiment (anti-blocage)", () => {
 		expect(world.heatAt(module)).toBeLessThan(60);
 	});
 });
+
+describe("renseignement payant (guetteurs)", () => {
+	it("des guetteurs impayés aveuglent le renseignement", () => {
+		const world = new World(1);
+		const player = world.player;
+		const module = firstNeutral(world);
+		world.territory.owner[module] = player.id;
+		world.territory.control[module] = 100;
+		world.territory.building[module] = BUILDING_INDEX.contre;
+		player.cashSale = 1000;
+		world.step();
+		expect(player.guardsPaid).toBe(true);
+		expect(world.guardsAt(module)).toBeGreaterThan(0);
+
+		// Plus un sou : les guetteurs ne sont plus payés → aveugles.
+		player.cashSale = 0;
+		for (let i = 0; i < 5; i += 1) world.step();
+		expect(player.guardsPaid).toBe(false);
+		expect(world.guardsAt(module)).toBe(0);
+	});
+});

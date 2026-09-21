@@ -34,6 +34,14 @@ export interface Faction {
 	interceptCooldown: number;
 	/** Nombre de corruptions achetées (coût croissant). */
 	corruptionUses: number;
+	/** Les guetteurs sont-ils payés ce tick ? (sinon le renseignement est aveugle). */
+	guardsPaid: boolean;
+	/** Fin de la fenêtre d'armement achetée (tick) — bonus d'attaque temporaire. */
+	armamentUntil: number;
+	/** Niveau d'armement acheté (0 = aucun). */
+	armamentLevel: number;
+	/** Nombre d'achats d'armement (coût croissant). */
+	armamentUses: number;
 	/** Quartiers pris (toute capture, neutre comprise). */
 	captures: number;
 	/** Quartiers perdus. */
@@ -95,6 +103,10 @@ export function createFactions(count: number, startMembers: number): Faction[] {
 			attackRatio: 0.2,
 			launderRatio: 0.5,
 			corruptionUses: 0,
+			guardsPaid: true,
+			armamentUntil: 0,
+			armamentLevel: 0,
+			armamentUses: 0,
 			captures: 0,
 			quartersLost: 0,
 			eliminations: 0,
