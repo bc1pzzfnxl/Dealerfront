@@ -245,7 +245,7 @@ function App() {
 	const build = useCallback(
 		(type: BuildingType) => {
 			if (selected === null) return;
-			if (world.playerQueueBuild(selected, type)) setVersion((value) => value + 1);
+			if (world.playerBuild(selected, type)) setVersion((value) => value + 1);
 		},
 		[selected, world],
 	);
@@ -258,10 +258,10 @@ function App() {
 				const type = chooseBuildType(
 					world.buildingCounts(world.player.id),
 					world.modulesOwned(world.player.id),
-					(candidate) => world.playerCanQueue(selected, candidate),
+					(candidate) => world.playerCanBuild(selected, candidate),
 					{ atelier: TECH.maxLevel },
 				);
-				if (type !== null && world.playerQueueBuild(selected, type)) {
+				if (type !== null && world.playerBuild(selected, type)) {
 					setVersion((value) => value + 1);
 				}
 			}
@@ -390,7 +390,7 @@ function App() {
 	const cityLabel = "Paris · 992 quartiers IRIS";
 	const playerPct = Math.round(world.controlRatio(player.id) * 100);
 	const perSecond = Math.round(world.productionPerTick(player.id) * SIM_HZ * 10) / 10;
-	const afford = (type: BuildingType) => selected !== null && world.playerCanQueue(selected, type);
+	const afford = (type: BuildingType) => selected !== null && world.playerCanBuild(selected, type);
 	const costFactor = (type: BuildingType) =>
 		selected !== null ? world.buildCostFactor(player.id, selected, type) : 1;
 	const constructionLeft = selected !== null ? world.constructionLeft(selected) : 0;
@@ -494,8 +494,9 @@ function App() {
 		if (world.buildingAt(selected) !== null) return "quartier occupé";
 		if (world.constructionLeft(selected) > 0) return "chantier en cours";
 		if (!world.canBuildInZone(selected, type)) return "zone incompatible";
-		if (world.playerBuildOrders().some((order) => order.module === selected)) return "déjà en file";
-		if (world.queueLength() >= world.queueCap()) return "file pleine";
+		if (world.activeConstructions(player.id) >= world.buildCrews()) {
+			return `équipes occupées (${world.activeConstructions(player.id)}/${world.buildCrews()})`;
+		}
 		return null;
 	};
 	const attackReason = !adjacentTarget
@@ -754,8 +755,7 @@ function App() {
 					</div>
 					<div className="quarter-foot">
 						<span>
-							Chantiers {world.activeConstructions(player.id)}/{world.buildCrews()} · file{" "}
-							{world.queueLength()}/{world.queueCap()}
+							Chantiers {world.activeConstructions(player.id)}/{world.buildCrews()}
 						</span>
 						{selected !== null && selectedBuilding
 							? (() => {
@@ -790,8 +790,8 @@ function App() {
 						<span>Engagement</span>
 						<input
 							type="range"
-							min={5}
-							max={60}
+							min={10}
+							max={80}
 							step={5}
 							value={Math.round(world.playerAttackRatio() * 100)}
 							onChange={(event) => {
@@ -908,7 +908,9 @@ function App() {
 										key: "descent",
 										icon: DescentIcon,
 										label: "butin",
-										title: descentReason() ?? "Descente : vole le butin sans détruire le bâtiment",
+										title:
+											descentReason() ??
+											`Descente : vole le butin sans détruire le bâtiment${selected !== null && world.guardsAt(selected) >= 1 ? ` · ${world.guardsAt(selected)} guetteur(s) — ${world.guardsAt(selected) >= 2 ? "butin NUL" : "butin réduit de moitié"}` : ""}`,
 										disabled: descentReason() !== null,
 										run: () => {
 											if (selected !== null && world.playerDescent(selected)) {
@@ -923,7 +925,9 @@ function App() {
 										key: "sabotage",
 										icon: SabotageIcon,
 										label: `${world.sabotageCost()}`,
-										title: sabotageReason() ?? "Sabotage : production ÷2 pendant 30 s",
+										title:
+											sabotageReason() ??
+											`Sabotage : production ÷2 pendant 30 s${selected !== null && world.guardsAt(selected) >= 1 ? ` · ${world.guardsAt(selected)} guetteur(s) — sabotage DÉJOUÉ` : ""}`,
 										disabled: sabotageReason() !== null,
 										run: () => {
 											if (selected !== null && world.playerSabotage(selected)) {
@@ -1221,28 +1225,7 @@ function App() {
 						<p className="hint-inline">
 							Part de la capacité des façades affectée au blanchiment. Baissez pour garder du Cash sale (achats).
 						</p>
-					</section>					{world.playerBuildOrders().length > 0 ? (
-					<section className="card loop-card queue-card">
-						<h2>File d'ordres <em>{world.queueLength()}</em></h2>
-						{world.playerBuildOrders().map((order) => (
-							<div className="loop-row" key={order.module}>
-								<span>
-									{BUILDINGS[order.type].label} <em>mod. {order.module}</em>
-								</span>
-								<button
-									type="button"
-									className="tech-up"
-									onClick={() => {
-										world.playerCancelOrder(order.module);
-										setVersion((value) => value + 1);
-									}}
-								>
-									Annuler
-								</button>
-							</div>
-						))}
 					</section>
-				) : null}
 				<section className="card journal-card">
 						<h2>Journal</h2>
 						<ul className="journal">

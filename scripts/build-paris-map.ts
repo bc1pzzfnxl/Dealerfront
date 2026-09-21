@@ -133,6 +133,21 @@ function normalize(values: Float32Array, min: number, max: number): void {
 	}
 }
 
+/** Aire d'un anneau (formule du lacet), en degrés² — sert de proxy de taille. */
+function ringArea(ring: Position[]): number {
+	let a = 0;
+	for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+		a += (ring[j]![0]! + ring[i]![0]!) * (ring[j]![1]! - ring[i]![1]!);
+	}
+	return Math.abs(a / 2);
+}
+
+function featureArea(geometry: Feature["geometry"]): number {
+	let total = 0;
+	for (const polygon of ringsOf(geometry)) total += ringArea(polygon[0]!);
+	return total;
+}
+
 function ringsOf(geometry: Feature["geometry"]): Polygon[] {
 	return geometry.type === "Polygon"
 		? [geometry.coordinates as Polygon]
@@ -179,6 +194,14 @@ async function main(): Promise<void> {
 	normalize(demand, 0.4, 1.4);
 	normalize(wealth, 0.5, 1.4);
 
+	// 1c. Taille : racine de l'aire, normalisée (moyenne 1, bornée 0,7–1,5).
+	// Un grand quartier oppose plus de « Contrôle » à vider au siège.
+	const size = new Float32Array(features.length);
+	features.forEach((feature, i) => {
+		size[i] = Math.sqrt(featureArea(feature.geometry));
+	});
+	normalize(size, 0.7, 1.5);
+
 	// 2. Adjacence : quartiers partageant ≥ 2 sommets (frontière commune).
 	const neighbors = adjacent(features);
 
@@ -187,7 +210,7 @@ async function main(): Promise<void> {
 
 	// 4. Sorties.
 	mkdirSync(dirname(SIM_OUT), { recursive: true });
-	writeFileSync(SIM_OUT, emitSim(centroids, zones, neighbors, spawns, demand, wealth));
+	writeFileSync(SIM_OUT, emitSim(centroids, zones, neighbors, spawns, demand, wealth, size));
 	writeFileSync(GEO_OUT, emitGeo(features));
 	console.log(`→ ${SIM_OUT}`);
 	console.log(`→ ${GEO_OUT}`);
@@ -261,6 +284,7 @@ function emitSim(
 	spawns: number[],
 	demand: Float32Array,
 	wealth: Float32Array,
+	size: Float32Array,
 ): string {
 	const arr = (items: unknown[]) => `[${items.map((x) => JSON.stringify(x)).join(",")}]`;
 	const floats = (items: Float32Array) => `Float32Array.from([${items.join(",")}])`;
@@ -277,6 +301,7 @@ export const PARIS_NEIGHBORS: readonly (readonly number[])[] = ${arr(neighbors)}
 export const PARIS_SPAWNS: readonly number[] = ${arr(spawns)};
 export const PARIS_DEMAND: Float32Array = ${floats(demand)};
 export const PARIS_WEALTH: Float32Array = ${floats(wealth)};
+export const PARIS_SIZE: Float32Array = ${floats(size)};
 
 /** Carte jouable Paris (992 quartiers IRIS), rendue avec mapcn/MapLibre. */
 export const PARIS_MAP: CityGrid = {
@@ -286,6 +311,7 @@ export const PARIS_MAP: CityGrid = {
 	spawns: PARIS_SPAWNS,
 	demand: PARIS_DEMAND,
 	wealth: PARIS_WEALTH,
+	size: PARIS_SIZE,
 };
 `;
 }

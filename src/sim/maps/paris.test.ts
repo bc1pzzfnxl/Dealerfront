@@ -35,3 +35,17 @@ describe("carte Paris (IRIS)", () => {
 		expect(world.log.length).toBeGreaterThan(0);
 	});
 });
+
+describe("taille des quartiers", () => {
+	it("chaque quartier a une taille normalisée et variable", () => {
+		expect(PARIS_MAP.size.length).toBe(PARIS_MAP.modules.length);
+		let min = Number.POSITIVE_INFINITY;
+		let max = 0;
+		for (const value of PARIS_MAP.size) {
+			min = Math.min(min, value);
+			max = Math.max(max, value);
+		}
+		expect(min).toBeGreaterThan(0);
+		expect(max).toBeGreaterThan(min);
+	});
+});

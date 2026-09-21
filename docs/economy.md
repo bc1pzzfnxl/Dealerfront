@@ -114,6 +114,7 @@ La ville générée contient des bâtiments « neutres » (appartements, commerc
   `Membres_max = 2 × (quartiers_possédés^0.6 × 1 000 + 50 000) + dépôts × 250 000` (à équilibrer).
 - **Régénération de Membres/tick** (inspiré OpenFront) :
   `régén = (10 + Membres^0.73 / 4) × (1 − Membres / Membres_max) + dépôts × 5` (à équilibrer).
+- **Chantiers directs** : plus de **file d'attente**. Un build démarre immédiatement s'il reste une **équipe** (2 max) et est refusé sinon (« équipes occupées »). Le lot (`Aménager`) lance directement ce que les équipes permettent.
 - **Coût croissant** des bâtiments (inspiré OpenFront City/Factory/Port) : `coût(n) = coût_base × 1,35^n` où `n` = nombre de bâtiments **du même type** déjà possédés (conversion = ×0,5). Le coût est calculé par faction et par type ; un lot tient compte des bâtiments déjà prévus. Force la **diversification** plutôt que le spam d'un seul type.
 
 ### 6. Objectif économique

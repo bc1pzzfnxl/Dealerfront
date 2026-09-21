@@ -89,19 +89,17 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 	check("construire labo/vente/façade", built.length === 3, built.join(", "));
 }
 
-// ---------- 3. File d'ordres + lot ----------
+// ---------- 3. Chantiers (sans file) ----------
 {
 	const world = new World(1);
 	boost(world);
 	const a = ownConversion(world, world.player.id, "labo");
 	const b = ownConversion(world, world.player.id, "vente");
-	const queued = a >= 0 && b >= 0 && world.playerQueueBuild(a, "labo") && world.playerQueueBuild(b, "vente");
-	// La file se vide dans les chantiers actifs (2 équipes).
+	const builtA = a >= 0 && world.playerBuild(a, "labo");
+	const builtB = b >= 0 && world.playerBuild(b, "vente");
 	const active = world.activeConstructions(world.player.id);
-	const cancelled = world.playerCancelOrder(a);
 	const batch = world.playerBatchPreview();
-	check("file d'ordres + lot", queued && active === 2 && batch.count >= 0, `${active} chantiers, lot ${batch.count}`);
-	void cancelled;
+	check("chantiers directs + lot", builtA && builtB && active === 2, `${active} chantiers, lot ${batch.count}`);
 }
 
 // ---------- 4. Tech ----------
@@ -128,9 +126,7 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 	ownAdjacentTo(world, world.player.id, target);
 	// Descente et sabotage exigent un bâtiment : on les joue AVANT le raid (qui le détruit).
 	const descent = world.playerCanDescent(target) && world.playerDescent(target);
-	world.player.hitmanCooldown = 0;
 	const sabotage = world.playerCanSabotage(target) && world.playerSabotage(target);
-	world.player.hitmanCooldown = 0;
 	const raid = world.playerCanRaid(target) && world.playerRaid(target);
 	check("descente / sabotage / raid", descent && sabotage && raid, `descente=${descent} sabotage=${sabotage} raid=${raid}`);
 }

@@ -876,8 +876,8 @@ describe("ratio d'assaut", () => {
 	});
 });
 
-describe("file de construction", () => {
-	it("met en file quand les équipes sont occupées puis démarre à leur libération", () => {
+describe("chantiers (sans file d'attente)", () => {
+	it("démarre directement, dans la limite des équipes", () => {
 		const world = new World(1);
 		const player = world.player;
 		player.cashSale = 100_000;
@@ -886,50 +886,39 @@ describe("file de construction", () => {
 		const b = ownConversion(world, player.id, "labo");
 		const c = ownConversion(world, player.id, "labo");
 
-		expect(world.playerQueueBuild(a, "labo")).toBe(true);
-		expect(world.playerQueueBuild(b, "labo")).toBe(true);
-		expect(world.playerQueueBuild(c, "labo")).toBe(true);
+		expect(world.playerBuild(a, "labo")).toBe(true);
+		expect(world.playerBuild(b, "labo")).toBe(true);
 		expect(world.activeConstructions(player.id)).toBe(world.buildCrews());
-		expect(world.queueLength()).toBe(1);
+		// Équipes occupées : plus de file, le 3e est refusé.
+		expect(world.playerBuild(c, "labo")).toBe(false);
 		expect(world.constructionLeft(c)).toBe(0);
 
+		// Une équipe se libère → le chantier suivant est possible.
 		finishBuild(world, a);
-		expect(world.queueLength()).toBe(0);
+		expect(world.playerBuild(c, "labo")).toBe(true);
 		expect(world.constructionLeft(c)).toBeGreaterThan(0);
 	});
 
-	it("annule un ordre en file", () => {
+	it("un chantier interrompu par une capture est partiellement remboursé", () => {
 		const world = new World(1);
 		const player = world.player;
-		player.cashSale = 100_000;
-		player.cashPropre = 100_000;
-		const a = ownConversion(world, player.id, "labo");
-		const b = ownConversion(world, player.id, "labo");
-		const c = ownConversion(world, player.id, "labo");
-		world.playerQueueBuild(a, "labo");
-		world.playerQueueBuild(b, "labo");
-		world.playerQueueBuild(c, "labo");
-		expect(world.queueLength()).toBe(1);
-		expect(world.playerCancelOrder(c)).toBe(true);
-		expect(world.queueLength()).toBe(0);
-		expect(world.constructionLeft(c)).toBe(0);
-	});
+		player.members = 100_000;
+		world.playerSetAttackRatio(0.6);
+		const target = ADJACENT;
+		world.territory.owner[target] = 1;
+		world.territory.control[target] = 1;
+		const victim = world.factions[1]!;
+		victim.cashSale = 0;
+		// Chantier en cours chez la victime.
+		world.territory.pending[target] = BUILDING_INDEX.vente;
+		world.territory.construction[target] = 999;
 
-	it("un ordre inabordable ne bloque plus la file et finit purgé", () => {
-		const world = new World(1);
-		const player = world.player;
-		const rich = ownConversion(world, player.id, "vente");
-		const poor = ownConversion(world, player.id, "logement");
-		// Le logement (payé en Membres) est hors de portée ; la vente (Cash sale) est abordable.
-		player.members = 0;
-		player.cashSale = 100_000;
-		expect(world.playerQueueBuild(poor, "logement")).toBe(true);
-		expect(world.playerQueueBuild(rich, "vente")).toBe(true);
-		// La vente démarre malgré le logement inabordable placé devant.
-		expect(world.constructionLeft(rich)).toBeGreaterThan(0);
-		// Passé le délai de grâce, l'ordre inabordable est purgé (plus de blocage).
-		for (let i = 0; i < 320; i += 1) world.step();
-		expect(world.playerBuildOrders().some((order) => order.type === "logement")).toBe(false);
+		expect(world.playerAttack(target)).toBe(true);
+		for (let i = 0; i < 40 && world.ownerAt(target) !== player.id; i += 1) world.step();
+
+		expect(world.ownerAt(target)).toBe(player.id);
+		// La victime récupère 50 % du coût du chantier interrompu.
+		expect(victim.cashSale).toBeCloseTo(BUILDINGS.vente.costSale! * 0.5);
 	});
 });
 
@@ -946,9 +935,9 @@ describe("aménagement par lot", () => {
 		expect(preview.count).toBeGreaterThanOrEqual(2);
 		expect(preview.sale + preview.members + preview.clean).toBeGreaterThan(0);
 
-		const queued = world.playerBatchBuild();
-		expect(queued).toBeGreaterThanOrEqual(1);
-		expect(world.queueLength()).toBeGreaterThanOrEqual(1);
+		const built = world.playerBatchBuild();
+		expect(built).toBeGreaterThanOrEqual(1);
+		expect(world.activeConstructions(player.id)).toBeGreaterThanOrEqual(1);
 	});
 });
 
@@ -1053,5 +1042,27 @@ describe("cooldowns d'opérations séparés", () => {
 		// Le raid a détruit le bâtiment : on le remet pour tester la descente.
 		world.territory.building[ADJACENT] = BUILDING_INDEX.vente;
 		expect(world.playerCanDescent(ADJACENT)).toBe(true);
+	});
+});
+
+describe("temps de conquête ∝ taille du quartier", () => {
+	it("un grand quartier résiste plus longtemps qu'un petit", () => {
+		const capture = (size: number): number => {
+			const world = new World(1);
+			world.player.members = 1_000_000;
+			world.playerSetAttackRatio(0.3);
+			const target = ADJACENT;
+			world.territory.owner[target] = NEUTRAL;
+			world.territory.control[target] = 60;
+			world.city.size[target] = size;
+			expect(world.playerAttack(target)).toBe(true);
+			let ticks = 0;
+			while (world.ownerAt(target) !== world.player.id && ticks < 4000) {
+				world.step();
+				ticks += 1;
+			}
+			return ticks;
+		};
+		expect(capture(1.5)).toBeGreaterThan(capture(0.7));
 	});
 });

@@ -22,7 +22,7 @@ export const POLICE = {
 	 * est nécessaire pour conclure, le seuil est haut : la police punit la
 	 * domination *totale*, pas l'avance.
 	 */
-	dominationFloor: 250,
+	dominationFloor: 60,
 	/** Part de carte au-delà de laquelle un leader est « écrasant ». */
 	dominationShare: 0.8,
 	/** Paliers. */

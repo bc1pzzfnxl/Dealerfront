@@ -50,17 +50,16 @@ const DAMAGE_PER_TROOP = 0.0004;
 /** Plafond de dégâts par tick : empêche les prises instantanées (sièges obligatoires). */
 const MAX_DAMAGE_PER_TICK = 5;
 const ATTACK_LOSS = 8;
+/** Pertes infligées au défenseur par tick de siège (attrition mutuelle). */
+const DEFENDER_LOSS = 4;
 const CONTROL_REGEN = 1.2;
 /** Assauts simultanés max par faction : pas de « clique-partout ». */
-const MAX_ASSAULTS = 4;
+const MAX_ASSAULTS = 3;
 /** Déplacement des troupes avant le siège (ticks). */
 export const TRAVEL_TICKS = 12;
 /** Équipes de construction simultanées par faction. */
 const BUILD_CREWS = 2;
 /** Longueur max de la file d'ordres par faction. */
-const QUEUE_MAX = 12;
-/** Durée (ticks) avant de purger un ordre durablement inabordable (libère la file). */
-const QUEUE_GRACE = 300;
 /** Part de la valeur d'un bâtiment prise en butin à la capture. */
 const LOOT_RATIO = 0.2;
 /** Descente : coup de main pour voler le butin sans détruire (gaté Armement). */
@@ -106,7 +105,7 @@ const HEAT = {
 	decay: 0.08,
 	/** Demi-vie de la décroissance : la décroissance double à ce niveau de heat. */
 	decayHalf: 30,
-	policeSuppress: 3,
+	policeSuppress: 2,
 	max: 100,
 } as const;
 
@@ -282,7 +281,6 @@ export class World {
 	private readonly events: GameEvent[] = [];
 	private readonly floaters: Floater[] = [];
 	/** Ordres de construction en attente, par faction. */
-	readonly buildOrders: BuildOrder[] = [];
 	private outcomeRecorded = false;
 	/** Index du contact corrompu courant (change s'il est grillé). */
 	private contactIndex: number;
@@ -1183,6 +1181,12 @@ export class World {
 		if (this.floaters.length > 24) this.floaters.shift();
 	}
 
+	/** Nombre de Guetteurs couvrant un quartier (rayon 1) — pré-check UI. */
+	guardsAt(module: number): number {
+		const owner = this.ownerAt(module);
+		return owner === NEUTRAL ? 0 : this.guardedBy(owner, module);
+	}
+
 	/** Un Guetteur (contre-espionnage) couvre-t-il ce quartier (rayon 1) ? */
 	private guardedBy(owner: number, module: number): number {
 		let guards = 0;
@@ -1487,33 +1491,9 @@ export class World {
 		return this.events.splice(0, this.events.length);
 	}
 
-	/** Ordres en file pour une faction. */
-	playerBuildOrders(): readonly BuildOrder[] {
-		return this.buildOrders.filter((order) => order.factionId === this.player.id);
-	}
-
-	queueCap(): number {
-		return QUEUE_MAX;
-	}
-
-	queueLength(factionId = this.player.id): number {
-		return this.buildOrders.filter((order) => order.factionId === factionId).length;
-	}
-
-	/** Peut-on mettre cet ordre en file ? (état, zone, file non pleine) */
-	playerCanQueue(module: number, type: BuildingType): boolean {
-		if (this.outcome !== null) return false;
-		if (this.ownerAt(module) !== this.player.id) return false;
-		if (this.territory.building[module] !== NO_BUILDING) return false;
-		if (this.territory.construction[module]! > 0) return false;
-		if (!canBuildInZone(this.city.modules[module]!, type)) return false;
-		if (this.buildOrders.some((order) => order.module === module)) return false;
-		return this.queueLength() < QUEUE_MAX;
-	}
-
 	/**
-	 * Plan de construction par lot : aménage tous les quartiers possédés vides
-	 * (hors file/chantier) selon la composition cible. Chiffres pour prévisualisation.
+	 * Plan de construction par lot : aménage les quartiers possédés vides selon
+	 * la composition cible. Chiffres pour prévisualisation (sans la file).
 	 */
 	playerBatchPreview(): { count: number; sale: number; members: number; clean: number } {
 		const player = this.player;
@@ -1531,7 +1511,6 @@ export class World {
 			if (this.ownerAt(i) !== player.id) continue;
 			if (this.territory.building[i] !== NO_BUILDING) continue;
 			if (this.territory.construction[i]! > 0) continue;
-			if (this.buildOrders.some((order) => order.module === i)) continue;
 			const type =
 				bootstrap ??
 				chooseBuildType(scratch, owned, (t) => canBuildInZone(this.city.modules[i]!, t));
@@ -1548,19 +1527,18 @@ export class World {
 		return { count, sale, members, clean };
 	}
 
-	/** Met en file le lot d'aménagement (dans la limite de la file). */
+	/** Lance directement les aménagements possibles, dans la limite des équipes. */
 	playerBatchBuild(): number {
 		const player = this.player;
 		const counts = this.buildingCounts(player.id);
 		const scratch = { ...counts };
 		const owned = this.modulesOwned(player.id);
-		let queued = 0;
+		let built = 0;
 		for (let i = 0; i < this.territory.count; i += 1) {
-			if (this.queueLength() >= QUEUE_MAX) break;
+			if (this.activeConstructions(player.id) >= BUILD_CREWS) break;
 			if (this.ownerAt(i) !== player.id) continue;
 			if (this.territory.building[i] !== NO_BUILDING) continue;
 			if (this.territory.construction[i]! > 0) continue;
-			if (this.buildOrders.some((order) => order.module === i)) continue;
 			const bootstrap = missingEconomyStep(scratch, (t) =>
 				this.canAfford(player, t, CONVERSION_COST),
 			);
@@ -1568,75 +1546,13 @@ export class World {
 				bootstrap ??
 				chooseBuildType(scratch, owned, (t) => canBuildInZone(this.city.modules[i]!, t));
 			if (type === null) continue;
-			if (this.playerQueueBuild(i, type)) {
-				scratch[type] += 1;
-				queued += 1;
-			}
+			const factor = this.buildCostFactor(player.id, i, type, scratch[type]);
+			if (!this.canAfford(player, type, factor)) continue;
+			this.startBuild(player.id, i, type);
+			scratch[type] += 1;
+			built += 1;
 		}
-		return queued;
-	}
-
-	/** Met un ordre en file ; démarre immédiatement si une équipe est libre. */
-	playerQueueBuild(module: number, type: BuildingType): boolean {
-		if (!this.playerCanQueue(module, type)) return false;
-		this.buildOrders.push({ factionId: this.player.id, module, type, queuedAt: this.tick });
-		this.processBuildQueues();
-		return true;
-	}
-
-	/** Annule l'ordre en file visant ce quartier. */
-	playerCancelOrder(module: number): boolean {
-		const index = this.buildOrders.findIndex(
-			(order) => order.factionId === this.player.id && order.module === module,
-		);
-		if (index < 0) return false;
-		this.buildOrders.splice(index, 1);
-		return true;
-	}
-
-	/** Démarre les ordres en file tant qu'une équipe est disponible et abordable. */
-	private processBuildQueues(): void {
-		for (const faction of this.factions) {
-			let guard = QUEUE_MAX;
-			while (guard > 0) {
-				guard -= 1;
-				if (this.activeConstructions(faction.id) >= BUILD_CREWS) break;
-				// On cherche le premier ordre **valide et abordable** de la faction.
-				// Un ordre invalide est retiré ; un ordre inabordable ne bloque plus
-				// les suivants (et est purgé s'il le reste trop longtemps).
-				let started = false;
-				for (let k = 0; k < this.buildOrders.length; k += 1) {
-					const order = this.buildOrders[k]!;
-					if (order.factionId !== faction.id) continue;
-					const valid =
-						this.ownerAt(order.module) === faction.id &&
-						this.territory.building[order.module] === NO_BUILDING &&
-						this.territory.construction[order.module] === 0 &&
-						canBuildInZone(this.city.modules[order.module]!, order.type);
-					if (!valid) {
-						this.buildOrders.splice(k, 1);
-						k -= 1;
-						continue;
-					}
-					if (!this.canAfford(faction, order.type, this.buildCostFactor(faction.id, order.module, order.type))) {
-						if (this.tick - order.queuedAt > QUEUE_GRACE) {
-							this.buildOrders.splice(k, 1);
-							k -= 1;
-							if (faction.isPlayer) {
-								this.pushLog(`Ordre annulé (fonds insuffisants) : ${BUILDINGS[order.type].label}`);
-							}
-							continue;
-						}
-						continue;
-					}
-					this.buildOrders.splice(k, 1);
-					this.startBuild(faction.id, order.module, order.type);
-					started = true;
-					break;
-				}
-				if (!started) break;
-			}
-		}
+		return built;
 	}
 
 	/** Nombre de chantiers simultanés autorisés par faction. */
@@ -1717,10 +1633,27 @@ export class World {
 		this.recount();
 	}
 
-	/** Interrompt un éventuel chantier (bâtiment détruit, quartier perdu). */
-	private cancelConstruction(module: number): void {
+	/**
+	 * Interrompt un chantier (bâtiment détruit, quartier perdu). Le coût versé est
+	 * **partiellement remboursé** (50 %) au propriétaire qui l'avait payé — sinon
+	 * perdre un quartier en construction était une perte sèche opaque.
+	 */
+	private cancelConstruction(module: number, refundTo?: number): void {
+		const pending = this.territory.pending[module]!;
+		const payer = refundTo ?? this.territory.owner[module];
 		this.territory.construction[module] = 0;
 		this.territory.pending[module] = NO_BUILDING;
+		if (pending === NO_BUILDING || payer === undefined || payer === NEUTRAL) return;
+		const type = BUILDING_TYPES[pending];
+		if (type) this.refund(this.factions[payer]!, type, 0.5);
+	}
+
+	/** Rend une part du coût d'un bâtiment (annulation de chantier). */
+	private refund(faction: Faction, type: BuildingType, ratio: number): void {
+		const spec = BUILDINGS[type];
+		if (spec.costMembers) faction.members += spec.costMembers * ratio;
+		if (spec.costSale) faction.cashSale += spec.costSale * ratio;
+		if (spec.costClean) faction.cashPropre += spec.costClean * ratio;
 	}
 
 	/** Avance les chantiers d'un tick ; livre ceux qui arrivent à terme. */
@@ -1819,7 +1752,6 @@ export class World {
 		this.launder();
 		this.regenerateControl();
 		this.advanceConstruction();
-		this.processBuildQueues();
 		this.resolveAttacks();
 		this.resolveEncirclements();
 		this.updateDiplomacyTimers();
@@ -1991,13 +1923,21 @@ export class World {
 			const defense =
 				(ZONE_DEFENSE[zone] ?? 1) * planque * (1 + defenderBonus) * traitorDefense;
 			const attackBonus = 1 + this.attackBonus(attack.factionId);
+			// Taille du quartier : un grand quartier oppose plus de résistance
+			// (temps de conquête ∝ taille / troupes engagées).
+			const sizeFactor = this.city.size?.[attack.target] ?? 1;
 			// Le plafond de dégâts suit l'Armement : la tech reste utile au-delà du cap.
 			const damage = Math.min(
-				MAX_DAMAGE_PER_TICK * attackBonus,
-				Math.max(0.5, (attack.troops * DAMAGE_PER_TROOP * attackBonus) / defense),
+				(MAX_DAMAGE_PER_TICK * attackBonus) / sizeFactor,
+				Math.max(0.5, (attack.troops * DAMAGE_PER_TROOP * attackBonus) / (defense * sizeFactor)),
 			);
 			const control = this.territory.control[attack.target]! - damage;
 			attack.troops -= damage * ATTACK_LOSS;
+			// Attrition mutuelle : défendre saigne aussi (pas de hold gratuit).
+			if (owner !== NEUTRAL) {
+				const defender = this.factions[owner]!;
+				defender.members = Math.max(0, defender.members - damage * DEFENDER_LOSS);
+			}
 
 			if (control <= 0) {
 				const previous = this.territory.owner[attack.target];
@@ -2020,7 +1960,7 @@ export class World {
 				);
 				this.territory.building[attack.target] = NO_BUILDING;
 				this.territory.capturedAt[attack.target] = this.tick;
-				this.cancelConstruction(attack.target);
+				this.cancelConstruction(attack.target, previous);
 				this.addHeat(attack.target, HEAT.capture);
 				this.attacks.splice(index, 1);
 				this.recount();

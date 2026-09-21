@@ -46,4 +46,6 @@ export interface CityGrid {
 	readonly demand: Float32Array;
 	/** Richesse locale : multiplicateur de prix et de blanchiment (≈0,6–1,4). */
 	readonly wealth: Float32Array;
+	/** Taille relative du quartier (≈0,7–1,5) : résistance au siège. */
+	readonly size: Float32Array;
 }
