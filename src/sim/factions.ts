@@ -37,10 +37,9 @@ export interface Faction {
 	/** Share of Fronts' capacity actually laundered (0–1). */
 	launderRatio: number;
 	/** **Per-operation** cooldowns (ticks) — avoids the false choice. */
-	hitmanCooldown: number;
+	strikeCooldown: number;
 	raidCooldown: number;
 	bustCooldown: number;
-	sabotageCooldown: number;
 	interceptCooldown: number;
 	/** Number of corruptions bought (increasing cost). */
 	corruptionUses: number;
@@ -120,10 +119,9 @@ export function createFactions(count: number, startMembers: number): Faction[] {
 			housing: 0,
 			buildings: 0,
 			tech: { armament: 0, protection: 0, logistics: 0 },
-			hitmanCooldown: 0,
+			strikeCooldown: 0,
 			raidCooldown: 0,
 			bustCooldown: 0,
-			sabotageCooldown: 0,
 			interceptCooldown: 0,
 			attackRatio: 0.2,
 			launderRatio: 0.5,

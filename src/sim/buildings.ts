@@ -125,7 +125,7 @@ export const BUILDING_EFFECT_LABELS: Record<BuildingType, string> = {
 	safehouse: "defense ×1.5",
 	depot: "+2000 max members",
 	workshop: "+1 tech level",
-	counter: "alerts on busts · −15% hitman · hinders busts/sabotages",
+	counter: "alerts on busts · −15% hitman · hinders busts",
 };
 
 /** Bootstrap order of the economy chain (build first). */

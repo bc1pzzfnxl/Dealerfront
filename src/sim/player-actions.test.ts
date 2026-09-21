@@ -15,7 +15,7 @@ import {
 } from "./buildings";
 import { DIPLOMACY, EMBARGO } from "./diplomacy";
 import { CONTACT_NAMES, POLICE } from "./police";
-import { HITMAN, TECH, techCost } from "./tech";
+import { STRIKE, TECH, techCost } from "./tech";
 import { NEUTRAL } from "./territory";
 import { World } from "./world";
 
@@ -100,8 +100,8 @@ function forceVictory(world: World): void {
 	world.step();
 }
 
-/** Control drop at the center of a hitman, based on the target's Counter-intel count. */
-function hitmanCenterDrop(counter: number): number {
+/** Control drop at the center of a strike, based on the target's Counter-intel count. */
+function strikeCenterDrop(counter: number): number {
 	const world = new World(1);
 	const player = world.player;
 	player.cleanCash = 100000;
@@ -120,7 +120,9 @@ function hitmanCenterDrop(counter: number): number {
 	}
 	// Forced recount: direct edits don't refresh `buildingCount`.
 	world.playerBuild(SPAWN, "housing");
-	expect(world.playerHitman(enemy)).toBe(true);
+	expect(world.playerStrike(enemy)).toBe(true);
+	// The strike is telegraphed: it only lands after the warning.
+	for (let i = 0; i < STRIKE.delayTicks; i += 1) world.step();
 	return 100 - world.controlAt(enemy);
 }
 
@@ -293,8 +295,10 @@ describe("construction — build site cancellation", () => {
 		world.territory.control[enemy] = 100;
 		world.territory.pending[enemy] = BUILDING_INDEX.lab;
 		world.territory.construction[enemy] = BUILD_TICKS.lab;
-		expect(world.playerCanHitman(enemy)).toBe(true);
-		expect(world.playerHitman(enemy)).toBe(true);
+		expect(world.playerCanStrike(enemy)).toBe(true);
+		expect(world.playerStrike(enemy)).toBe(true);
+		// The strike lands after its warning and cancels the build site.
+		for (let i = 0; i < STRIKE.delayTicks; i += 1) world.step();
 		expect(world.constructionLeft(enemy)).toBe(0);
 		expect(world.pendingBuilding(enemy)).toBeNull();
 	});
@@ -336,7 +340,7 @@ describe("attack", () => {
 	});
 });
 
-describe("hitman", () => {
+describe("heavy strike", () => {
 	it("requires Armament ≥ 2", () => {
 		const world = new World(1);
 		const player = world.player;
@@ -345,11 +349,11 @@ describe("hitman", () => {
 		const enemy = firstNeutral(world);
 		world.territory.owner[enemy] = 1;
 		world.territory.control[enemy] = 100;
-		player.tech.armament = HITMAN.requiredArmament - 1;
-		expect(world.playerCanHitman(enemy)).toBe(false);
-		expect(world.playerHitman(enemy)).toBe(false);
-		player.tech.armament = HITMAN.requiredArmament;
-		expect(world.playerCanHitman(enemy)).toBe(true);
+		player.tech.armament = STRIKE.requiredArmament - 1;
+		expect(world.playerCanStrike(enemy)).toBe(false);
+		expect(world.playerStrike(enemy)).toBe(false);
+		player.tech.armament = STRIKE.requiredArmament;
+		expect(world.playerCanStrike(enemy)).toBe(true);
 	});
 
 	it("refuses its own target and neutral quarters", () => {
@@ -357,66 +361,72 @@ describe("hitman", () => {
 		const player = world.player;
 		player.cleanCash = 100000;
 		player.members = 100000;
-		player.tech.armament = HITMAN.requiredArmament;
-		expect(world.playerCanHitman(SPAWN)).toBe(false);
-		expect(world.playerCanHitman(firstNeutral(world))).toBe(false);
+		player.tech.armament = STRIKE.requiredArmament;
+		expect(world.playerCanStrike(SPAWN)).toBe(false);
+		expect(world.playerCanStrike(firstNeutral(world))).toBe(false);
 	});
 
-	it("respects the cost and cooldown", () => {
+	it("is telegraphed: paid now, lands only after the warning", () => {
 		const world = new World(1);
 		const player = world.player;
 		player.cleanCash = 100000;
 		player.members = 100000;
-		player.tech.armament = HITMAN.requiredArmament;
+		player.tech.armament = STRIKE.requiredArmament;
 		const enemy = firstNeutral(world);
 		world.territory.owner[enemy] = 1;
 		world.territory.control[enemy] = 100;
 
 		const cashBefore = player.cleanCash;
 		const membersBefore = player.members;
-		expect(world.playerHitman(enemy)).toBe(true);
-		expect(player.cleanCash).toBe(cashBefore - HITMAN.costClean);
-		expect(player.members).toBe(membersBefore - HITMAN.costMembers);
-		expect(player.hitmanCooldown).toBe(HITMAN.cooldownTicks);
-		expect(world.playerCanHitman(enemy)).toBe(false);
-		player.hitmanCooldown = 0;
-		expect(world.playerCanHitman(enemy)).toBe(true);
+		expect(world.playerStrike(enemy)).toBe(true);
+		// Paid immediately, and visible in flight...
+		expect(player.cleanCash).toBe(cashBefore - STRIKE.costClean);
+		expect(player.members).toBe(membersBefore - STRIKE.costMembers);
+		expect(player.strikeCooldown).toBe(STRIKE.cooldownTicks);
+		expect(world.pendingStrikes()).toHaveLength(1);
+		// ...but nothing has landed yet.
+		expect(world.controlAt(enemy)).toBe(100);
+		for (let i = 0; i < STRIKE.delayTicks; i += 1) world.step();
+		expect(world.controlAt(enemy)).toBeLessThan(100);
+		expect(world.pendingStrikes()).toHaveLength(0);
 	});
 
 	it("refuses without enough Clean cash or Members", () => {
 		const world = new World(1);
 		const player = world.player;
 		player.members = 100000;
-		player.tech.armament = HITMAN.requiredArmament;
+		player.tech.armament = STRIKE.requiredArmament;
 		const enemy = firstNeutral(world);
 		world.territory.owner[enemy] = 1;
 		world.territory.control[enemy] = 100;
-		player.cleanCash = HITMAN.costClean - 1;
-		expect(world.playerCanHitman(enemy)).toBe(false);
+		player.cleanCash = STRIKE.costClean - 1;
+		expect(world.playerCanStrike(enemy)).toBe(false);
 		player.cleanCash = 100000;
-		player.members = HITMAN.costMembers - 1;
-		expect(world.playerCanHitman(enemy)).toBe(false);
+		player.members = STRIKE.costMembers - 1;
+		expect(world.playerCanStrike(enemy)).toBe(false);
 	});
 
 	it("reduces damage via Counter-intel (cap)", () => {
-		expect(hitmanCenterDrop(0)).toBe(HITMAN.damageCenter);
-		expect(hitmanCenterDrop(4)).toBeCloseTo(
-			HITMAN.damageCenter * (1 - HITMAN.counterReductionMax),
+		expect(strikeCenterDrop(0)).toBeCloseTo(STRIKE.damageCenter, 6);
+		expect(strikeCenterDrop(4)).toBeCloseTo(
+			STRIKE.damageCenter * (1 - STRIKE.counterReductionMax),
+			6,
 		);
 	});
 
-	it("does not capture (Control floor at 5)", () => {
+	it("weakens but never captures", () => {
 		const world = new World(1);
 		const player = world.player;
 		player.cleanCash = 100000;
 		player.members = 100000;
-		player.tech.armament = HITMAN.requiredArmament;
+		player.tech.armament = STRIKE.requiredArmament;
 		const enemy = firstNeutral(world);
 		world.territory.owner[enemy] = 1;
-		world.territory.control[enemy] = 10;
-		expect(world.playerHitman(enemy)).toBe(true);
-		expect(world.controlAt(enemy)).toBe(5);
+		world.territory.control[enemy] = 100;
+		expect(world.playerStrike(enemy)).toBe(true);
+		for (let i = 0; i < STRIKE.delayTicks; i += 1) world.step();
 		expect(world.ownerAt(enemy)).toBe(1);
+		expect(world.controlAt(enemy)).toBeLessThan(100);
 	});
 });
 
@@ -654,7 +664,7 @@ describe("end of game", () => {
 		world.player.members = 100000;
 		world.player.dirtyCash = 100000;
 		world.player.cleanCash = 100000;
-		world.player.tech.armament = HITMAN.requiredArmament;
+		world.player.tech.armament = STRIKE.requiredArmament;
 		world.territory.owner[0] = 1;
 		world.territory.control[0] = 100;
 
@@ -662,8 +672,8 @@ describe("end of game", () => {
 		expect(world.playerBuild(SPAWN, "housing")).toBe(false);
 		expect(world.playerCanAttack(ADJACENT)).toBe(false);
 		expect(world.playerAttack(ADJACENT)).toBe(false);
-		expect(world.playerCanHitman(0)).toBe(false);
-		expect(world.playerHitman(0)).toBe(false);
+		expect(world.playerCanStrike(0)).toBe(false);
+		expect(world.playerStrike(0)).toBe(false);
 		expect(world.playerUpgradeTech("armament")).toBe(false);
 		expect(world.playerCanCorrupt()).toBe(false);
 		expect(world.playerCorrupt()).toBe(false);
@@ -681,13 +691,13 @@ describe("end of game", () => {
 		world.player.members = 100000;
 		world.player.dirtyCash = 100000;
 		world.player.cleanCash = 100000;
-		world.player.tech.armament = HITMAN.requiredArmament;
+		world.player.tech.armament = STRIKE.requiredArmament;
 		world.territory.owner[0] = 1;
 		world.territory.control[0] = 100;
 
 		expect(world.playerBuild(SPAWN, "housing")).toBe(false);
 		expect(world.playerAttack(ADJACENT)).toBe(false);
-		expect(world.playerHitman(0)).toBe(false);
+		expect(world.playerStrike(0)).toBe(false);
 		expect(world.playerUpgradeTech("armament")).toBe(false);
 		expect(world.playerCorrupt()).toBe(false);
 		expect(world.playerProposePact(1)).toBe(false);
@@ -846,23 +856,43 @@ describe("raid & simultaneous assaults", () => {
 		expect(world.playerCanRaid(target)).toBe(false);
 	});
 
-	it("limits simultaneous assaults", () => {
+	it("has no cap on simultaneous assaults: the troop pool is the limit", () => {
 		const world = new World(1);
 		const player = world.player;
 		player.members = 100_000;
-		const max = world.maxAssaults();
 		// Takes a group of contiguous owned quarters with neutral neighbors.
-		// The player owns the spawn; we target its direct neutral neighbors.
 		const targets = [...(world.city.neighbors[SPAWN] ?? [])];
 		for (const target of targets) {
 			world.territory.owner[target] = NEUTRAL;
 			world.territory.control[target] = 100;
 		}
+		const before = player.members;
 		let launched = 0;
 		for (const target of targets) {
 			if (world.playerAttack(target)) launched += 1;
 		}
-		expect(launched).toBe(Math.min(max, targets.length));
+		// Every bordering quarter can be pushed at once...
+		expect(launched).toBe(targets.length);
+		// ...but each one commits troops from the same pool.
+		expect(player.members).toBeLessThan(before);
+	});
+
+	it("a siege drains the defender's global army (defense has a cost)", () => {
+		const world = new World(1);
+		const player = world.player;
+		const victim = world.factions[1]!;
+		const target = world.city.neighbors[SPAWN]![0]!;
+		world.territory.owner[target] = 1;
+		world.territory.control[target] = 100;
+		victim.members = 20_000;
+		player.members = 1_000_000;
+		const before = victim.members;
+		expect(world.playerAttack(target)).toBe(true);
+		for (let i = 0; i < 20; i += 1) world.step();
+		// The defending army pays for holding the line...
+		expect(victim.members).toBeLessThan(before);
+		// ...and the battle gauge moves.
+		expect(world.controlAt(target)).toBeLessThan(100);
 	});
 });
 
@@ -970,7 +1000,7 @@ describe("loot (buildings as objectives)", () => {
 	});
 });
 
-describe("bust & sabotage (armament)", () => {
+describe("bust (armament)", () => {
 	it("the bust steals loot without destroying or capturing (Armament ≥ 1)", () => {
 		const world = new World(1);
 		const player = world.player;
@@ -1005,28 +1035,26 @@ describe("bust & sabotage (armament)", () => {
 		expect(world.playerCanBust(target)).toBe(false);
 		player.tech.armament = 1;
 		expect(world.playerCanBust(target)).toBe(true);
-		expect(world.playerCanSabotage(target)).toBe(false);
-		player.tech.armament = 2;
-		expect(world.playerCanSabotage(target)).toBe(true);
 	});
 
-	it("an enemy Watcher blocks the sabotage", () => {
+	it("an enemy Watcher foils the bust", () => {
 		const world = new World(1);
 		const player = world.player;
 		player.dirtyCash = 100_000;
-		player.tech.armament = 2;
+		player.members = 100_000;
+		player.tech.armament = 1;
 		const target = ADJACENT;
 		world.territory.owner[target] = 1;
 		world.territory.control[target] = 100;
 		world.territory.building[target] = BUILDING_INDEX.storefront;
-		const lookout = world.city.neighbors[ADJACENT]!.find(
-			(neighbor) => neighbor !== SPAWN,
-		)!;
+		const lookout = world.city.neighbors[ADJACENT]!.find((neighbor) => neighbor !== SPAWN)!;
 		world.territory.owner[lookout] = 1;
 		world.territory.building[lookout] = BUILDING_INDEX.counter;
+		const before = player.dirtyCash;
 
-		expect(world.playerSabotage(target)).toBe(true);
-		expect(world.territory.sabotageUntil[target]).toBe(0);
+		// The op is paid for, but the loot never lands.
+		expect(world.playerBust(target)).toBe(true);
+		expect(player.dirtyCash).toBeLessThan(before);
 	});
 });
 

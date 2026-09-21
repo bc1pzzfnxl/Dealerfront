@@ -175,9 +175,9 @@ Each branch has **5 tiers** (P0 = base, P1→P4 researchable). **Multiplicative*
 - **Counter-intel**: reduces damage by **15% per unit** (cap **60%**).
 
 
-### P20 — Armament, Bust, Sabotage
+### P20 — Armament, Bust, Strike
 
 - **Armament**: +10% damage **and** the **damage cap per tick follows Armament** (`5 × (1 + 0.1 × level)`) — without that, tech was useless beyond the cap.
 - **Bust** (Armament ≥ 1): 2,000 Dirty cash + 600 Members, 25 s recharge → **steals the loot** of an adjacent building **without destroying or capturing it**. An enemy **Watcher** halves the loot.
-- **Sabotage** (Armament ≥ 2): 1,500 Dirty cash, 25 s recharge → **building production ÷ 2 for 30 s**. **Blocked** by a Watcher.
-- **Watcher** (ex-Counter-intel, 2,000 Clean cash): **alerts** busts (radius 1), **−15% hitman**, **hinders busts and sabotages**.
+- **Heavy strike** (Armament ≥ 2): 12,000 Clean cash + 1,500 Members, 90 s recharge → **telegraphed** area strike (50 ticks / 5 s of warning, target ring visible to everyone): −55 Control at the epicenter, −25 on the neighbours, **destroys buildings** and cancels build sites. **Blunted by Counter-intel** (−25% per unit, capped at −70%).
+- **Watcher** (ex-Counter-intel, 2,000 Clean cash): **alerts** busts (radius 1), **−25% strike damage**, **hinders busts**.

@@ -81,7 +81,6 @@ describe("logistics", () => {
 		expect(world.playerIntercept(storefront)).toBe(true);
 		expect(player.product).toBeCloseTo(cargo, 6);
 		expect(route.cargo).toBe(0);
-		expect(world.territory.sabotageUntil[storefront]!).toBeGreaterThan(world.tick);
 	});
 
 	it("refuses to intercept an empty convoy", () => {

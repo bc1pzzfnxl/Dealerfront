@@ -43,6 +43,7 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 					territory={world.territory}
 					attacks={world.attacks}
 					convoys={convoys}
+					strikes={world.pendingStrikes()}
 					heat={world.heat}
 					tick={world.tick}
 					selected={selected}

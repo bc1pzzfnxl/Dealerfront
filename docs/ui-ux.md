@@ -137,7 +137,7 @@ Define a **remote command** interface: read the situation at a glance (possessio
 | Zone | Content | Role |
 |---|---|---|
 | **Top bar** (`topbar`) | Brand + map, **resources** (Members, Product, Dirty cash, Clean cash), **Control**, Quarters, Production, **objective** (threshold + Clean cash) and **time left** | Always visible, at-a-glance reading |
-| **Left column** (`panel-left`) | Selected **quarter** (profile, logistics, heat) + **orders** (build / attack / raid / bust / sabotage / interception / hitman) | Contextual **action** panel |
+| **Left column** (`panel-left`) | Selected **quarter** (profile, logistics, heat) + **orders** (build / attack / raid / bust / interception / strike) | Contextual **action** panel |
 | **Right column** (`panel-right`) | **Police** (Pressure, target, raids, corruption), **Tech** (3 branches), **Diplomacy** (relations, pacts, merged factions) | **Steering** panel |
 | **Bottom bar** (`panel-bottom`) | **Log** + key reminders + buttons (Pause / New seed / Colorblind) + tick | Mood / control |
 
@@ -209,7 +209,7 @@ Define a **remote command** interface: read the situation at a glance (possessio
 ### UI
 
 - **Icons (lucide, `currentColor`)**: buildings (Housing=Users, Lab=FlaskConical, Storefront=Store, Front=Landmark, Safehouse=Shield, Depot=Warehouse, Workshop=Factory, Watcher=Eye), resources, operations. No more long labels.
-- **Command bar** (left panel, non-owned quarter): icon grid Assault/Raid/Bust/Sabotage/Interception/Hitman, **cost + shortcut** shown in the button, unavailability reason in a tooltip.
+- **Command bar** (left panel, non-owned quarter): icon grid Assault/Raid/Bust/Interception/Strike, **cost + shortcut** shown in the button, unavailability reason in a tooltip.
 - **Compact top bar**: resource icons + two **objective bars** (Control, Clean cash); timer in **urgency** under 3 min.
 - **Log feed**: 3 colored entries (gain / loss / info) with a short entry animation.
 - **City selection**: pitch + visual loop reminder (Produce → Sell → Launder) + single CTA.

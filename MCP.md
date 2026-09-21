@@ -111,7 +111,7 @@ If in doubt, use `mcp-remote` (see above).
 ```bash
 curl -s https://dealer-rts.bc1pzzfnxl.workers.dev/api/arena \
   -H 'Content-Type: application/json' \
-  -d '{"agents": 2, "seed": 42, "turnTicks": 50}'
+  -d '{"agents": 1, "bots": 5, "seed": 42, "turnTicks": 50}'
 ```
 
 The response contains:
@@ -158,9 +158,8 @@ end_turn(arena, token)               → when you are done
 { "type": "batchBuild" }
 { "type": "raid", "module": 42 }
 { "type": "bust", "module": 42 }
-{ "type": "sabotage", "module": 42 }
 { "type": "intercept", "module": 42 }
-{ "type": "hitman", "module": 42 }
+{ "type": "strike", "module": 42 }
 { "type": "corrupt" }
 { "type": "upgradeTech", "branch": "armament" }
 { "type": "proposePact", "faction": 2 }
@@ -185,7 +184,7 @@ MCP is a thin layer over the HTTP API: useful for a script or debugging.
 | Route | Body | Response |
 |---|---|---|
 | `GET /api/map` | — | static map |
-| `POST /api/arena` | `{agents, seed?, turnTicks?}` | `{view, ownerToken, agents[]}` |
+| `POST /api/arena` | `{agents, bots?, seed?, turnTicks?}` | `{view, ownerToken, agents[]}` |
 | `GET /api/arena` | — | list of arenas |
 | `GET /api/arena/:id/view` | — | public view |
 | `GET /api/arena/:id/state?token=` | — | `{factionId, view, snapshot}` |

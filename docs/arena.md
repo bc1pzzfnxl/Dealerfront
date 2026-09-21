@@ -50,7 +50,7 @@
 
 ## 5. Intents
 
-`applyIntent` (`src/sim/intents.ts`) is the **only** entry point: `attack`, `attackBest`, `build`, `batchBuild`, `raid`, `bust`, `sabotage`, `intercept`, `hitman`, `corrupt`, `upgradeTech`, `proposePact`, `respondOffer`, `breakPact`, `embargo`, `fundContract`, `buyQuarter`, `hireMercenaries`, `buyArmament`, `setAttackRatio`, `setLaunderRatio`, `choose`.
+`applyIntent` (`src/sim/intents.ts`) is the **only** entry point: `attack`, `attackBest`, `build`, `batchBuild`, `raid`, `bust`, `intercept`, `strike`, `corrupt`, `upgradeTech`, `proposePact`, `respondOffer`, `breakPact`, `embargo`, `fundContract`, `buyQuarter`, `hireMercenaries`, `buyArmament`, `setAttackRatio`, `setLaunderRatio`, `choose`.
 
 Every rejection returns `{ ok:false, error }` — **never** an exception that breaks the game.
 

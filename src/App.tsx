@@ -13,7 +13,7 @@ import {
 } from "./sim/buildings";
 import { SimClock } from "./sim/clock";
 import { SIM_HZ } from "./sim/constants";
-import { HITMAN, TECH, TECH_BRANCHES, TECH_LABELS, techCost } from "./sim/tech";
+import { STRIKE, TECH, TECH_BRANCHES, TECH_LABELS, techCost } from "./sim/tech";
 import { POLICE_TIER_LABELS } from "./sim/police";
 import { NEUTRAL } from "./sim/territory";
 import { ZONE_LABELS } from "./sim/types";
@@ -27,7 +27,7 @@ const EVENT_SOUND: Record<GameEvent, SoundName> = {
 	capture: "success",
 	lost: "error",
 	raid: "error",
-	hitman: "scan",
+	strike: "scan",
 	tech: "ready",
 	pact: "toggle",
 	betray: "error",
@@ -35,7 +35,6 @@ const EVENT_SOUND: Record<GameEvent, SoundName> = {
 	corrupt: "droplet",
 	build: "press",
 	bust: "scan",
-	sabotage: "whisper",
 	intercept: "sparkle",
 	event: "bloom",
 	alert: "error",
@@ -273,17 +272,20 @@ function App() {
 		if (world.playerAttack(selected)) setVersion((value) => value + 1);
 	}, [selected, world]);
 
-	const hitmanReason = useCallback((): string | null => {
+	const strikeReason = useCallback((): string | null => {
 		if (selected === null) return "no target";
 		const owner = world.ownerAt(selected);
 		if (owner === player.id) return "already yours";
 		if (owner === NEUTRAL) return "neutral target";
-		if (player.tech.armament < HITMAN.requiredArmament) {
-			return `Armament ≥ ${HITMAN.requiredArmament} required`;
+		if (player.tech.armament < STRIKE.requiredArmament) {
+			return `Armament ≥ ${STRIKE.requiredArmament} required`;
 		}
-		if (player.hitmanCooldown > 0) return `cooldown ${Math.ceil(player.hitmanCooldown / SIM_HZ)} s`;
-		if (player.cleanCash < HITMAN.costClean) return `${HITMAN.costClean} Clean cash required`;
-		if (player.members < HITMAN.costMembers) return `${HITMAN.costMembers} Members required`;
+		if (player.strikeCooldown > 0) return `cooldown ${Math.ceil(player.strikeCooldown / SIM_HZ)} s`;
+		if (world.pendingStrikes().some((strike) => strike.factionId === player.id)) {
+			return "strike already in flight";
+		}
+		if (player.cleanCash < STRIKE.costClean) return `${STRIKE.costClean} Clean cash required`;
+		if (player.members < STRIKE.costMembers) return `${STRIKE.costMembers} Members required`;
 		return null;
 	}, [selected, world, player]);
 
@@ -298,18 +300,6 @@ function App() {
 		const cost = world.bustCost();
 		if (player.dirtyCash < cost.sale) return `${cost.sale} dirty required`;
 		if (player.members < cost.members) return `${cost.members} Members required`;
-		return null;
-	}, [selected, world, player]);
-
-	const sabotageReason = useCallback((): string | null => {
-		if (selected === null) return "no target";
-		if (world.ownerAt(selected) === player.id) return "already yours";
-		if (world.ownerAt(selected) === NEUTRAL) return "neutral target";
-		if (!world.canAttack(player.id, selected)) return "not adjacent";
-		if (!world.buildingAt(selected)) return "no building";
-		if (player.tech.armament < 2) return "Armament ≥ 2 required";
-		if (player.sabotageCooldown > 0) return `cooldown ${Math.ceil(player.sabotageCooldown / SIM_HZ)} s`;
-		if (player.dirtyCash < world.sabotageCost()) return `${world.sabotageCost()} dirty required`;
 		return null;
 	}, [selected, world, player]);
 
@@ -359,16 +349,16 @@ function App() {
 			if (event.code === "KeyT") {
 				event.preventDefault();
 				if (selected === null) {
-					setNotice("Hitman: select an enemy quarter first.");
+					setNotice("Strike: select an enemy quarter first.");
 					return;
 				}
-				if (world.playerHitman(selected)) setVersion((value) => value + 1);
-				else setNotice(`Hitman: ${hitmanReason() ?? "impossible"}.`);
+				if (world.playerStrike(selected)) setVersion((value) => value + 1);
+				else setNotice(`Strike: ${strikeReason() ?? "impossible"}.`);
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [act, selected, world, hitmanReason]);
+	}, [act, selected, world, strikeReason]);
 
 	/** Starts a game on the real map (Paris IRIS). */
 	const startParis = () => {
@@ -583,6 +573,7 @@ function App() {
 					territory={world.territory}
 					attacks={world.attacks}
 					convoys={world.convoyRoutes()}
+					strikes={world.pendingStrikes()}
 					heat={world.heat}
 					tick={world.tick}
 					selected={selected}
@@ -1024,23 +1015,6 @@ function App() {
 											}
 										},
 									});
-									const SabotageIcon = ACTION_ICONS.sabotage;
-									actions.push({
-										key: "sabotage",
-										icon: SabotageIcon,
-										label: `${world.sabotageCost()}`,
-										title:
-											sabotageReason() ??
-											`Sabotage: production ÷2 for 30 s${selected !== null && world.guardsAt(selected) >= 1 ? ` · ${world.guardsAt(selected)} watcher(s) — sabotage FOILED` : ""}`,
-										disabled: sabotageReason() !== null,
-										run: () => {
-											if (selected !== null && world.playerSabotage(selected)) {
-												setVersion((value) => value + 1);
-											} else {
-												setNotice(`Sabotage: ${sabotageReason() ?? "impossible"}.`);
-											}
-										},
-									});
 									const InterceptIcon = ACTION_ICONS.intercept;
 									actions.push({
 										key: "intercept",
@@ -1060,19 +1034,21 @@ function App() {
 									});
 								}
 								if (selectedOwner !== player.id) {
-									const HitmanIcon = ACTION_ICONS.hitman;
+									const StrikeIcon = ACTION_ICONS.strike;
 									actions.push({
-										key: "hitman",
-										icon: HitmanIcon,
+										key: "strike",
+										icon: StrikeIcon,
 										label: "T",
 										hotkey: "T",
-										title: hitmanReason() ?? "Hitman: weakens a quarter (Armament ≥ 2)",
-										disabled: hitmanReason() !== null,
+										title:
+											strikeReason() ??
+											`Heavy strike: telegraphed area strike, lands in ${STRIKE.delayTicks / SIM_HZ}s (Armament ≥ ${STRIKE.requiredArmament})`,
+										disabled: strikeReason() !== null,
 										run: () => {
-											if (selected !== null && world.playerHitman(selected)) {
+											if (selected !== null && world.playerStrike(selected)) {
 												setVersion((value) => value + 1);
 											} else {
-												setNotice(`Hitman: ${hitmanReason() ?? "impossible"}.`);
+												setNotice(`Strike: ${strikeReason() ?? "impossible"}.`);
 											}
 										},
 									});
@@ -1390,7 +1366,7 @@ function App() {
 					</section>
 					<div className="bottom-controls">
 						<p className="hud-keys">
-							<kbd>click</kbd> select · <kbd>Q</kbd> attack / build · <kbd>T</kbd> hitman ·
+							<kbd>click</kbd> select · <kbd>Q</kbd> attack / build · <kbd>T</kbd> strike ·
 							drag = camera
 						</p>
 						<div className="hud-actions">
@@ -1544,7 +1520,7 @@ function App() {
 							Pressure and cools your quarters.
 						</p>
 						<p className="help-keys">
-							<kbd>click</kbd> select · <kbd>Q</kbd> attack / build · <kbd>T</kbd> hitman ·
+							<kbd>click</kbd> select · <kbd>Q</kbd> attack / build · <kbd>T</kbd> strike ·
 							drag = camera
 						</p>
 						<button type="button" onClick={() => setShowHelp(false)}>

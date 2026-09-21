@@ -17,9 +17,8 @@ export type Intent =
 	| { type: "batchBuild" }
 	| { type: "raid"; module: number }
 	| { type: "bust"; module: number }
-	| { type: "sabotage"; module: number }
 	| { type: "intercept"; module: number }
-	| { type: "hitman"; module: number }
+	| { type: "strike"; module: number }
 	| { type: "corrupt" }
 	| { type: "upgradeTech"; branch: TechBranch }
 	| { type: "proposePact"; faction: number }
@@ -63,12 +62,10 @@ export function applyIntent(world: World, factionId: number, intent: Intent): In
 			return ok(world.playerRaid(intent.module), "raid impossible");
 		case "bust":
 			return ok(world.playerBust(intent.module), "bust impossible");
-		case "sabotage":
-			return ok(world.playerSabotage(intent.module), "sabotage impossible");
 		case "intercept":
 			return ok(world.playerIntercept(intent.module), "interception impossible");
-		case "hitman":
-			return ok(world.playerHitman(intent.module), "hitman impossible");
+		case "strike":
+			return ok(world.playerStrike(intent.module), "strike impossible");
 		case "corrupt":
 			return ok(world.playerCorrupt(), "corruption impossible");
 		case "upgradeTech":
@@ -116,9 +113,8 @@ export const INTENT_CATALOG: readonly { type: Intent["type"]; doc: string }[] = 
 	{ type: "batchBuild", doc: "Automatically develop empty quarters." },
 	{ type: "raid", doc: "Raid: destroys a target's control and building." },
 	{ type: "bust", doc: "Bust: steals the loot from an enemy building." },
-	{ type: "sabotage", doc: "Sabotage: production ÷2 for 30 s." },
 	{ type: "intercept", doc: "Interception: steals a convoy and cuts the line." },
-	{ type: "hitman", doc: "Hitman: weakens a quarter and its neighbors." },
+	{ type: "strike", doc: "Heavy strike: telegraphed area strike (buildings + neighbours)." },
 	{ type: "corrupt", doc: "Bribe the police: lowers Pressure." },
 	{ type: "upgradeTech", doc: "Research a tier (armament/protection/logistics)." },
 	{ type: "proposePact", doc: "Propose a pact (faction)." },

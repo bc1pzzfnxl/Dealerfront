@@ -30,18 +30,23 @@ export function techCost(nextLevel: number): number {
 	return TECH.costPerLevel * nextLevel;
 }
 
-/** Hitman (unlocked by Armament ≥ 2). */
-export const HITMAN = {
+/**
+ * Heavy strike (unlocked by Armament ≥ 2): an expensive, **telegraphed** area
+ * strike. Everyone sees it coming for `delayTicks`, so it is a threat you can
+ * brace for, not a surprise — Counter-intel can blunt it.
+ */
+export const STRIKE = {
 	requiredArmament: 2,
-	costClean: 3000,
-	costMembers: 1000,
-	/** Control damage to the targeted quarter. */
-	damageCenter: 40,
-	/** Control damage to adjacent quarters. */
-	damageSplash: 20,
+	costClean: 12000,
+	costMembers: 1500,
+	/** Warning before impact (ticks, 10 Hz). */
+	delayTicks: 50,
 	/** Cooldown (ticks). */
-	cooldownTicks: 100,
+	cooldownTicks: 900,
+	/** Control damage at the epicenter / on the neighbouring quarters. */
+	damageCenter: 55,
+	damageSplash: 25,
 	/** Damage reduction per defender Counter-intel (capped). */
-	counterReductionPerUnit: 0.15,
-	counterReductionMax: 0.6,
+	counterReductionPerUnit: 0.25,
+	counterReductionMax: 0.7,
 } as const;

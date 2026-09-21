@@ -7,7 +7,6 @@ import {
 	FlaskConical,
 	HandCoins,
 	Landmark,
-	Paintbrush,
 	Shield,
 	Skull,
 	Store,
@@ -82,9 +81,8 @@ export const ACTION_ICONS = {
 	attack: Zap,
 	raid: Skull,
 	bust: HandCoins,
-	sabotage: Paintbrush,
 	intercept: Truck,
-	hitman: Skull,
+	strike: Skull,
 	batch: Boxes,
 	buy: Coins,
 } as const;

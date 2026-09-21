@@ -7,6 +7,7 @@ import { BUILDING_INDEX, type BuildingType } from "../src/sim/buildings";
 import { NEUTRAL } from "../src/sim/territory";
 import { createRng } from "../src/sim/rng";
 import { playOut } from "../src/sim/bot";
+import { STRIKE } from "../src/sim/tech";
 import { World } from "../src/sim/world";
 
 const results: string[] = [];
@@ -124,14 +125,13 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 	world.territory.building[target] = BUILDING_INDEX.storefront;
 	world.factions[1]!.dirtyCash = 5000;
 	ownAdjacentTo(world, world.player.id, target);
-	// Bust and sabotage require a building: play them BEFORE the raid (which destroys it).
+	// Bust requires a building: play it BEFORE the raid (which destroys it).
 	const bust = world.playerCanBust(target) && world.playerBust(target);
-	const sabotage = world.playerCanSabotage(target) && world.playerSabotage(target);
 	const raid = world.playerCanRaid(target) && world.playerRaid(target);
-	check("bust / sabotage / raid", bust && sabotage && raid, `bust=${bust} sabotage=${sabotage} raid=${raid}`);
+	check("bust / raid", bust && raid, `bust=${bust} raid=${raid}`);
 }
 
-// ---------- 6. Hitman ----------
+// ---------- 6. Heavy strike ----------
 {
 	const world = new World(1);
 	boost(world);
@@ -140,8 +140,15 @@ function boost(world: World, clean = 1e6, sale = 1e6, members = 1e6): void {
 	world.territory.owner[target] = 1;
 	world.territory.control[target] = 90;
 	ownAdjacentTo(world, world.player.id, target);
-	const ok = world.playerCanHitman(target) && world.playerHitman(target);
-	check("hitman", ok, `target control ${Math.round(world.controlAt(target))}`);
+	const launched = world.playerCanStrike(target) && world.playerStrike(target);
+	// Telegraphed: it must be visible in flight before it lands.
+	const inFlight = world.pendingStrikes().length === 1;
+	for (let i = 0; i < STRIKE.delayTicks; i += 1) world.step();
+	check(
+		"heavy strike",
+		launched && inFlight && world.controlAt(target) < 90,
+		`telegraphed, control ${Math.round(world.controlAt(target))}`,
+	);
 }
 
 // ---------- 7. Police corruption ----------

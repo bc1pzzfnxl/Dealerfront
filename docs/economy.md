@@ -121,7 +121,7 @@ The generated city contains "neutral" buildings (apartments, shops, warehouses, 
 
 **Dirty** and **clean** cash are not just scores: they **buy the war**.
 
-- **Watcher wages** (`GUARD_UPKEEP = 1.5` dirty/tick per Watcher): intel costs money. **Unpaid** watchers = **blind** (no bust alert, no counter-sabotage, no hitman reduction). A poor cartel is deaf.
+- **Watcher wages** (`GUARD_UPKEEP = 1.5` dirty/tick per Watcher): intel costs money. **Unpaid** watchers = **blind** (no bust alert, no strike reduction). A poor cartel is deaf.
 - **Armament stockpile** (`ARMAMENT`): buying armament with **Clean cash** gives `+20%` attack for **40 s**, stackable up to **×6**, **increasing** cost (`3000 × 1.5^n`) — a permanent sink. You invest before an offensive: money decides the military tempo.
 - **Upkeep** (`BUILDING_UPKEEP`): each building costs **Dirty cash/tick** (Housing 0.5; Lab/Storefront/Safehouse/Depot 1; Front/Watcher 1.5; Workshop 2). If it is not covered, `upkeepPaid = false` → **production ×0.5** (`UNPAID_UPKEEP_FACTOR`) and **blind watchers**. Big empires are expensive to run.
 - **Mercenaries** (`MERC`): **Dirty cash → Members** immediately (`+400`), increasing cost (`4000 × 1.4^n`), capped by the Members cap. *(Exception to the "Members cannot be bought" pillar: it is a war lever, bounded by the cap.)*
@@ -166,7 +166,7 @@ The generated city contains "neutral" buildings (apartments, shops, warehouses, 
 ## Edge cases
 
 - **Building destroyed by a raid**: the building is **destroyed** (slot freed), not refunded; any collateral damage is logged (`scoring.md`). A retaken quarter can be reconverted.
-- **Quarter lost with buildings on it**: by default the buildings **change owner with the quarter** (the conqueror inherits the infrastructure); only a **sabotage/raid** action destroys them. Decision to confirm in `combat.md`.
+- **Quarter lost with buildings on it**: by default the buildings **change owner with the quarter** (the conqueror inherits the infrastructure); only a **raid** or a **heavy strike** destroys them. Decision to confirm in `combat.md`.
 - **Bankruptcy**: no more Dirty cash, Clean cash or Product → no building buildable; **Members keep regenerating** (escape route: conquering rich quarters or forced selling), never a total lock.
 - **Stored Product capped**: the Product stock per faction is bounded (e.g. `10,000 × N_depots + base`), to avoid infinite accumulation and force outflow through Storefronts.
 - **Conversion during a quarter loss**: the conversion is canceled, the paid cost is **partially refunded** (to balance); the source building returns to its neutral state.
@@ -240,7 +240,7 @@ The generated city contains "neutral" buildings (apartments, shops, warehouses, 
 | **Safehouse** | 1,200 dirty | local defense ×1.5 |
 | **Depot** | 1,200 dirty | +2,000 max Members |
 | **Workshop** | 2,500 clean | +1 tech level unlocked (max 5) |
-| **Counter-intel** | 2,000 clean | −15% hitman damage (cap −60%) |
+| **Counter-intel** | 2,000 clean | −25% strike damage (cap −70%) |
 
 ### Member formulas
 
@@ -302,7 +302,7 @@ An owned and **empty** quarter can only be converted to types **compatible with 
 
 - **Conversion** (**built** zone: residential, commercial, nightlife, industrial, laundromat, park, police): **instant**, cost **−50%**.
 - **New construction** (vacant lot): **full cost** + **build site** (`BUILD_TICKS` ≈ 3–8 s depending on type, 10 Hz).
-- **Build site**: paid on order, **parallel** (one per quarter), **lost** if the quarter is captured or the building destroyed (police raid, hitman). The quarter produces nothing during the work.
+- **Build site**: paid on order, **parallel** (one per quarter), **lost** if the quarter is captured or the building destroyed (police raid, heavy strike). The quarter produces nothing during the work.
 - Rendering: **reduced amber** block on the map; Quarter panel → "Build site: X — N s left".
 
 ### Controlled laundering (P13)

@@ -26,10 +26,14 @@ interface ArenaState {
 	phase: ArenaPhase;
 	ownerToken: string;
 	agents: AgentInfo[];
+	/** Total factions in play (agents + AI bots). */
+	factionCount: number;
 }
 
 const MAX_AGENTS = 4;
-const MIN_AGENTS = 2;
+const MIN_AGENTS = 1;
+/** Hard cap: the faction name palette has 6 entries. */
+const MAX_FACTIONS = 6;
 
 export class Arena extends DurableObject<Env> {
 	private arena: ArenaState | null = null;
@@ -44,7 +48,7 @@ export class Arena extends DurableObject<Env> {
 		this.arena = stored;
 		const snapshot = await this.ctx.storage.get<WorldSnapshot>("world");
 		const world = new World(stored.seed, {
-			factionCount: stored.agents.length,
+			factionCount: stored.factionCount ?? stored.agents.length,
 			controlled: stored.agents.map((agent) => agent.factionId),
 		});
 		if (snapshot) world.applySnapshot(snapshot);
@@ -102,6 +106,8 @@ export class Arena extends DurableObject<Env> {
 	/** Creates the arena (called by the Worker). */
 	private async create(id: string, config: ArenaConfig): Promise<CreateResponse> {
 		const count = Math.max(MIN_AGENTS, Math.min(MAX_AGENTS, Math.floor(config.agents)));
+		const bots = Math.max(0, Math.min(MAX_FACTIONS - count, Math.floor(config.bots ?? 0)));
+		const factionCount = count + bots;
 		const seed = config.seed ?? Math.floor(Math.random() * 2 ** 31);
 		const names = ["Cartel", "Northside Gang", "Eastside Gang", "Southside Gang"];
 		const agents: AgentInfo[] = Array.from({ length: count }, (_, index) => ({
@@ -118,9 +124,12 @@ export class Arena extends DurableObject<Env> {
 			phase: "playing",
 			ownerToken: crypto.randomUUID(),
 			agents,
+			factionCount,
 		};
+		// Only the agents are `controlled`: the bots are left to the AI, so the
+		// simulation drives them while the agents wait for their turn.
 		this.world = new World(seed, {
-			factionCount: count,
+			factionCount,
 			controlled: agents.map((agent) => agent.factionId),
 		});
 		this.result = null;

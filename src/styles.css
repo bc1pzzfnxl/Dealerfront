@@ -59,6 +59,40 @@ body {
 	gap: 0.35rem;
 }
 
+/* Heavy strike telegraph: the whole world sees it coming. */
+.strike-rings {
+	position: absolute;
+	inset: 0;
+	z-index: 4;
+	pointer-events: none;
+	overflow: hidden;
+}
+
+.strike-ring {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 2.4rem;
+	height: 2.4rem;
+	border: 2px solid #ff5b5b;
+	border-radius: 50%;
+	box-shadow: 0 0 0 2px rgba(255, 91, 91, 0.25) inset;
+	animation: strike-ping 0.9s ease-out infinite;
+	transition: transform 130ms linear;
+}
+
+@keyframes strike-ping {
+	0% {
+		opacity: 0.35;
+	}
+	50% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0.35;
+	}
+}
+
 /* Front labels: "attacker vs defender" pinned to contested quarters. */
 .front-labels {
 	position: absolute;

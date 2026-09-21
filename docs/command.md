@@ -25,7 +25,7 @@ Define **how the player commands from afar**: quarter selection, faction orders,
 | **Research (tech)** | Global (via Workshop) | Upgrades a branch (Armament/Protection/Logistics) — `tech.md` |
 | **Corrupt** | Global | Spends to reduce police Pressure — `police-ai.md` |
 | **Diplomacy** | Faction | Propose a pact, embargo — `factions.md` |
-| **Hitman** | Enemy quarter | Targeted assassination (if tech) — `combat.md` |
+| **Heavy strike** | Enemy quarter | Telegraphed area strike (if tech) — `combat.md` |
 
 ### Planning
 

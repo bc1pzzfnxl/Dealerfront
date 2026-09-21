@@ -26,11 +26,11 @@ import {
 	zoneBuildBonus,
 	zoneTimeFactor,
 } from "./buildings";
-import { START_HOUR, TICKS_PER_HOUR } from "./constants";
+import { SIM_HZ, START_HOUR, TICKS_PER_HOUR } from "./constants";
 import { PARIS_CENTROIDS, PARIS_MAP } from "./maps/paris";
 import { createRng, type Rng } from "./rng";
 import { createFactions, FACTION_COUNT, type Faction } from "./factions";
-import { HITMAN, TECH, TECH_BRANCHES, type TechBranch, techCost } from "./tech";
+import { STRIKE, TECH, TECH_BRANCHES, type TechBranch, techCost } from "./tech";
 import { CONTACT_NAMES, POLICE, policeTier, type PoliceState, type PoliceTier } from "./police";
 import {
 	DIPLOMACY,
@@ -48,7 +48,6 @@ const NEUTRAL_GARRISON = 60;
 const CAPTURE_CONTROL = 30;
 const START_MEMBERS = 3000;
 const COMMIT_RATIO = 0.2;
-const DAMAGE_PER_TROOP = 0.0004;
 /** Damage cap per tick: prevents instant captures (sieges required). */
 const MAX_DAMAGE_PER_TICK = 5;
 const ATTACK_LOSS = 8;
@@ -102,7 +101,6 @@ const BUY = {
 } as const;
 const CONTROL_REGEN = 1.2;
 /** Max simultaneous assaults per faction: no "click everywhere". */
-const MAX_ASSAULTS = 3;
 /** Troop movement before the siege (ticks). */
 export const TRAVEL_TICKS = 12;
 /** Simultaneous build crews per faction. */
@@ -112,14 +110,8 @@ const BUILD_CREWS = 2;
 const LOOT_RATIO = 0.2;
 /** Bust: heist to steal loot without destroying (gated by Armament). */
 const BUST = { costSale: 2000, costMembers: 600, requiredArmament: 1, cooldownTicks: 250 } as const;
-/** Sabotage: a building's production halved for N ticks (gated by Armament). */
-const SABOTAGE = {
-	costSale: 1500,
-	requiredArmament: 2,
-	duration: 300,
-	cooldownTicks: 250,
-	factor: 0.5,
-} as const;
+/** Share of its army an AI is willing to leave on the field at once. */
+const AI_MAX_COMMIT = 0.5;
 const AI_INTERVAL = 25;
 const MIN_COMMIT = 400;
 /** Raid: weakens an adjacent quarter without capturing it. */
@@ -147,7 +139,6 @@ const CONVOY_TRANSIT_TICKS = 60;
 const INTERCEPT = {
 	costMembers: 500,
 	requiredArmament: 1,
-	disruptTicks: 250,
 	cooldownTicks: 300,
 } as const;
 /**
@@ -157,7 +148,7 @@ const INTERCEPT = {
  */
 const HEAT = {
 	capture: 30,
-	hitman: 20,
+	strike: 20,
 	operation: 15,
 	storefront: 0.15,
 	front: 0.08,
@@ -260,11 +251,11 @@ export interface WorldSnapshot {
 		pending: number[];
 		builtAt: number[];
 		capturedAt: number[];
-		sabotageUntil: number[];
 	};
 	factions: Faction[];
 	/** Cargo on the road — must survive a snapshot round-trip. */
 	convoys: ConvoyRoute[];
+	strikes: Strike[];
 	attacks: Attack[];
 	pacts: Pact[];
 	offers: PactOffer[];
@@ -343,6 +334,16 @@ export interface Attack {
 	initialTroops: number;
 }
 
+/**
+ * Heavy strike in flight: paid for at launch, lands at `landsAt`. Visible to
+ * everyone in between, which is what makes it a threat rather than a surprise.
+ */
+export interface Strike {
+	factionId: number;
+	target: number;
+	landsAt: number;
+}
+
 export type Outcome = null | "victory" | "defeat";
 
 /** Floating text (juice) anchored to a quarter, ephemeral. */
@@ -359,7 +360,7 @@ export type GameEvent =
 	| "capture"
 	| "lost"
 	| "raid"
-	| "hitman"
+	| "strike"
 	| "tech"
 	| "pact"
 	| "betray"
@@ -367,7 +368,6 @@ export type GameEvent =
 	| "corrupt"
 	| "build"
 	| "bust"
-	| "sabotage"
 	| "intercept"
 	| "event"
 	| "alert"
@@ -379,6 +379,8 @@ export class World {
 	readonly territory: Territory;
 	readonly factions: Faction[];
 	readonly attacks: Attack[] = [];
+	/** Heavy strikes in flight (telegraphed). */
+	readonly strikes: Strike[] = [];
 	readonly log: string[] = [];
 	readonly police: PoliceState = {
 		pressure: 0,
@@ -417,8 +419,6 @@ export class World {
 	private counts: Array<Record<BuildingType, number>> = [];
 	/** Quarters owned per faction (recomputed once per tick). */
 	private owned: number[] = [];
-	/** Sabotaged buildings per faction (recomputed once per tick). */
-	private sabotaged: Array<Record<BuildingType, number>> = [];
 	/** Local sums weighted by quarter profile (recomputed per tick). */
 	private recruitDemand: number[] = [];
 	private housingDemand: number[] = [];
@@ -486,7 +486,6 @@ export class World {
 		);
 		this.proposalCooldown = this.factions.map(() => this.factions.map(() => 0));
 		this.counts = this.factions.map(() => emptyCounts());
-		this.sabotaged = this.factions.map(() => emptyCounts());
 		this.owned = this.factions.map(() => 0);
 		this.recruitDemand = this.factions.map(() => 0);
 		this.housingDemand = this.factions.map(() => 0);
@@ -532,13 +531,13 @@ export class World {
 				pending: Array.from(this.territory.pending),
 				builtAt: Array.from(this.territory.builtAt),
 				capturedAt: Array.from(this.territory.capturedAt),
-				sabotageUntil: Array.from(this.territory.sabotageUntil),
-			},
+				},
 			factions: this.factions.map((faction) => ({
 				...faction,
 				tech: { ...faction.tech },
 			})),
 			convoys: this.convoys.map((route) => ({ ...route })),
+			strikes: this.strikes.map((strike) => ({ ...strike })),
 			attacks: this.attacks.map((attack) => ({ ...attack })),
 			pacts: this.pacts.map((pact) => ({ ...pact })),
 			offers: this.offers.map((offer) => ({ ...offer })),
@@ -570,11 +569,12 @@ export class World {
 		this.territory.pending.set(snap.territory.pending);
 		this.territory.builtAt.set(snap.territory.builtAt);
 		this.territory.capturedAt.set(snap.territory.capturedAt);
-		this.territory.sabotageUntil.set(snap.territory.sabotageUntil);
 		for (let i = 0; i < this.factions.length && i < snap.factions.length; i += 1) {
 			const source = snap.factions[i]!;
 			Object.assign(this.factions[i]!, source, { tech: { ...source.tech } });
 		}
+		this.strikes.length = 0;
+		this.strikes.push(...(snap.strikes ?? []).map((strike) => ({ ...strike })));
 		this.attacks.length = 0;
 		this.attacks.push(...snap.attacks.map((attack) => ({ ...attack })));
 		this.pacts.length = 0;
@@ -683,7 +683,7 @@ export class World {
 		const faction = this.factions[factionId]!;
 		const ownedDemand = this.recruitDemand[factionId] ?? 0;
 		const housingDemand =
-			(this.housingDemand[factionId] ?? 0) * this.sabotageFactor(factionId, "housing");
+			this.housingDemand[factionId] ?? 0;
 		const max = this.maxMembers(factionId);
 		if (faction.members >= max) return 0;
 		const logistics = 1 + TECH.logisticsProduction * faction.tech.logistics;
@@ -900,47 +900,68 @@ export class World {
 		return this.upgradeTech(this.player.id, branch);
 	}
 
-	canHitman(factionId: number, module: number): boolean {
+	canStrike(factionId: number, module: number): boolean {
 		if (this.outcome !== null) return false;
 		const owner = this.territory.owner[module];
 		if (owner === factionId || owner === NEUTRAL) return false;
 		const faction = this.factions[factionId]!;
-		if (faction.tech.armament < HITMAN.requiredArmament) return false;
-		if (faction.hitmanCooldown > 0) return false;
-		return faction.cleanCash >= HITMAN.costClean && faction.members >= HITMAN.costMembers;
+		if (faction.tech.armament < STRIKE.requiredArmament) return false;
+		if (faction.strikeCooldown > 0) return false;
+		if (this.strikes.some((strike) => strike.factionId === factionId)) return false;
+		return faction.cleanCash >= STRIKE.costClean && faction.members >= STRIKE.costMembers;
 	}
 
-	playerCanHitman(module: number): boolean {
-		return this.canHitman(this.player.id, module);
+	playerCanStrike(module: number): boolean {
+		return this.canStrike(this.player.id, module);
 	}
 
-	/** Hitman: weakens an enemy quarter and its neighbors (does not capture). */
-	playerHitman(module: number): boolean {
-		if (!this.canHitman(this.player.id, module)) return false;
-		this.player.hitmanCooldown = HITMAN.cooldownTicks;
-		this.events.push("hitman");
-		this.payHitman(this.player.id);
-		this.applyHitman(this.player.id, module);
-		this.pushLog(`Hitman sent (module ${module})`);
+	/**
+	 * Heavy strike: pays now, lands `STRIKE.delayTicks` later. The delay is the
+	 * whole point — everyone sees the target ring and can brace for it, so it is
+	 * a threat you play around, not a surprise (OpenFront's nuke telegraph).
+	 */
+	playerStrike(module: number): boolean {
+		if (!this.canStrike(this.player.id, module)) return false;
+		this.launchStrike(this.player.id, module);
+		this.events.push("strike");
+		this.float(module, `💥 strike in ${STRIKE.delayTicks / SIM_HZ}s`, "loss");
+		this.pushLog(`Strike inbound (module ${module}) — ${STRIKE.delayTicks / SIM_HZ}s`);
 		return true;
 	}
 
-	private payHitman(factionId: number): void {
+	private launchStrike(factionId: number, module: number): void {
 		const faction = this.factions[factionId]!;
-		faction.cleanCash -= HITMAN.costClean;
-		faction.members -= HITMAN.costMembers;
+		faction.cleanCash -= STRIKE.costClean;
+		faction.members -= STRIKE.costMembers;
+		faction.strikeCooldown = STRIKE.cooldownTicks;
+		this.strikes.push({ factionId, target: module, landsAt: this.tick + STRIKE.delayTicks });
 	}
 
-	private applyHitman(factionId: number, module: number): void {
+	/** Pending strikes waiting for their impact tick (telegraphed). */
+	pendingStrikes(): readonly Strike[] {
+		return this.strikes;
+	}
+
+	private resolveStrikes(): void {
+		for (let index = this.strikes.length - 1; index >= 0; index -= 1) {
+			const strike = this.strikes[index]!;
+			if (strike.landsAt > this.tick) continue;
+			this.strikes.splice(index, 1);
+			this.applyStrike(strike);
+		}
+	}
+
+	private applyStrike(strike: Strike): void {
+		const { factionId, target: module } = strike;
 		const targets = [module, ...this.neighbors(module)];
 		for (const target of targets) {
 			const owner = this.territory.owner[target];
 			if (owner === factionId || owner === NEUTRAL) continue;
 			const reduction = Math.min(
-				HITMAN.counterReductionMax,
-				this.buildingCount(owner, "counter") * HITMAN.counterReductionPerUnit,
+				STRIKE.counterReductionMax,
+				this.buildingCount(owner, "counter") * STRIKE.counterReductionPerUnit,
 			);
-			const base = target === module ? HITMAN.damageCenter : HITMAN.damageSplash;
+			const base = target === module ? STRIKE.damageCenter : STRIKE.damageSplash;
 			this.territory.control[target] = Math.max(
 				5,
 				this.territory.control[target]! - base * (1 - reduction),
@@ -950,8 +971,13 @@ export class World {
 				this.recount();
 			}
 			this.cancelConstruction(target);
-			this.addHeat(target, HEAT.hitman);
+			this.addHeat(target, HEAT.strike);
 		}
+		if (this.territory.owner[module] === this.player.id) {
+			this.events.push("alert");
+			this.float(module, "💥 strike hit", "loss");
+		}
+		this.pushLog(`Strike impact (module ${module})`);
 	}
 
 	/** Faction with the most quarters (the "leader"), -1 if none. */
@@ -1504,7 +1530,7 @@ export class World {
 		this.cancelConstruction(module);
 		this.addHeat(module, HEAT.operation);
 		this.recount();
-		this.events.push("hitman");
+		this.events.push("raid");
 		this.float(module, `raid −${RAID.control}`, "loss");
 		this.pushLog(`Raid on module ${module}`);
 		return true;
@@ -1605,41 +1631,6 @@ export class World {
 		return true;
 	}
 
-	sabotageCost(): number {
-		return SABOTAGE.costSale;
-	}
-
-	playerCanSabotage(module: number): boolean {
-		if (this.outcome !== null) return false;
-		if (!this.canAttack(this.player.id, module)) return false;
-		const owner = this.ownerAt(module);
-		if (owner === NEUTRAL || owner === this.player.id) return false;
-		if (!this.buildingAt(module)) return false;
-		if (this.player.tech.armament < SABOTAGE.requiredArmament) return false;
-		if (this.territory.sabotageUntil[module]! > this.tick) return false;
-		if (this.player.sabotageCooldown > 0) return false;
-		return this.player.dirtyCash >= SABOTAGE.costSale;
-	}
-
-	/** Sabotage: halves an enemy building's production for a time. */
-	playerSabotage(module: number): boolean {
-		if (!this.playerCanSabotage(module)) return false;
-		const owner = this.ownerAt(module);
-		this.player.dirtyCash -= SABOTAGE.costSale;
-		this.player.sabotageCooldown = SABOTAGE.cooldownTicks;
-		if (this.guardedBy(owner, module) >= 1) {
-			this.pushLog(`Sabotage foiled (watchers, module ${module})`);
-			this.events.push("alert");
-			return true;
-		}
-		this.territory.sabotageUntil[module] = this.tick + SABOTAGE.duration;
-		this.addHeat(module, HEAT.operation);
-		this.events.push("sabotage");
-		this.float(module, "sabotaged −50%", "loss");
-		this.pushLog(`Sabotage (module ${module})`);
-		return true;
-	}
-
 	/** Convoy heading to this quarter (interception target), if any. */
 	private convoyTo(module: number): ConvoyRoute | undefined {
 		return this.convoys.find((route) => route.to === module);
@@ -1669,7 +1660,6 @@ export class World {
 		this.player.members -= INTERCEPT.costMembers;
 		this.player.interceptCooldown = INTERCEPT.cooldownTicks;
 		const gained = this.takeCargo(this.player, route);
-		this.territory.sabotageUntil[module] = this.tick + INTERCEPT.disruptTicks;
 		this.addHeat(module, HEAT.operation);
 		this.events.push("intercept");
 		this.float(module, `interception +${Math.round(gained)}`, "gain");
@@ -1803,14 +1793,6 @@ export class World {
 		this.pending = pool[Math.floor(this.rng() * pool.length)]!;
 	}
 
-	/** Production factor of a faction (sabotaged buildings = half). */
-	private sabotageFactor(factionId: number, type: BuildingType): number {
-		const total = this.buildingCount(factionId, type);
-		const hit = this.sabotaged[factionId]?.[type] ?? 0;
-		if (total === 0) return 0;
-		return (total - hit * (1 - SABOTAGE.factor)) / total;
-	}
-
 	/** Loot: transfers a share of the destroyed building's value to the attacker. */
 	private loot(attackerId: number, victimId: number, type: BuildingType, ratio = LOOT_RATIO): { sale: number; clean: number; members: number } {
 		const spec = BUILDINGS[type];
@@ -1917,10 +1899,6 @@ export class World {
 	}
 
 	/** Number of simultaneous assaults allowed per faction. */
-	maxAssaults(): number {
-		return MAX_ASSAULTS;
-	}
-
 	commitRatio(): number {
 		return this.player.attackRatio;
 	}
@@ -2037,10 +2015,8 @@ export class World {
 
 	private attackFrom(factionId: number, module: number): boolean {
 		const faction = this.factions[factionId]!;
-		// No more than N simultaneous assaults: you must choose your fronts.
-		if (this.attacks.filter((attack) => attack.factionId === factionId).length >= MAX_ASSAULTS) {
-			return false;
-		}
+		// No cap on simultaneous assaults: the **global troop pool** is the limit.
+		// Every front you open drains your own army (and the defender's).
 		const troops = Math.floor(faction.members * faction.attackRatio);
 		if (troops < MIN_COMMIT) return false;
 		// Origin = owned quarter adjacent with the highest control.
@@ -2088,10 +2064,9 @@ export class World {
 		this.tick += 1;
 		this.recount();
 		for (const faction of this.factions) {
-			if (faction.hitmanCooldown > 0) faction.hitmanCooldown -= 1;
+			if (faction.strikeCooldown > 0) faction.strikeCooldown -= 1;
 			if (faction.raidCooldown > 0) faction.raidCooldown -= 1;
 			if (faction.bustCooldown > 0) faction.bustCooldown -= 1;
-			if (faction.sabotageCooldown > 0) faction.sabotageCooldown -= 1;
 			if (faction.interceptCooldown > 0) faction.interceptCooldown -= 1;
 			if (faction.buyCooldown > 0) faction.buyCooldown -= 1;
 		}
@@ -2103,6 +2078,7 @@ export class World {
 		this.regenerateControl();
 		this.advanceConstruction();
 		this.resolveAttacks();
+		this.resolveStrikes();
 		this.resolveEncirclements();
 		this.updateDiplomacyTimers();
 		this.think();
@@ -2128,10 +2104,7 @@ export class World {
 				max,
 				faction.members + Math.max(0, this.productionPerTick(faction.id)),
 			);
-			const labs =
-				(this.labWeight[faction.id] ?? 0) *
-				this.sabotageFactor(faction.id, "lab") *
-				this.upkeepFactor(faction.id);
+			const labs = (this.labWeight[faction.id] ?? 0) * this.upkeepFactor(faction.id);
 			if (labs > 0) faction.productInTransit += labs * BUILDING_EFFECTS.productPerLab;
 		}
 	}
@@ -2141,8 +2114,7 @@ export class World {
 		for (const faction of this.factions) {
 			const demand = this.retailDemand[faction.id] ?? 0;
 			const supply = SUPPLY_FLOOR + (1 - SUPPLY_FLOOR) * (this.retailSupply[faction.id] ?? 1);
-			const storefronts =
-				demand * supply * this.sabotageFactor(faction.id, "storefront") * this.upkeepFactor(faction.id);
+			const storefronts = demand * supply * this.upkeepFactor(faction.id);
 			if (storefronts === 0) continue;
 			const capacity = storefronts * BUILDING_EFFECTS.productPerStorefront;
 			// In-house product first; the rest comes from an external supplier.
@@ -2162,7 +2134,6 @@ export class World {
 			const fronts =
 				(this.launderWealth[faction.id] ?? 0) *
 				(SUPPLY_FLOOR + (1 - SUPPLY_FLOOR) * (this.launderSupply[faction.id] ?? 1)) *
-				this.sabotageFactor(faction.id, "front") *
 				this.upkeepFactor(faction.id);
 			if (fronts === 0 || faction.dirtyCash <= 0 || faction.launderRatio <= 0) continue;
 			const capacity = fronts * BUILDING_EFFECTS.cashPerFront * faction.launderRatio;
@@ -2309,6 +2280,19 @@ export class World {
 	}
 
 	/**
+	 * Share of a faction's army currently out on the field (0–1). Committing
+	 * everything leaves the homeland empty: the pool is also your defense.
+	 */
+	committedShare(factionId: number): number {
+		let committed = 0;
+		for (const attack of this.attacks) {
+			if (attack.factionId === factionId) committed += attack.troops;
+		}
+		const total = (this.factions[factionId]?.members ?? 0) + committed;
+		return total > 0 ? committed / total : 0;
+	}
+
+	/**
 	 * Troop-equivalent holding a quarter — what the front label shows: the
 	 * owner's Members spread over its quarters (OpenFront's `troops / tiles`).
 	 * A neutral quarter holds the standing garrison.
@@ -2337,20 +2321,28 @@ export class World {
 			const defenderBonus = owner === NEUTRAL ? 0 : this.defenseBonus(owner);
 			const traitorDefense =
 				owner !== NEUTRAL && this.isTraitor(owner) ? DIPLOMACY.traitorDefense : 1;
-			const defense =
+			const defenseMul =
 				(ZONE_DEFENSE[zone] ?? 1) * safehouse * (1 + defenderBonus) * traitorDefense;
 			const attackBonus = 1 + this.attackBonus(attack.factionId);
-			// Quarter size: a large quarter puts up more resistance
-			// (conquest time ∝ size / committed troops).
+			// Quarter size: a large quarter puts up more resistance.
 			const sizeFactor = this.city.size?.[attack.target] ?? 1;
-			// The damage cap follows Armament: tech stays useful beyond the cap.
-			const damage = Math.min(
-				(MAX_DAMAGE_PER_TICK * attackBonus) / sizeFactor,
-				Math.max(0.5, (attack.troops * DAMAGE_PER_TROOP * attackBonus) / (defense * sizeFactor)),
+			// **Defense is the defender's army, not an abstract value**: its Members
+			// spread over its quarters (OpenFront idea). A neutral quarter holds the
+			// standing garrison. Attacking several quarters at once therefore drains
+			// the defender's army several times faster — defense finally has a cost.
+			const garrison = Math.max(1, this.garrisonAt(attack.target) * defenseMul);
+			// Share of the fight the attacker owns: 0.5 at parity. The battle gauge
+			// drains fast when you outnumber, slowly when you don't. A small force
+			// still creeps forward, so no quarter is ever a hard wall.
+			const share = attack.troops / (attack.troops + garrison);
+			const damage = Math.max(
+				0.25,
+				(MAX_DAMAGE_PER_TICK * 2 * attackBonus * share) / sizeFactor,
 			);
 			const control = this.territory.control[attack.target]! - damage;
-			attack.troops -= damage * ATTACK_LOSS;
-			// Mutual attrition: defending bleeds too (no free hold).
+			// Both sides pay: the attacker in committed troops (more when
+			// outnumbered), the defender in its global army.
+			attack.troops = Math.max(0, attack.troops - damage * ATTACK_LOSS * (1 - share) * 2);
 			if (owner !== NEUTRAL) {
 				const defender = this.factions[owner]!;
 				defender.members = Math.max(0, defender.members - damage * DEFENDER_LOSS);
@@ -2449,12 +2441,14 @@ export class World {
 			) {
 				this.corruptPolice(i);
 			}
-			// Operations (bust/sabotage): armament required, hence tech investment.
+			// Operations (bust): armament required, hence tech investment.
 			if (this.rng() < 0.3 && this.aiOperate(i)) continue;
 			// Interception of an adjacent enemy convoy.
 			if (this.rng() < 0.2 && this.aiIntercept(i)) continue;
-			// Occasional hitman on an adjacent enemy quarter.
-			if (this.rng() < 0.25 && this.aiHitman(i)) continue;
+			// Occasional heavy strike on an adjacent enemy quarter.
+			if (this.rng() < 0.15 && this.aiStrike(i)) continue;
+			// Keep a reserve: the pool you commit is the pool that is not defending.
+			if (this.committedShare(i) > AI_MAX_COMMIT) continue;
 			// Force concentration: reinforce the ongoing assault before opening a front.
 			const active = this.attacks.find((attack) => attack.factionId === i);
 			const focus =
@@ -2463,13 +2457,11 @@ export class World {
 		}
 	}
 
-	private aiHitman(factionId: number): boolean {
+	private aiStrike(factionId: number): boolean {
 		for (let i = 0; i < this.territory.count; i += 1) {
 			if (!this.canAttack(factionId, i)) continue;
-			if (!this.canHitman(factionId, i)) continue;
-			this.factions[factionId]!.hitmanCooldown = HITMAN.cooldownTicks;
-			this.payHitman(factionId);
-			this.applyHitman(factionId, i);
+			if (!this.canStrike(factionId, i)) continue;
+			this.launchStrike(factionId, i);
 			return true;
 		}
 		return false;
@@ -2529,10 +2521,10 @@ export class World {
 		return false;
 	}
 
-	/** AI operations: bust/sabotage of an enemy building (gated by Armament). */
+	/** AI operations: bust of an enemy building (gated by Armament). */
 	private aiOperate(factionId: number): boolean {
 		const faction = this.factions[factionId]!;
-		if (faction.hitmanCooldown > 0) return false;
+		if (faction.bustCooldown > 0) return false;
 		// We don't launch operations before having an established economy and a surplus.
 		if (this.buildingCount(factionId, "lab") === 0 || this.buildingCount(factionId, "storefront") === 0) {
 			return false;
@@ -2546,29 +2538,13 @@ export class World {
 			if (!type) continue;
 			if (this.guardedBy(owner, i) > 0) continue;
 			if (
-				faction.tech.armament >= SABOTAGE.requiredArmament &&
-				faction.dirtyCash >= SABOTAGE.costSale &&
-				this.territory.sabotageUntil[i]! <= this.tick
-			) {
-				faction.dirtyCash -= SABOTAGE.costSale;
-				faction.hitmanCooldown = SABOTAGE.cooldownTicks;
-				this.territory.sabotageUntil[i] = this.tick + SABOTAGE.duration;
-				this.addHeat(i, HEAT.operation);
-				if (owner === this.player.id) {
-					this.events.push("sabotage");
-					this.float(i, "sabotaged −50%", "loss");
-					this.pushLog(`Enemy sabotage (module ${i})`);
-				}
-				return true;
-			}
-			if (
 				faction.tech.armament >= BUST.requiredArmament &&
 				faction.dirtyCash >= BUST.costSale &&
 				faction.members >= BUST.costMembers
 			) {
 				faction.dirtyCash -= BUST.costSale;
 				faction.members -= BUST.costMembers;
-				faction.hitmanCooldown = BUST.cooldownTicks;
+				faction.bustCooldown = BUST.cooldownTicks;
 				this.loot(factionId, owner, type);
 				this.addHeat(i, HEAT.operation);
 				if (owner === this.player.id) {
@@ -2585,7 +2561,7 @@ export class World {
 	/** AI interception: diverts an adjacent enemy convoy. */
 	private aiIntercept(factionId: number): boolean {
 		const faction = this.factions[factionId]!;
-		if (faction.hitmanCooldown > 0) return false;
+		if (faction.interceptCooldown > 0) return false;
 		if (faction.tech.armament < INTERCEPT.requiredArmament) return false;
 		if (faction.members < INTERCEPT.costMembers) return false;
 		for (let i = 0; i < this.territory.count; i += 1) {
@@ -2595,9 +2571,8 @@ export class World {
 			const route = this.convoyTo(i);
 			if (!route || route.cargo <= 0) continue;
 			faction.members -= INTERCEPT.costMembers;
-			faction.hitmanCooldown = INTERCEPT.cooldownTicks;
+			faction.interceptCooldown = INTERCEPT.cooldownTicks;
 			this.takeCargo(faction, route);
-			this.territory.sabotageUntil[i] = this.tick + INTERCEPT.disruptTicks;
 			this.addHeat(i, HEAT.operation);
 			if (owner === this.player.id) {
 				this.events.push("intercept");
@@ -2675,15 +2650,6 @@ export class World {
 		const hour = this.hourOfDay();
 		for (let f = 0; f < this.factions.length; f += 1) {
 			const c = this.counts[f]!;
-			const sab = this.sabotaged[f]!;
-			sab.housing = 0;
-			sab.lab = 0;
-			sab.storefront = 0;
-			sab.front = 0;
-			sab.safehouse = 0;
-			sab.depot = 0;
-			sab.workshop = 0;
-			sab.counter = 0;
 			c.housing = 0;
 			c.lab = 0;
 			c.storefront = 0;
@@ -2729,7 +2695,6 @@ export class World {
 			if (type === "front") {
 				this.launderWealth[owner] = (this.launderWealth[owner] ?? 0) + wealth * bonus;
 			}
-			if (this.territory.sabotageUntil[i]! > this.tick) this.sabotaged[owner]![type] += 1;
 		}
 		for (const faction of this.factions) {
 			const c = this.counts[faction.id]!;

@@ -41,12 +41,13 @@ export function autoPlay(world: World, rng: Rng): void {
 		}
 	}
 
-	// Attack an adjacent quarter.
+	// Attack an adjacent quarter — but keep a reserve: committed troops are
+	// troops that are not defending (the pool is global).
 	const targets: number[] = [];
 	for (let i = 0; i < world.territory.count; i += 1) {
 		if (world.playerCanAttack(i)) targets.push(i);
 	}
-	if (targets.length > 0) {
+	if (targets.length > 0 && world.committedShare(player.id) < 0.5) {
 		world.playerAttack(targets[Math.floor(rng() * targets.length)]!);
 	}
 
@@ -78,11 +79,11 @@ export function autoPlay(world: World, rng: Rng): void {
 		}
 	}
 
-	// Occasional hitman.
-	if (rng() < 0.25) {
+	// Occasional heavy strike.
+	if (rng() < 0.15) {
 		for (let i = 0; i < world.territory.count; i += 1) {
-			if (world.playerCanHitman(i)) {
-				world.playerHitman(i);
+			if (world.playerCanStrike(i)) {
+				world.playerStrike(i);
 				break;
 			}
 		}

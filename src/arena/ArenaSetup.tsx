@@ -29,7 +29,8 @@ function Copy({ value }: { value: string }) {
 }
 
 export function ArenaSetup({ onSpectate, onBack }: Props) {
-	const [agents, setAgents] = useState(3);
+	const [agents, setAgents] = useState(1);
+	const [bots, setBots] = useState(5);
 	const [seed, setSeed] = useState("");
 	const [turnTicks, setTurnTicks] = useState(50);
 	const [created, setCreated] = useState<CreateResponse | null>(null);
@@ -59,6 +60,7 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					agents,
+					bots,
 					turnTicks,
 					seed: seed.trim() === "" ? undefined : Number(seed),
 				}),
@@ -87,13 +89,30 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 						<span>Agents</span>
 						<input
 							type="range"
-							min={2}
+							min={1}
 							max={4}
 							step={1}
 							value={agents}
-							onChange={(event) => setAgents(Number(event.target.value))}
+							onChange={(event) => {
+								const next = Number(event.target.value);
+								setAgents(next);
+								// Never more than 6 factions in play.
+								if (next + bots > 6) setBots(6 - next);
+							}}
 						/>
 						<code>{agents}</code>
+					</label>
+					<label className="slider-row" title="AI factions the agents fight (the solo setup uses 5)">
+						<span>AI bots</span>
+						<input
+							type="range"
+							min={0}
+							max={6 - agents}
+							step={1}
+							value={bots}
+							onChange={(event) => setBots(Number(event.target.value))}
+						/>
+						<code>{bots}</code>
 					</label>
 					<label className="slider-row">
 						<span>Ticks / turn</span>

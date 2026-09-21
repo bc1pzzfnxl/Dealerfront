@@ -15,7 +15,7 @@ import { FACTION_COLORS } from "../sim/factions";
 import { PARIS_CENTROIDS } from "../sim/maps/paris";
 import parisGeoUrl from "../sim/maps/paris-iris.geojson?url";
 import type { Territory } from "../sim/territory";
-import type { Attack, ConvoyRoute } from "../sim/world";
+import type { Attack, ConvoyRoute, Strike } from "../sim/world";
 import { BUILDING_ICONS, buildingIconImage } from "./icons";
 import { factionDisplayColor } from "./palette";
 import { useReducedMotion } from "./useReducedMotion";
@@ -63,6 +63,8 @@ interface WorldMapProps {
 	territory: Territory;
 	attacks: readonly Attack[];
 	convoys: readonly ConvoyRoute[];
+	/** Heavy strikes in flight — telegraphed to everyone. */
+	strikes: readonly Strike[];
 	heat: Float32Array;
 	tick: number;
 	selected: number | null;
@@ -98,6 +100,7 @@ export function WorldMap({
 	territory,
 	attacks,
 	convoys,
+	strikes,
 	heat,
 	tick,
 	selected,
@@ -228,6 +231,7 @@ export function WorldMap({
 				tick={tick}
 				territory={territory}
 			/>
+			<StrikeRings strikes={strikes} tick={tick} />
 			<MapControls className="map-controls" />
 		</Map>
 	);
@@ -826,6 +830,49 @@ function AttackLabels({
 					<span className="front-vs">⚔</span>
 					{label.defender.toLocaleString("en-US")}
 				</div>
+			))}
+		</div>
+	);
+}
+
+/**
+ * Heavy strike telegraph: a pulsing target ring at every quarter under an
+ * incoming strike. Everyone sees it for the whole warning, so it is a threat
+ * you brace for — not a surprise (OpenFront's nuke telegraph).
+ */
+function StrikeRings({ strikes, tick }: { strikes: readonly Strike[]; tick: number }) {
+	const { map, isLoaded } = useMap();
+	const [rings, setRings] = useState<{ key: string; x: number; y: number }[]>([]);
+
+	useEffect(() => {
+		if (!map || !isLoaded) return;
+		const project = (): void => {
+			const next: { key: string; x: number; y: number }[] = [];
+			strikes.forEach((strike, index) => {
+				const center = PARIS_CENTROIDS[strike.target] ?? PARIS_CENTER;
+				const point = map.project([center[0], center[1]]);
+				next.push({ key: `${strike.factionId}-${strike.target}-${index}`, x: point.x, y: point.y });
+			});
+			setRings(next);
+		};
+		project();
+		map.on("move", project);
+		map.on("zoom", project);
+		return () => {
+			map.off("move", project);
+			map.off("zoom", project);
+		};
+	}, [map, isLoaded, strikes, tick]);
+
+	if (rings.length === 0) return null;
+	return (
+		<div className="strike-rings">
+			{rings.map((ring) => (
+				<span
+					key={ring.key}
+					className="strike-ring"
+					style={{ transform: `translate(-50%, -50%) translate(${ring.x}px, ${ring.y}px)` }}
+				/>
 			))}
 		</div>
 	);

@@ -112,7 +112,7 @@ Define the **police** as a **non-playable opposing faction**, **anti-leader (ant
 | 8 | Readability | Diegetic indicator/mood, auditable causality |
 | 9 | Old version | "Patrols/suspicion/single dealer" abandoned |
 | 10 | Session end | The police do not end it before liquidation; the score decides otherwise |
-| 11 | Local police | **Heat per quarter** (0–100): +capture 30, +hitman 20, +operation 15, +storefront 0.15×demand, +front 0.08×wealth; decay **proportional to heat** `0.08 × (1 + heat/30)` (a hot quarter cools faster → equilibrium below 100: demand 1 ≈ 26, demand 2 ≈ 82), ×3 in zones under **police surveillance**. **Raids target the leader's hottest quarters** and **destroy their building**. **Corruption cools** the cartel's quarters (heat ÷2). |
+| 11 | Local police | **Heat per quarter** (0–100): +capture 30, +strike 20, +operation 15, +storefront 0.15×demand, +front 0.08×wealth; decay **proportional to heat** `0.08 × (1 + heat/30)` (a hot quarter cools faster → equilibrium below 100: demand 1 ≈ 26, demand 2 ≈ 82), ×3 in zones under **police surveillance**. **Raids target the leader's hottest quarters** and **destroy their building**. **Corruption cools** the cartel's quarters (heat ÷2). |
 
 ---
 

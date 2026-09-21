@@ -11,8 +11,13 @@ export type ArenaPhase = "lobby" | "playing" | "finished";
 
 /** Configuration when creating an arena. */
 export interface ArenaConfig {
-	/** Number of agents/factions (2–4). */
+	/** Number of **agents** (external, token-driven) — 1 to 4. */
 	agents: number;
+	/**
+	 * Number of **AI bots** added alongside the agents (0–5). Use 5 with a single
+	 * agent to play the full solo setup (6 cartels) from the outside.
+	 */
+	bots?: number;
 	/** Game seed (default: random). */
 	seed?: number;
 	/** Game ticks elapsed per turn (default: 50 = 5 s of game time). */
