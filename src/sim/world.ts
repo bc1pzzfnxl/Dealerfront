@@ -104,6 +104,8 @@ const HEAT = {
 	vente: 0.15,
 	facade: 0.08,
 	decay: 0.08,
+	/** Demi-vie de la décroissance : la décroissance double à ce niveau de heat. */
+	decayHalf: 30,
 	policeSuppress: 3,
 	max: 100,
 } as const;
@@ -927,7 +929,13 @@ export class World {
 			const building = this.territory.building[i]!;
 			if (building === BUILDING_INDEX.vente) value += HEAT.vente * (this.city.demand[i] ?? 1);
 			else if (building === BUILDING_INDEX.facade) value += HEAT.facade * (this.city.wealth[i] ?? 1);
-			const decay = HEAT.decay * (this.policeZone[i] ? HEAT.policeSuppress : 1);
+			// Décroissance **proportionnelle au heat** : un quartier chaud refroidit
+			// plus vite, donc l'équilibre se stabilise sous 100 (≈45 pour une vente
+			// de demande 1). Sinon toute vente finissait à 100 en ~2 min.
+			const decay =
+				HEAT.decay *
+				(1 + this.heat[i]! / HEAT.decayHalf) *
+				(this.policeZone[i] ? HEAT.policeSuppress : 1);
 			this.heat[i] = Math.max(0, Math.min(HEAT.max, value - decay));
 		}
 	}

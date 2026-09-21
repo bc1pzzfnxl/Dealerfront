@@ -294,8 +294,8 @@ Un quartier possédé et **vide** ne peut être converti que vers les types **co
 
 ### Blanchiment contrôlé (P13)
 
-- Le joueur règle un **ratio de blanchiment 0–100 %** (curseur) : la capacité effective des façades est `façades × 60 × ratio`.
-- À **0 %**, le Cash sale s'accumule (pour acheter) ; à **100 %**, tout part en Cash propre (objectif). Compromis central de la boucle.
+- Le joueur règle un **ratio de blanchiment 0–100 %** (curseur) : la capacité effective des façades est `façades × 60 × ratio`. **Défaut : 50 %** — à 100 % tout le Cash sale part en Cash propre et il n'en reste plus pour bâtir (blocage).
+- À **0 %**, le Cash sale s'accumule (pour acheter) ; à **100 %**, tout part en Cash propre. Compromis central de la boucle.
 
 ### Réglages P15 — chantiers
 

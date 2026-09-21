@@ -27,8 +27,7 @@ function firstNeutral(world: World): number {
 	throw new Error("aucun quartier neutre");
 }
 
-describe("police", () => {
-	it("cible le leader (à égalité, l'id le plus faible)", () => {
+describe("police", () => {	it("cible le leader (à égalité, l'id le plus faible)", () => {
 		const world = new World(1);
 		world.step();
 		expect(world.police.target).toBe(0);
@@ -161,5 +160,24 @@ describe("police", () => {
 
 		player.cashPropre = 0;
 		expect(world.playerCanCorrupt()).toBe(false);
+	});
+});
+
+describe("heat & blanchiment (anti-blocage)", () => {
+	it("le blanchiment par défaut laisse du Cash sale pour bâtir", () => {
+		const world = new World(1);
+		expect(world.playerLaunderRatio()).toBeLessThan(1);
+	});
+
+	it("le heat d'un point de vente se stabilise sous 100 (demande normale)", () => {
+		const world = new World(1);
+		const module = firstNeutral(world);
+		world.territory.owner[module] = world.player.id;
+		world.territory.control[module] = 100;
+		world.territory.building[module] = BUILDING_INDEX.vente;
+		world.city.demand[module] = 1;
+		for (let t = 0; t < 3000; t += 1) world.step();
+		expect(world.heatAt(module)).toBeGreaterThan(10);
+		expect(world.heatAt(module)).toBeLessThan(60);
 	});
 });

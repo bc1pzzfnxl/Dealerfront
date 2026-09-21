@@ -85,7 +85,7 @@ export function createFactions(count: number, startMembers: number): Faction[] {
 			tech: { armement: 0, protection: 0, logistique: 0 },
 			hitmanCooldown: 0,
 			attackRatio: 0.2,
-			launderRatio: 1,
+			launderRatio: 0.5,
 			corruptionUses: 0,
 			captures: 0,
 			quartersLost: 0,
