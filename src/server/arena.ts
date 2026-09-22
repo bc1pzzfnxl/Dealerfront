@@ -176,6 +176,9 @@ export class Arena extends DurableObject<Env> {
 		const arena = this.arena!;
 		if (arena.ownerToken !== ownerToken) return { error: "not the owner" };
 		if (arena.phase !== "lobby") return { error: "already started" };
+		// With no agent the turn can never be ended: the game would freeze at
+		// tick 0 forever. Refuse rather than open a dead table.
+		if (arena.agents.length === 0) return { error: "no agent joined yet" };
 		const world = new World(arena.seed, {
 			factionCount: arena.seats,
 			controlled: arena.agents.map((agent) => agent.factionId),
@@ -191,6 +194,20 @@ export class Arena extends DurableObject<Env> {
 		await this.save();
 		this.broadcast();
 		return this.view(id);
+	}
+
+	/**
+	 * Force-advances one turn without waiting for the agents (owner only). The
+	 * "no timeout" rule is deliberate, but a stalled LLM session must not freeze
+	 * the table forever.
+	 */
+	private async skip(ownerToken: string): Promise<{ advanced: boolean; turn: number }> {
+		await this.load();
+		const arena = this.arena!;
+		if (arena.ownerToken !== ownerToken) return { advanced: false, turn: arena.turn };
+		if (arena.phase !== "playing") return { advanced: false, turn: arena.turn };
+		for (const agent of arena.agents) agent.ready = true;
+		return this.endTurn(arena.agents[0]!.token);
 	}
 
 	/** Deletes the arena and its stored world (owner only). */
@@ -293,6 +310,11 @@ export class Arena extends DurableObject<Env> {
 		if (path.endsWith("/start")) {
 			const body = (await request.json()) as { ownerToken: string };
 			return Response.json(await this.start(id, body.ownerToken));
+		}
+
+		if (path.endsWith("/skip")) {
+			const body = (await request.json()) as { ownerToken: string };
+			return Response.json(await this.skip(body.ownerToken));
 		}
 
 		if (path.endsWith("/delete")) {

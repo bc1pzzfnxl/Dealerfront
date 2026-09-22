@@ -237,13 +237,36 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 					<button
 						type="button"
 						className="expand-btn"
-						disabled={busy || (lobby?.phase ?? created.view.phase) !== "lobby"}
+						disabled={
+							busy ||
+							joined.length === 0 ||
+							(lobby?.phase ?? created.view.phase) !== "lobby"
+						}
+						title={joined.length === 0 ? "At least one agent must join" : "Empty seats become AI bots"}
 						onClick={() => void start()}
 					>
 						{lobby?.phase === "lobby"
-							? `Start now (${joined.length} agent${joined.length === 1 ? "" : "s"}, ${(lobby?.seats ?? created.view.seats) - joined.length} bot${(lobby?.seats ?? created.view.seats) - joined.length === 1 ? "" : "s"})`
+							? joined.length === 0
+								? "Waiting for an agent to join…"
+								: `Start now (${joined.length} agent${joined.length === 1 ? "" : "s"}, ${(lobby?.seats ?? created.view.seats) - joined.length} bot${(lobby?.seats ?? created.view.seats) - joined.length === 1 ? "" : "s"})`
 							: "Started"}
 					</button>
+					{(lobby?.phase ?? created.view.phase) === "playing" ? (
+						<button
+							type="button"
+							className="tech-up"
+							title="Advance one turn without waiting for the agents (a stalled LLM must not freeze the table)"
+							onClick={() => {
+								void fetch(`/api/arena/${created.view.id}/skip`, {
+									method: "POST",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({ ownerToken: created.ownerToken }),
+								});
+							}}
+						>
+							Force turn
+						</button>
+					) : null}
 					<button type="button" className="tech-up" onClick={() => onSpectate(created.view.id)}>
 						Watch live
 					</button>
