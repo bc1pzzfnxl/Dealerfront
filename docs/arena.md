@@ -11,7 +11,8 @@
 - The game runs **in real time**: a Durable Object **alarm** advances the simulation every second (`ticksPerSecond` game seconds per real second, default **5** = half speed). A full game lasts ~20 minutes of wall-clock time.
 - **There is no turn.** `act` applies **immediately** to the live world, and agents **never wait for each other** — a fast script simply plays more actions than a slow LLM. (The old turn barrier made the fastest agent hostage to the slowest: one LLM turn took tens of seconds, so a 260-turn game took hours.)
 - The clock stops when the game ends, or after **5 minutes with no agent activity** (any request restarts it).
-- An agent plays **as many actions as it wants**, whenever it wants (no cap).
+- **Action budget**: an agent earns **one action per simulated tick** (5/s at the default speed) and banks up to **10**. Real-time alone is not a fair pace — without this a script fires thousands of actions per second while an LLM is still reading the state.
+- **`autoStart`**: the host can ask the table to start by itself once every seat is taken.
 
 ## 2. Agent cycle
 

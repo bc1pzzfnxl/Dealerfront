@@ -42,6 +42,8 @@ interface ArenaState {
 	lastActivity: number;
 	/** Alarms since the last snapshot write. */
 	alarms: number;
+	/** Start as soon as every seat is taken. */
+	autoStart: boolean;
 }
 
 const MIN_SEATS = 2;
@@ -59,6 +61,13 @@ const DEFAULT_TICKS_PER_SECOND = 5;
 const IDLE_STOP_MS = 5 * 60 * 1000;
 /** Persist the world every N alarms rather than every second. */
 const SAVE_EVERY_ALARMS = 10;
+/**
+ * Action budget: an agent earns **one action per simulated tick** (so 5/s at the
+ * default speed — a human clicking), and can bank up to this many. Without it a
+ * script can fire thousands of actions per second while an LLM is still reading
+ * the state: real-time alone is not a fair pace.
+ */
+const MAX_ACTION_BUDGET = 10;
 
 export class Arena extends DurableObject<Env> {
 	private arena: ArenaState | null = null;
@@ -176,6 +185,7 @@ export class Arena extends DurableObject<Env> {
 			),
 			lastActivity: Date.now(),
 			alarms: 0,
+			autoStart: config.autoStart === true,
 		};
 		this.world = null;
 		this.result = null;
@@ -203,11 +213,17 @@ export class Arena extends DurableObject<Env> {
 			factionId,
 			name: `Seat ${factionId + 1}`,
 			token: crypto.randomUUID(),
+			budget: MAX_ACTION_BUDGET,
+			budgetTick: 0,
 		};
 		arena.agents.push(agent);
 		arena.lastActivity = Date.now();
 		await this.save();
 		this.broadcast();
+		// Filled the table and the host asked for it: go.
+		if (arena.autoStart && arena.agents.length >= arena.seats) {
+			await this.start(id, arena.ownerToken);
+		}
 		return {
 			arena: id,
 			factionId,
@@ -269,7 +285,22 @@ export class Arena extends DurableObject<Env> {
 			return { ok: false, error: "game not active", tick: this.world?.tick ?? 0 };
 		}
 		arena.lastActivity = Date.now();
+		// Action budget: one action per simulated tick, bankable up to a small cap.
+		const tick = this.world!.tick;
+		if (tick > agent.budgetTick) {
+			agent.budget = Math.min(MAX_ACTION_BUDGET, agent.budget + (tick - agent.budgetTick));
+			agent.budgetTick = tick;
+		}
+		if (agent.budget < 1) {
+			return {
+				ok: false,
+				error: "too fast: one action per game second, bankable up to 10",
+				tick,
+			};
+		}
 		const result = applyIntent(this.world!, agent.factionId, intent);
+		// Only an accepted action costs budget: a refused one did nothing.
+		if (result.ok) agent.budget -= 1;
 		// The clock may have been stopped by an idle timeout: restart it.
 		await this.schedule();
 		return { ok: result.ok, error: result.error, tick: this.world!.tick };
@@ -303,11 +334,24 @@ export class Arena extends DurableObject<Env> {
 		if (!agent) return { error: "unknown token" };
 		this.arena!.lastActivity = Date.now();
 		await this.schedule();
+		// Lobby: no world yet. Say so plainly, so an agent waits instead of
+		// hammering `act` and burning its context on errors.
+		if (!this.world || this.arena!.phase !== "playing") {
+			return {
+				factionId: agent.factionId,
+				view: this.view(this.arenaId()),
+				state: null,
+				hint:
+					this.arena!.phase === "lobby"
+						? `Waiting for the host to start: ${this.arena!.agents.length}/${this.arena!.seats} seats taken. Do NOT act yet — poll again in a few seconds.`
+						: "The game is over.",
+			};
+		}
 		return {
 			factionId: agent.factionId,
 			view: this.view(this.arenaId()),
-			state: this.world ? compactState(this.world, agent.factionId) : null,
-			snapshot: full ? (this.world?.snapshot() ?? null) : undefined,
+			state: compactState(this.world, agent.factionId),
+			snapshot: full ? this.world.snapshot() : undefined,
 		};
 	}
 

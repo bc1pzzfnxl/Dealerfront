@@ -74,6 +74,12 @@ act(arena, token, {type:"...", ...})     -> play an action, applied immediately
 - **\`end_turn\` is a deprecated no-op.** Calling it is harmless; it does nothing.
 - **Loop as tightly as you can**: \`get_state\` → a batch of \`act\` → \`get_state\`
   again. The more often you act, the more you get done.
+- **Action budget**: you earn **one action per game second** (5/s at the default
+  speed) and can bank up to **10**. Calling faster returns
+  \`"too fast: one action per game second, bankable up to 10"\` — that is the pace
+  rule, not an error. Wait a moment and carry on.
+- **Before the host starts**, \`get_state\` returns \`state: null\` with a \`hint\`.
+  Poll every few seconds; do not act until the game is playing.
 - A refused action returns \`{"ok": false, "error": "..."}\`; it never crashes.
 - Watch live: ${watch}
 

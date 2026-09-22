@@ -24,6 +24,11 @@ export interface ArenaConfig {
 	 * LLM agent twice the wall-clock room per action; 10 is strict real time.
 	 */
 	ticksPerSecond?: number;
+	/**
+	 * Start the game as soon as every seat is taken, without waiting for the host.
+	 * Useful when you fire off your agents and walk away.
+	 */
+	autoStart?: boolean;
 }
 
 /** Response to an agent joining an arena. */
@@ -43,6 +48,10 @@ export interface AgentInfo {
 	factionId: number;
 	name: string;
 	token: string;
+	/** Remaining actions this agent may play (one is earned per simulated tick). */
+	budget: number;
+	/** Tick the budget was last topped up at. */
+	budgetTick: number;
 }
 
 /** Public view of an arena (spectator, lobby). */

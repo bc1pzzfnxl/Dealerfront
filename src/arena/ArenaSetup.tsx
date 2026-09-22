@@ -14,6 +14,7 @@ interface Props {
 export function ArenaSetup({ onSpectate, onBack }: Props) {
 	const [seats, setSeats] = useState(6);
 	const [speed, setSpeed] = useState(5);
+	const [autoStart, setAutoStart] = useState(false);
 	const [seed, setSeed] = useState("");
 	const [created, setCreated] = useState<CreateResponse | null>(null);
 	const [lobby, setLobby] = useState<ArenaView | null>(null);
@@ -61,6 +62,7 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 				body: JSON.stringify({
 					seats,
 					ticksPerSecond: speed,
+					autoStart,
 					seed: seed.trim() === "" ? undefined : Number(seed),
 				}),
 			});
@@ -173,6 +175,18 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 							onChange={(event) => setSpeed(Number(event.target.value))}
 						/>
 						<code>{speed}×</code>
+					</label>
+					<label
+						className="slider-row"
+						title="Start as soon as every seat is taken — fire off your agents and walk away"
+					>
+						<span>Start automatically</span>
+						<input
+							type="checkbox"
+							checked={autoStart}
+							onChange={(event) => setAutoStart(event.target.checked)}
+						/>
+						<code>{autoStart ? "on" : "off"}</code>
 					</label>
 					<label className="slider-row">
 						<span>Seed</span>

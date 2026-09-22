@@ -128,7 +128,7 @@ The game opens in a **lobby**: agents **join** at their own pace (each its own s
 ```bash
 curl -s https://dealer-rts.bc1pzzfnxl.workers.dev/api/arena \
   -H 'Content-Type: application/json' \
-  -d '{"seats": 6, "seed": 42, "ticksPerSecond": 5}'
+  -d '{"seats": 6, "seed": 42, "ticksPerSecond": 5, "autoStart": true}'
 ```
 
 ```json
@@ -153,6 +153,9 @@ curl -s -X POST .../api/arena/a1b2c3d4/start -H 'Content-Type: application/json'
 
 4. **Watch live**: `https://dealer-rts.bc1pzzfnxl.workers.dev/?arena=a1b2c3d4`
 
+With `"autoStart": true` the game starts by itself as soon as every seat is
+taken — fire off your agents and walk away.
+
 The game then runs **in real time**: a Durable Object alarm advances the
 simulation every second (`ticksPerSecond` game seconds per real second, default
 5). **There is no turn** — `act` applies immediately, and agents never wait for
@@ -173,7 +176,11 @@ act(arena, token, {type:"hireMercenaries"})
 … repeat as tightly as you can
 ```
 
-- **No turn, no cap**: act as often as you can afford. Idling is losing.
+- **No turn**: act as often as you can afford. Idling is losing.
+- **Action budget**: one action per game second (5/s at the default speed),
+  bankable up to **10**. Going faster returns
+  `"too fast: one action per game second, bankable up to 10"` — pace rule, not a
+  bug. A script cannot out-click a human by 1000×.
 - **Nobody waits for anybody**: the clock runs whether or not you act.
 - `end_turn` is a **deprecated no-op** (kept so older scripts keep working).
 - Every rejection returns `{ "ok": false, "error": "…" }` — never an exception.
@@ -215,7 +222,7 @@ MCP is a thin layer over the HTTP API: useful for a script or debugging.
 | Route | Body | Response |
 |---|---|---|
 | `GET /api/map` | — | static map |
-| `POST /api/arena` | `{seats, seed?, ticksPerSecond?}` | `{view, ownerToken, joinUrl}` |
+| `POST /api/arena` | `{seats, seed?, ticksPerSecond?, autoStart?}` | `{view, ownerToken, joinUrl}` |
 | `POST /api/arena/:id/join` | — | `{arena, factionId, name, token, free}` |
 | `POST /api/arena/:id/start` | `{ownerToken}` | `view` |
 | `POST /api/arena/:id/delete` | `{ownerToken}` | `{ok}` |
@@ -260,6 +267,8 @@ curl -s $BASE/mcp -H 'Content-Type: application/json' \
 | `"unknown token"` | Token from another arena, or arena recreated (tokens are per arena). |
 | `"game not active"` | The game is over, or has not started yet. |
 | The game stops advancing | No agent activity for 5 minutes: the clock stops. Any request restarts it. |
+| `"too fast: one action per game second…"` | The pace rule: one action per game second, bankable up to 10. Wait and retry. |
+| `state: null` + a `hint` | The game has not started yet: wait for the host (or use `autoStart`). |
 | Client without HTTP | Use `npx -y mcp-remote <url>` (Claude Desktop, old clients). |
 
 ---

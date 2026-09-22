@@ -6,6 +6,7 @@
  */
 
 import { INTENT_CATALOG, type Intent } from "../sim/intents";
+import { mapPayload } from "./map-payload";
 import type { ArenaView } from "./protocol";
 
 interface JsonRpc {
@@ -86,12 +87,7 @@ function text(value: unknown): { content: { type: "text"; text: string }[] } {
 	return { content: [{ type: "text", text: JSON.stringify(value) }] };
 }
 
-async function callTool(
-	env: Env,
-	name: string,
-	args: Record<string, unknown>,
-	origin: string,
-): Promise<unknown> {
+async function callTool(env: Env, name: string, args: Record<string, unknown>): Promise<unknown> {
 	const arena = String(args.arena ?? "");
 	const token = String(args.token ?? "");
 	const stub = () => env.ARENA.get(env.ARENA.idFromName(arena));
@@ -102,10 +98,9 @@ async function callTool(
 		const response = await stub().fetch(`https://arena/${arena}/join`, { method: "POST" });
 		return response.json();
 	}
-	if (name === "get_map") {
-		const response = await fetch(`${origin}/api/map`);
-		return response.json();
-	}
+	// Built in-process: fetching `/api/map` from inside the Worker is a
+	// subrequest back to itself, and fails with a 500.
+	if (name === "get_map") return mapPayload();
 	if (!arena) return { error: "missing arena" };
 
 	if (name === "get_state") {
@@ -132,7 +127,6 @@ async function callTool(
 }
 
 export async function handleMcp(request: Request, env: Env): Promise<Response> {
-	const origin = new URL(request.url).origin;
 	let message: JsonRpc;
 	try {
 		message = (await request.json()) as JsonRpc;
@@ -157,7 +151,7 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
 	if (message.method === "tools/list") return reply({ tools: TOOLS });
 	if (message.method === "tools/call") {
 		const params = (message.params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
-		const result = await callTool(env, String(params.name), params.arguments ?? {}, origin);
+		const result = await callTool(env, String(params.name), params.arguments ?? {});
 		return reply(text(result));
 	}
 	if (message.method === "ping") return reply({});

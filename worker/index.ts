@@ -7,7 +7,7 @@
  */
 
 import { agentGuide } from "../src/server/agent-guide";
-import { PARIS_MAP } from "../src/sim/maps/paris";
+import { mapPayload } from "../src/server/map-payload";
 import type { ArenaConfig } from "../src/server/protocol";
 import { handleMcp } from "../src/server/mcp";
 
@@ -19,19 +19,6 @@ const CORS = {
 
 function json(data: unknown, status = 200): Response {
 	return Response.json(data, { status, headers: CORS });
-}
-
-/** Static map served once to agents (zones, neighbors, profiles). */
-function mapPayload() {
-	return {
-		count: PARIS_MAP.modules.length,
-		zones: PARIS_MAP.modules,
-		neighbors: PARIS_MAP.neighbors,
-		spawns: PARIS_MAP.spawns,
-		demand: Array.from(PARIS_MAP.demand),
-		wealth: Array.from(PARIS_MAP.wealth),
-		size: Array.from(PARIS_MAP.size),
-	};
 }
 
 async function handleArena(request: Request, env: Env, id: string): Promise<Response> {
