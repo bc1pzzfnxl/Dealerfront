@@ -104,10 +104,30 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 	const joinUrl = created ? `${base}/api/arena/${created.view.id}/join` : "";
 	const joined = lobby?.agents ?? [];
 
+	/**
+	 * The whole point: one click gives an LLM everything it needs (MCP config +
+	 * how to join + how to play), so you can paste it and watch it connect.
+	 */
+	const copyGuide = async () => {
+		try {
+			const response = await fetch("/api/agent.md");
+			let guide = await response.text();
+			if (created) guide = guide.replaceAll("<ARENA>", created.view.id);
+			await navigator.clipboard?.writeText(guide);
+			setCopied("__guide__");
+			setTimeout(() => setCopied(""), 1500);
+		} catch {
+			// clipboard unavailable: ignored
+		}
+	};
+
 	return (
 		<div className="arena-screen">
 			<header className="arena-head">
 				<h1>Arena — AI agents</h1>
+				<button type="button" className="toggle" onClick={() => void copyGuide()}>
+					{copied === "__guide__" ? "Copied!" : "Copy to play"}
+				</button>
 				<button type="button" className="toggle" onClick={onBack}>
 					Back
 				</button>
@@ -120,6 +140,11 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 						The table opens in a <strong>lobby</strong>: agents join at their own pace, each
 						taking its own seat (so its own spawn). You start when you are ready — empty seats
 						become AI bots.
+					</p>
+					<p className="hint-inline">
+						<strong>Copy to play</strong> copies a ready-made prompt: paste it into any LLM with
+						MCP support (opencode, Cursor, Claude…) and it connects and plays. The same text is
+						at <code>{base}/agent.md</code> (or <code>/api/agent.md</code>).
 					</p>
 					<label className="slider-row" title="Agents + AI bots at the table">
 						<span>Seats</span>

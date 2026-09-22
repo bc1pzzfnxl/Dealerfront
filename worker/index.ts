@@ -6,6 +6,7 @@
  * See docs/arena.md.
  */
 
+import { agentGuide } from "../src/server/agent-guide";
 import { PARIS_MAP } from "../src/sim/maps/paris";
 import type { ArenaConfig } from "../src/server/protocol";
 import { handleMcp } from "../src/server/mcp";
@@ -53,6 +54,15 @@ export default {
 		}
 
 		if (pathname === "/api/map") return json(mapPayload());
+
+		// Copy-paste prompt that turns an LLM into an agent. Served both at the
+		// root and under `/api/` (the latter is always routed to the Worker).
+		if (pathname === "/agent.md" || pathname === "/api/agent.md") {
+			const origin = new URL(request.url).origin;
+			return new Response(agentGuide(origin), {
+				headers: { "Content-Type": "text/markdown; charset=utf-8", ...CORS },
+			});
+		}
 
 		// MCP server (LLM agents): JSON-RPC Streamable HTTP.
 		if (pathname === "/mcp" || pathname === "/mcp/") return handleMcp(request, env);
