@@ -738,32 +738,41 @@ export class World {
 	}
 
 	/** Cost of the next armament purchase (Clean cash, increasing). */
-	armamentCost(): number {
-		return Math.round(ARMAMENT.costClean * ARMAMENT.costGrowth ** this.player.armamentUses);
+	armamentCost(factionId = this.player.id): number {
+		return Math.round(
+			ARMAMENT.costClean * ARMAMENT.costGrowth ** this.factions[factionId]!.armamentUses,
+		);
+	}
+
+	canBuyArmament(factionId: number): boolean {
+		if (this.outcome !== null) return false;
+		return this.factions[factionId]!.cleanCash >= this.armamentCost(factionId);
+	}
+
+	/** Buys an armament tier (temporary attack bonus). Clean cash → firepower. */
+	buyArmament(factionId: number): boolean {
+		if (!this.canBuyArmament(factionId)) return false;
+		const faction = this.factions[factionId]!;
+		faction.cleanCash -= this.armamentCost(factionId);
+		faction.armamentLevel = Math.min(ARMAMENT.maxLevel, faction.armamentLevel + 1);
+		faction.armamentUntil = this.tick + ARMAMENT.durationTicks;
+		faction.armamentUses += 1;
+		if (factionId === this.player.id) {
+			const anchor = this.playerAnchor();
+			const bonus = Math.round(ARMAMENT.bonusPerLevel * 100);
+			if (anchor >= 0) this.float(anchor, `⚔ armament +${bonus} %`, "gain");
+			this.pushLog(`Armament +${bonus} % (${ARMAMENT.durationTicks / SIM_HZ} s)`);
+			this.events.push("tech");
+		}
+		return true;
 	}
 
 	playerCanBuyArmament(): boolean {
-		if (this.outcome !== null) return false;
-		return this.player.cleanCash >= this.armamentCost();
+		return this.canBuyArmament(this.player.id);
 	}
 
-	/** Buys an armament tier (temporary attack bonus). */
 	playerBuyArmament(): boolean {
-		if (!this.playerCanBuyArmament()) return false;
-		const player = this.player;
-		player.cleanCash -= this.armamentCost();
-		player.armamentLevel = Math.min(ARMAMENT.maxLevel, player.armamentLevel + 1);
-		player.armamentUntil = this.tick + ARMAMENT.durationTicks;
-		player.armamentUses += 1;
-		const armAnchor = this.playerAnchor();
-		if (armAnchor >= 0) {
-			this.float(armAnchor, `⚔ armament +${Math.round(ARMAMENT.bonusPerLevel * 100)} %`, "gain");
-		}
-		this.pushLog(
-			`Armament +${Math.round(ARMAMENT.bonusPerLevel * 100)} % (${ARMAMENT.durationTicks / 10} s)`,
-		);
-		this.events.push("tech");
-		return true;
+		return this.buyArmament(this.player.id);
 	}
 
 	/** Are the player's Watchers paid? */
@@ -772,95 +781,129 @@ export class World {
 	}
 
 	/** Cost of the next mercenary hire (Dirty cash, increasing). */
-	mercCost(): number {
-		return Math.round(MERC.costSale * MERC.costGrowth ** this.player.mercUses);
+	mercCost(factionId = this.player.id): number {
+		return Math.round(MERC.costSale * MERC.costGrowth ** this.factions[factionId]!.mercUses);
 	}
 
 	mercMembers(): number {
 		return MERC.members;
 	}
 
-	playerCanHireMercenaries(): boolean {
+	canHireMercenaries(factionId: number): boolean {
 		if (this.outcome !== null) return false;
-		return this.player.dirtyCash >= this.mercCost();
+		return this.factions[factionId]!.dirtyCash >= this.mercCost(factionId);
 	}
 
 	/** Hires mercenaries: Dirty cash → immediate Members. */
-	playerHireMercenaries(): boolean {
-		if (!this.playerCanHireMercenaries()) return false;
-		const player = this.player;
-		const cost = this.mercCost();
-		player.dirtyCash -= cost;
-		const before = player.members;
-		player.members = Math.min(this.maxMembers(player.id), player.members + MERC.members);
-		player.mercUses += 1;
-		const gained = Math.round(player.members - before);
-		const anchor = this.playerAnchor();
-		if (anchor >= 0) this.float(anchor, `+${gained} mercenaries`, "gain");
-		this.pushLog(`Mercenaries: +${gained} Members (−${cost.toLocaleString("en-US")} dirty)`);
-		this.events.push("capture");
+	hireMercenaries(factionId: number): boolean {
+		if (!this.canHireMercenaries(factionId)) return false;
+		const faction = this.factions[factionId]!;
+		const cost = this.mercCost(factionId);
+		faction.dirtyCash -= cost;
+		const before = faction.members;
+		faction.members = Math.min(this.maxMembers(factionId), faction.members + MERC.members);
+		faction.mercUses += 1;
+		const gained = Math.round(faction.members - before);
+		if (factionId === this.player.id) {
+			const anchor = this.playerAnchor();
+			if (anchor >= 0) this.float(anchor, `+${gained} mercenaries`, "gain");
+			this.pushLog(`Mercenaries: +${gained} Members (−${cost.toLocaleString("en-US")} dirty)`);
+			this.events.push("capture");
+		}
 		return true;
+	}
+
+	playerCanHireMercenaries(): boolean {
+		return this.canHireMercenaries(this.player.id);
+	}
+
+	playerHireMercenaries(): boolean {
+		return this.hireMercenaries(this.player.id);
 	}
 
 	/** Cost of the next contract against a gang (Clean cash, increasing). */
-	contractCost(): number {
-		return Math.round(CONTRACT.costClean * CONTRACT.costGrowth ** this.player.contractUses);
+	contractCost(factionId = this.player.id): number {
+		return Math.round(
+			CONTRACT.costClean * CONTRACT.costGrowth ** this.factions[factionId]!.contractUses,
+		);
 	}
 
-	playerCanFundContract(targetId: number): boolean {
+	canFundContract(factionId: number, targetId: number): boolean {
 		if (this.outcome !== null) return false;
-		if (targetId === this.player.id) return false;
+		if (targetId === factionId) return false;
 		if (this.factions[targetId]?.eliminated) return false;
-		if (this.hasPact(this.player.id, targetId)) return false;
-		return this.player.cleanCash >= this.contractCost();
+		if (this.hasPact(factionId, targetId)) return false;
+		return this.factions[factionId]!.cleanCash >= this.contractCost(factionId);
 	}
 
 	/** Pays a gang to attack a rival for the duration of the contract. */
-	playerFundContract(targetId: number, enemyId: number): boolean {
-		if (!this.playerCanFundContract(targetId)) return false;
+	fundContract(factionId: number, targetId: number, enemyId: number): boolean {
+		if (!this.canFundContract(factionId, targetId)) return false;
 		if (enemyId === targetId || this.factions[enemyId]?.eliminated) return false;
-		this.player.cleanCash -= this.contractCost();
-		this.player.contractUses += 1;
+		const payer = this.factions[factionId]!;
+		payer.cleanCash -= this.contractCost(factionId);
+		payer.contractUses += 1;
 		const target = this.factions[targetId]!;
 		target.contractTarget = enemyId;
 		target.contractUntil = this.tick + CONTRACT.durationTicks;
-		const contractAnchor = this.playerAnchor();
-		if (contractAnchor >= 0) this.float(contractAnchor, `🤝 contrat : ${target.name}`, "gain");
-		this.pushLog(
-			`Contract: ${target.name} paid to strike ${this.factions[enemyId]!.name}`,
-		);
-		this.events.push("pact");
+		if (factionId === this.player.id) {
+			const anchor = this.playerAnchor();
+			if (anchor >= 0) this.float(anchor, `🤝 contract: ${target.name}`, "gain");
+			this.pushLog(`Contract: ${target.name} paid to strike ${this.factions[enemyId]!.name}`);
+			this.events.push("pact");
+		}
 		return true;
 	}
-	buyCost(module: number): number {
+
+	playerCanFundContract(targetId: number): boolean {
+		return this.canFundContract(this.player.id, targetId);
+	}
+
+	playerFundContract(targetId: number, enemyId: number): boolean {
+		return this.fundContract(this.player.id, targetId, enemyId);
+	}
+
+	buyCost(module: number, factionId = this.player.id): number {
 		const size = this.city.size?.[module] ?? 1;
 		return Math.round(
-			BUY.baseCostClean * size * (1 + this.modulesOwned(this.player.id) * BUY.perOwned),
+			BUY.baseCostClean * size * (1 + this.modulesOwned(factionId) * BUY.perOwned),
 		);
 	}
 
-	playerCanBuy(module: number): boolean {
+	canBuy(factionId: number, module: number): boolean {
 		if (this.outcome !== null) return false;
 		if (this.ownerAt(module) !== NEUTRAL) return false;
-		if (!this.canAttack(this.player.id, module)) return false;
-		if (this.player.buyCooldown > 0) return false;
-		return this.player.cleanCash >= this.buyCost(module);
+		if (!this.canAttack(factionId, module)) return false;
+		if (this.factions[factionId]!.buyCooldown > 0) return false;
+		return this.factions[factionId]!.cleanCash >= this.buyCost(module, factionId);
 	}
 
 	/** Buys an adjacent neutral quarter: Clean cash → territory. */
-	playerBuy(module: number): boolean {
-		if (!this.playerCanBuy(module)) return false;
-		this.player.cleanCash -= this.buyCost(module);
-		this.player.buyCooldown = BUY.cooldownTicks;
-		this.territory.owner[module] = this.player.id;
+	buyQuarter(factionId: number, module: number): boolean {
+		if (!this.canBuy(factionId, module)) return false;
+		const faction = this.factions[factionId]!;
+		const cost = this.buyCost(module, factionId);
+		faction.cleanCash -= cost;
+		faction.buyCooldown = BUY.cooldownTicks;
+		this.territory.owner[module] = factionId;
 		this.territory.control[module] = BUY.control;
 		this.territory.capturedAt[module] = this.tick;
-		this.player.captures += 1;
+		faction.captures += 1;
 		this.recount();
-		this.float(module, `🏷 bought (${this.buyCost(module).toLocaleString("en-US")})`, "gain");
-		this.pushLog(`Quarter bought at a premium (module ${module})`);
-		this.events.push("capture");
+		if (factionId === this.player.id) {
+			this.float(module, `🏷 bought (${cost.toLocaleString("en-US")})`, "gain");
+			this.pushLog(`Quarter bought at a premium (module ${module})`);
+			this.events.push("capture");
+		}
 		return true;
+	}
+
+	playerCanBuy(module: number): boolean {
+		return this.canBuy(this.player.id, module);
+	}
+
+	playerBuy(module: number): boolean {
+		return this.buyQuarter(this.player.id, module);
 	}
 
 	private defenseBonus(factionId: number): number {
@@ -2462,6 +2505,7 @@ export class World {
 			if (this.rng() < 0.3) this.aiOperate(i);
 			if (this.rng() < 0.2) this.aiIntercept(i);
 			if (this.rng() < 0.15) this.aiStrike(i);
+			this.aiSpend(i);
 			// Push a couple of fronts. The first is **force concentration**: reinforce
 			// the ongoing assault before opening a new one. The rest expand the war.
 			const pushed = new Set<number>();
@@ -2480,6 +2524,41 @@ export class World {
 				if (!this.attackFrom(i, focus)) break;
 			}
 		}
+	}
+
+	/**
+	 * AI spending. Clean cash must **leave the treasury** or the cartels just
+	 * hoard millions doing nothing (they were ending games with 2–4 M unspent).
+	 * Armament, quarter buyouts and contracts are the clean sinks; mercenaries
+	 * convert surplus Dirty cash into troops.
+	 */
+	private aiSpend(factionId: number): void {
+		const faction = this.factions[factionId]!;
+		// Armament: repeatable firepower — the cheapest real sink.
+		if (this.canBuyArmament(factionId) && faction.cleanCash > this.armamentCost(factionId) * 2) {
+			this.buyArmament(factionId);
+		}
+		// Buyout: Clean cash → territory without committing a single troop.
+		if (faction.buyCooldown <= 0 && faction.cleanCash > 20000) {
+			for (let i = 0; i < this.territory.count; i += 1) {
+				if (faction.cleanCash < this.buyCost(i, factionId) * 3) continue;
+				if (!this.canBuy(factionId, i)) continue;
+				this.buyQuarter(factionId, i);
+				break;
+			}
+		}
+		// Contract: pay a rival to bleed the leader.
+		const leader = this.findLeader();
+		if (leader >= 0 && leader !== factionId && faction.cleanCash > 40000) {
+			for (const other of this.factions) {
+				if (other.id === factionId || other.id === leader) continue;
+				if (other.eliminated || other.contractUntil > this.tick) continue;
+				if (this.fundContract(factionId, other.id, leader)) break;
+			}
+		}
+		// Mercenaries: surplus Dirty cash → Members. Troops are the war currency,
+		// so a treasury that just sits there is a wasted army.
+		if (faction.dirtyCash > this.mercCost(factionId) * 2) this.hireMercenaries(factionId);
 	}
 
 	private aiStrike(factionId: number): boolean {

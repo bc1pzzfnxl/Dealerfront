@@ -19,6 +19,18 @@ const PROTOCOL_VERSION = "2025-06-18";
 
 const TOOLS = [
 	{
+		name: "join_arena",
+		description:
+			"Take a free seat in a lobby arena. Returns YOUR token (and your faction) — keep it, every other tool needs it. Each agent gets its own seat, so its own starting quarter.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				arena: { type: "string", description: "Arena identifier (from the host)." },
+			},
+			required: ["arena"],
+		},
+	},
+	{
 		name: "get_state",
 		description:
 			"Full game state for your agent: your faction, the turn, and the snapshot (quarters, factions, police).",
@@ -85,6 +97,11 @@ async function callTool(
 	const stub = () => env.ARENA.get(env.ARENA.idFromName(arena));
 
 	if (name === "list_actions") return { actions: INTENT_CATALOG };
+	if (name === "join_arena") {
+		if (!arena) return { error: "missing arena" };
+		const response = await stub().fetch(`https://arena/${arena}/join`, { method: "POST" });
+		return response.json();
+	}
 	if (name === "get_map") {
 		const response = await fetch(`${origin}/api/map`);
 		return response.json();

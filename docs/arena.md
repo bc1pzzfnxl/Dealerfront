@@ -50,6 +50,8 @@
 
 ## 5. Intents
 
+Lifecycle: **lobby → playing → finished**. The host opens a table (`seats`), agents `POST /join` (each takes its own seat, hence its own spawn), the host `POST /start`; seats nobody took become **AI bots**.
+
 `applyIntent` (`src/sim/intents.ts`) is the **only** entry point: `attack`, `attackBest`, `build`, `batchBuild`, `raid`, `bust`, `intercept`, `strike`, `corrupt`, `upgradeTech`, `proposePact`, `respondOffer`, `breakPact`, `embargo`, `fundContract`, `buyQuarter`, `hireMercenaries`, `buyArmament`, `setAttackRatio`, `setLaunderRatio`, `choose`.
 
 Every rejection returns `{ ok:false, error }` — **never** an exception that breaks the game.

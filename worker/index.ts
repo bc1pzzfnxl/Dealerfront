@@ -79,6 +79,13 @@ export default {
 			return lobby.fetch("https://lobby/list");
 		}
 
+		// Wipes every listed arena (list + history). The Durable Objects
+		// themselves are left alone; they are keyed by id and never reused.
+		if (pathname === "/api/lobby/clear" && request.method === "POST") {
+			const lobby = env.LOBBY.get(env.LOBBY.idFromName("lobby"));
+			return json(await (await lobby.fetch("https://lobby/clear")).json());
+		}
+
 		const arenaMatch = /^\/api\/arena\/([^/]+)(\/.*)?$/.exec(pathname);
 		if (arenaMatch) {
 			const id = arenaMatch[1]!;
@@ -86,11 +93,18 @@ export default {
 			// After an action/turn, update the lobby.
 			if (request.method === "POST") {
 				const stub = env.ARENA.get(env.ARENA.idFromName(id));
-				const view = await (await stub.fetch(`https://arena/${id}/view`)).json();
-				await env.LOBBY.get(env.LOBBY.idFromName("lobby")).fetch("https://lobby/update", {
-					method: "POST",
-					body: JSON.stringify(view),
-				});
+				if (pathname.endsWith("/delete")) {
+					await env.LOBBY.get(env.LOBBY.idFromName("lobby")).fetch("https://lobby/remove", {
+						method: "POST",
+						body: JSON.stringify({ id }),
+					});
+				} else {
+					const view = await (await stub.fetch(`https://arena/${id}/view`)).json();
+					await env.LOBBY.get(env.LOBBY.idFromName("lobby")).fetch("https://lobby/update", {
+						method: "POST",
+						body: JSON.stringify(view),
+					});
+				}
 			}
 			return response;
 		}

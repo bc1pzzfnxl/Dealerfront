@@ -11,31 +11,15 @@ interface Props {
 	onBack: () => void;
 }
 
-function Copy({ value }: { value: string }) {
-	const [copied, setCopied] = useState(false);
-	return (
-		<button
-			type="button"
-			className="tech-up"
-			onClick={() => {
-				void navigator.clipboard?.writeText(value);
-				setCopied(true);
-				setTimeout(() => setCopied(false), 1200);
-			}}
-		>
-			{copied ? "Copied" : "Copy"}
-		</button>
-	);
-}
-
 export function ArenaSetup({ onSpectate, onBack }: Props) {
-	const [agents, setAgents] = useState(1);
-	const [bots, setBots] = useState(5);
-	const [seed, setSeed] = useState("");
+	const [seats, setSeats] = useState(6);
 	const [turnTicks, setTurnTicks] = useState(50);
+	const [seed, setSeed] = useState("");
 	const [created, setCreated] = useState<CreateResponse | null>(null);
+	const [lobby, setLobby] = useState<ArenaView | null>(null);
 	const [arenas, setArenas] = useState<ArenaView[]>([]);
 	const [busy, setBusy] = useState(false);
+	const [copied, setCopied] = useState("");
 
 	const refresh = async () => {
 		try {
@@ -46,11 +30,27 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 		}
 	};
 
+	// Poll the lobby while a table is open, so you can watch the agents arrive.
 	useEffect(() => {
 		void refresh();
 		const timer = setInterval(() => void refresh(), 5000);
 		return () => clearInterval(timer);
 	}, []);
+
+	useEffect(() => {
+		if (!created || created.view.phase !== "lobby") return;
+		const timer = setInterval(() => {
+			void (async () => {
+				try {
+					const response = await fetch(`/api/arena/${created.view.id}/view`);
+					if (response.ok) setLobby((await response.json()) as ArenaView);
+				} catch {
+					// offline: ignored
+				}
+			})();
+		}, 1500);
+		return () => clearInterval(timer);
+	}, [created]);
 
 	const create = async () => {
 		setBusy(true);
@@ -59,19 +59,50 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
-					agents,
-					bots,
+					seats,
 					turnTicks,
 					seed: seed.trim() === "" ? undefined : Number(seed),
 				}),
 			});
-			if (response.ok) setCreated((await response.json()) as CreateResponse);
+			if (response.ok) {
+				const payload = (await response.json()) as CreateResponse;
+				setCreated(payload);
+				setLobby(payload.view);
+			}
 		} finally {
 			setBusy(false);
 		}
 	};
 
+	const start = async () => {
+		if (!created) return;
+		setBusy(true);
+		try {
+			const response = await fetch(`/api/arena/${created.view.id}/start`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ ownerToken: created.ownerToken }),
+			});
+			if (response.ok) {
+				const view = (await response.json()) as ArenaView;
+				setLobby(view);
+				setCreated({ ...created, view });
+				onSpectate(created.view.id);
+			}
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const copy = (value: string) => {
+		void navigator.clipboard?.writeText(value);
+		setCopied(value);
+		setTimeout(() => setCopied(""), 1200);
+	};
+
 	const base = location.origin;
+	const joinUrl = created ? `${base}/api/arena/${created.view.id}/join` : "";
+	const joined = lobby?.agents ?? [];
 
 	return (
 		<div className="arena-screen">
@@ -84,35 +115,23 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 
 			{!created ? (
 				<section className="card arena-card">
-					<h2>New arena</h2>
-					<label className="slider-row">
-						<span>Agents</span>
+					<h2>Open a table</h2>
+					<p className="hint-inline">
+						The table opens in a <strong>lobby</strong>: agents join at their own pace, each
+						taking its own seat (so its own spawn). You start when you are ready — empty seats
+						become AI bots.
+					</p>
+					<label className="slider-row" title="Agents + AI bots at the table">
+						<span>Seats</span>
 						<input
 							type="range"
-							min={1}
-							max={4}
+							min={2}
+							max={6}
 							step={1}
-							value={agents}
-							onChange={(event) => {
-								const next = Number(event.target.value);
-								setAgents(next);
-								// Never more than 6 factions in play.
-								if (next + bots > 6) setBots(6 - next);
-							}}
+							value={seats}
+							onChange={(event) => setSeats(Number(event.target.value))}
 						/>
-						<code>{agents}</code>
-					</label>
-					<label className="slider-row" title="AI factions the agents fight (the solo setup uses 5)">
-						<span>AI bots</span>
-						<input
-							type="range"
-							min={0}
-							max={6 - agents}
-							step={1}
-							value={bots}
-							onChange={(event) => setBots(Number(event.target.value))}
-						/>
-						<code>{bots}</code>
+						<code>{seats}</code>
 					</label>
 					<label className="slider-row">
 						<span>Ticks / turn</span>
@@ -137,18 +156,35 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 						<code>—</code>
 					</label>
 					<button type="button" className="expand-btn" disabled={busy} onClick={() => void create()}>
-						{busy ? "Creating…" : "Create arena"}
+						{busy ? "Opening…" : "Open the table"}
 					</button>
 				</section>
 			) : (
 				<section className="card arena-card">
 					<h2>
-						Arena <em>{created.view.id}</em>
+						Arena <em>{created.view.id}</em> — {lobby?.phase ?? created.view.phase}
 					</h2>
 					<p className="hint-inline">
-						Hand out one <strong>token</strong> per agent. Each agent polls the state, plays its
-						actions (as many as it wants) then ends its turn.
+						Give this URL to your agents: each <strong>POST</strong> takes a free seat and
+						returns its own token.
 					</p>
+					<div className="line">
+						<span>Join (POST)</span>
+						<code>{joinUrl}</code>
+						<button type="button" className="tech-up" onClick={() => copy(joinUrl)}>
+							{copied === joinUrl ? "Copied" : "Copy"}
+						</button>
+					</div>
+					<div className="line">
+						<span>
+							Seats taken <strong>{joined.length}</strong> / {lobby?.seats ?? created.view.seats}
+						</span>
+						<code>
+							{joined.length === 0
+								? "waiting for agents…"
+								: joined.map((agent) => `f${agent.factionId} ${agent.name}`).join(" · ")}
+						</code>
+					</div>
 					<div className="arena-endpoints">
 						<div className="line">
 							<span>State (GET)</span>
@@ -169,24 +205,21 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 							</code>
 						</div>
 						<div className="line">
-							<span>Map (GET)</span>
-							<code>{base}/api/map</code>
+							<span>MCP</span>
+							<code>{base}/mcp</code>
 						</div>
 					</div>
-					{created.agents.map((agent) => (
-						<div className="line" key={agent.factionId}>
-							<span>
-								Agent {agent.factionId + 1} — {agent.name}
-							</span>
-							<code>{agent.token}</code>
-							<Copy value={agent.token} />
-						</div>
-					))}
 					<button
 						type="button"
 						className="expand-btn"
-						onClick={() => onSpectate(created.view.id)}
+						disabled={busy || (lobby?.phase ?? created.view.phase) !== "lobby"}
+						onClick={() => void start()}
 					>
+						{lobby?.phase === "lobby"
+							? `Start now (${joined.length} agent${joined.length === 1 ? "" : "s"}, ${(lobby?.seats ?? created.view.seats) - joined.length} bot${(lobby?.seats ?? created.view.seats) - joined.length === 1 ? "" : "s"})`
+							: "Started"}
+					</button>
+					<button type="button" className="tech-up" onClick={() => onSpectate(created.view.id)}>
 						Watch live
 					</button>
 				</section>
@@ -200,7 +233,8 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 					arenas.map((arena) => (
 						<div className="line" key={arena.id}>
 							<span>
-								{arena.id} · {arena.phase} · turn {arena.turn} · {arena.agents.length} agents
+								{arena.id} · {arena.phase} · turn {arena.turn} · {arena.agents.length}/
+								{arena.seats} agents
 							</span>
 							<button type="button" className="tech-up" onClick={() => onSpectate(arena.id)}>
 								View
@@ -208,6 +242,16 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 						</div>
 					))
 				)}
+				<button
+					type="button"
+					className="tech-up"
+					title="Wipes the list and the finished-game history"
+					onClick={() => {
+						void fetch("/api/lobby/clear", { method: "POST" }).then(() => refresh());
+					}}
+				>
+					Clear list
+				</button>
 			</section>
 		</div>
 	);

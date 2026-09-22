@@ -37,6 +37,21 @@ export class Lobby extends DurableObject<Env> {
 			return Response.json(all);
 		}
 
+		/** Drops one arena from the list (after it is deleted). */
+		if (url.pathname.endsWith("/remove")) {
+			const { id } = (await request.json()) as { id: string };
+			this.arenas.delete(id);
+			await this.ctx.storage.put("arenas", [...this.arenas.values()]);
+			return Response.json({ ok: true });
+		}
+
+		/** Wipes the list and the history. */
+		if (url.pathname.endsWith("/clear")) {
+			this.arenas.clear();
+			await this.ctx.storage.put("arenas", []);
+			return Response.json({ ok: true, cleared: true });
+		}
+
 		return new Response("Not Found", { status: 404 });
 	}
 }

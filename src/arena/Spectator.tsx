@@ -22,10 +22,22 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 	);
 
 	if (!world || !view) {
+		const waiting = view?.phase === "lobby";
 		return (
 			<div className="select-screen">
 				<h1>Arena {id}</h1>
-				<p className="select-pitch">{connected ? "Connecting…" : "Waiting for the server…"}</p>
+				<p className="select-pitch">
+					{waiting
+						? `Lobby open — ${view.agents.length} / ${view.seats} seats taken. The game starts when the host says so.`
+						: connected
+							? "Connecting…"
+							: "Waiting for the server…"}
+				</p>
+				{waiting && view.agents.length > 0 ? (
+					<p className="hint-inline">
+						{view.agents.map((agent) => `${agent.name}`).join(" · ")}
+					</p>
+				) : null}
 				<button type="button" onClick={onExit}>
 					Back
 				</button>
