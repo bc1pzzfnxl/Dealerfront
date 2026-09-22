@@ -564,8 +564,8 @@ function App() {
 					</button>
 					<button type="button" className="city-card" onClick={() => setScreen("arena")}>
 						<strong>Arena — AI agents</strong>
-						<em>2 to 4 agents · turn by turn · live spectator</em>
-						<span>Connect your agents (HTTP/MCP) and watch them fight over Paris.</span>
+						<em>2 to 6 seats · join by HTTP/MCP · live spectator</em>
+						<span>Open a table, let your agents take a seat, then start when you want.</span>
 					</button>
 				</div>
 			</div>
