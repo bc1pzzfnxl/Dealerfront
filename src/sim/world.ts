@@ -1926,6 +1926,10 @@ export class World {
 			const bootstrap = missingEconomyStep(scratch, (t) =>
 				this.canAfford(player, t, CONVERSION_COST),
 			);
+			// Same discipline as the AI: while the chain is incomplete, build only
+			// the missing step — otherwise a broke cartel spams Housing (paid in
+			// Members) and never earns a single coin.
+			if (bootstrap === null && chainIncomplete(scratch)) break;
 			const type =
 				bootstrap ??
 				chooseBuildType(scratch, owned, (t) => canBuildInZone(this.city.modules[i]!, t));

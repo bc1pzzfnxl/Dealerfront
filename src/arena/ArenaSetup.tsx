@@ -13,7 +13,7 @@ interface Props {
 
 export function ArenaSetup({ onSpectate, onBack }: Props) {
 	const [seats, setSeats] = useState(6);
-	const [turnTicks, setTurnTicks] = useState(50);
+	const [speed, setSpeed] = useState(5);
 	const [seed, setSeed] = useState("");
 	const [created, setCreated] = useState<CreateResponse | null>(null);
 	const [lobby, setLobby] = useState<ArenaView | null>(null);
@@ -60,7 +60,7 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					seats,
-					turnTicks,
+					ticksPerSecond: speed,
 					seed: seed.trim() === "" ? undefined : Number(seed),
 				}),
 			});
@@ -139,7 +139,8 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 					<p className="hint-inline">
 						The table opens in a <strong>lobby</strong>: agents join at their own pace, each
 						taking its own seat (so its own spawn). You start when you are ready — empty seats
-						become AI bots.
+						become AI bots. The game then runs in <strong>real time</strong>: agents act
+						whenever they can and never wait for each other.
 					</p>
 					<p className="hint-inline">
 						<strong>Copy to play</strong> copies a ready-made prompt: paste it into any LLM with
@@ -158,17 +159,20 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 						/>
 						<code>{seats}</code>
 					</label>
-					<label className="slider-row">
-						<span>Ticks / turn</span>
+					<label
+						className="slider-row"
+						title="Game seconds simulated per real second. 5 leaves twice the wall-clock room per action; 10 is real time."
+					>
+						<span>Game speed</span>
 						<input
 							type="range"
-							min={10}
-							max={200}
-							step={10}
-							value={turnTicks}
-							onChange={(event) => setTurnTicks(Number(event.target.value))}
+							min={1}
+							max={10}
+							step={1}
+							value={speed}
+							onChange={(event) => setSpeed(Number(event.target.value))}
 						/>
-						<code>{turnTicks}</code>
+						<code>{speed}×</code>
 					</label>
 					<label className="slider-row">
 						<span>Seed</span>
@@ -251,22 +255,7 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 								: `Start now (${joined.length} agent${joined.length === 1 ? "" : "s"}, ${(lobby?.seats ?? created.view.seats) - joined.length} bot${(lobby?.seats ?? created.view.seats) - joined.length === 1 ? "" : "s"})`
 							: "Started"}
 					</button>
-					{(lobby?.phase ?? created.view.phase) === "playing" ? (
-						<button
-							type="button"
-							className="tech-up"
-							title="Advance one turn without waiting for the agents (a stalled LLM must not freeze the table)"
-							onClick={() => {
-								void fetch(`/api/arena/${created.view.id}/skip`, {
-									method: "POST",
-									headers: { "Content-Type": "application/json" },
-									body: JSON.stringify({ ownerToken: created.ownerToken }),
-								});
-							}}
-						>
-							Force turn
-						</button>
-					) : null}
+
 					<button type="button" className="tech-up" onClick={() => onSpectate(created.view.id)}>
 						Watch live
 					</button>
@@ -281,7 +270,7 @@ export function ArenaSetup({ onSpectate, onBack }: Props) {
 					arenas.map((arena) => (
 						<div className="line" key={arena.id}>
 							<span>
-								{arena.id} · {arena.phase} · turn {arena.turn} · {arena.agents.length}/
+								{arena.id} · {arena.phase} · tick {arena.tick} · {arena.agents.length}/
 								{arena.seats} agents
 							</span>
 							<button type="button" className="tech-up" onClick={() => onSpectate(arena.id)}>

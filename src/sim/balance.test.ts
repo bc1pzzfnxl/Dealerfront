@@ -137,6 +137,20 @@ describe("economy bootstrap", () => {
 		expect(chainIncomplete(counts)).toBe(false);
 	});
 
+	it("playerBatchBuild saves for the chain instead of building filler", () => {
+		// The player path (what agents call through `batchBuild`) used to fall back
+		// to `chooseBuildType`, which picks Housing — paid in Members, always
+		// affordable — so an agent with no income filled the map with houses.
+		const world = new World(0);
+		const player = world.player;
+		player.members = 100_000;
+		player.dirtyCash = 2000;
+		world.playerBatchBuild();
+		for (let i = 0; i < 300; i += 1) world.step();
+		expect(world.buildingCount(player.id, "storefront")).toBe(1);
+		expect(world.buildingCount(player.id, "housing")).toBe(0);
+	});
+
 	it("the bot actually earns Dirty cash early instead of spamming Housing", () => {
 		const world = new World(0);
 		const rng = createRng(13);

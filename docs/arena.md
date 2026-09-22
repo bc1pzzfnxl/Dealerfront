@@ -8,8 +8,10 @@
 
 - The simulation runs **server-side** (one **Durable Object per game**), authoritative.
 - The agents are **external** (on your side, LLM in the cloud) and connect via **HTTP** or **MCP**.
-- The pace is **set by the agents**: a **turn** = `turnTicks` game ticks (default 50 = 5 s). The server waits until **all** agents have finished their turn, then advances. **No timeout**: a slow agent slows the game down, it does not break it.
-- An agent plays **as many actions as they want** per turn (no cap).
+- The game runs **in real time**: a Durable Object **alarm** advances the simulation every second (`ticksPerSecond` game seconds per real second, default **5** = half speed). A full game lasts ~20 minutes of wall-clock time.
+- **There is no turn.** `act` applies **immediately** to the live world, and agents **never wait for each other** — a fast script simply plays more actions than a slow LLM. (The old turn barrier made the fastest agent hostage to the slowest: one LLM turn took tens of seconds, so a 260-turn game took hours.)
+- The clock stops when the game ends, or after **5 minutes with no agent activity** (any request restarts it).
+- An agent plays **as many actions as it wants**, whenever it wants (no cap).
 
 ## 2. Agent cycle
 
@@ -18,22 +20,24 @@
 2. GET  /api/arena/:id/state?token=…  → your faction + the full snapshot
 3. POST /api/arena/:id/act            → { token, intent }   (repeat as many times as you want)
 4. POST /api/arena/:id/endTurn        → { token }           (when you are done)
-5. back to 2 (when the turn has advanced)
+5. back to 2 (the next second, or as soon as the agent acts again)
 ```
 
-`state` returns `snapshot`: `tick`, `territory` (992 quarters), `factions`, `police`, `attacks`, `log`… See `WorldSnapshot` (`src/sim/world.ts`).
+`state` returns the **compact agent view** (`src/server/agent-view.ts`, ~3 KB): your faction, the standings, your empty quarters, the quarters you can attack now, incoming attacks, strikes, police, recent log. Add `&full=1` for the raw 30 KB `WorldSnapshot` (`src/sim/world.ts`). The **spectator** always receives the full snapshot — it has to draw the map.
 
 ## 3. HTTP
 
 | Route | Body | Response |
 |---|---|---|
 | `GET /api/map` | — | `{ count, zones, neighbors, spawns, demand, wealth, size }` |
-| `POST /api/arena` | `{ agents, seed?, turnTicks? }` | `{ view, ownerToken, agents:[{factionId,name,token}] }` |
+| `POST /api/arena` | `{ seats, seed?, ticksPerSecond? }` | `{ view, ownerToken, joinUrl }` |
+| `POST /api/arena/:id/join` | — | `{ arena, factionId, name, token, free }` |
+| `POST /api/arena/:id/start` | `{ ownerToken }` | `view` |
 | `GET /api/arena` | — | list of arenas (lobby) |
 | `GET /api/arena/:id/view` | — | public view (spectator) |
 | `GET /api/arena/:id/state?token=` | — | `{ factionId, view, snapshot }` |
-| `POST /api/arena/:id/act` | `{ token, intent }` | `{ ok, error?, turn }` |
-| `POST /api/arena/:id/endTurn` | `{ token }` | `{ advanced, turn }` |
+| `POST /api/arena/:id/act` | `{ token, intent }` | `{ ok, error?, tick }` |
+| `POST /api/arena/:id/endTurn` | `{ token }` | no-op, always `{ advanced:true }` |
 | `WS /api/arena/:id/spectate` | — | `{ kind:"state"\|"finished", view, snapshot }` |
 
 ## 4. MCP
@@ -45,7 +49,7 @@
 | `get_state` | `arena`, `token` | your faction + the snapshot |
 | `list_actions` | — | intent catalog |
 | `act` | `arena`, `token`, `intent` | plays an action |
-| `end_turn` | `arena`, `token` | ends your turn |
+| `end_turn` | `arena`, `token` | **deprecated no-op** (the game is real time) |
 | `get_map` | — | static map |
 
 ## 5. Intents
@@ -59,7 +63,7 @@ Every rejection returns `{ ok:false, error }` — **never** an exception that br
 ## 6. Decisions
 
 - **API first, MCP as adapter**: the HTTP API is the contract; MCP is a thin layer.
-- **Turn by turn at the agents' pace** (not real time): LLMs think in seconds.
+- **Real time, no turn barrier**: a mixed table (a fast script + a slow LLM) cannot deadlock, and the clock is predictable.
 - **Unchanged sim**: the `World` is pure and deterministic, it runs as-is in the Durable Object.
 - **Serializable snapshot** (`World.snapshot()` / `applySnapshot()`), **RNG included** → exact resume after hibernation.
-- **Free plan**: no periodic alarm (the agents trigger), snapshot persisted per turn.
+- **Free plan**: the clock is a DO **alarm** (~1/s, ~1,200 per game — negligible), snapshot persisted every 10 s, and an idle game stops its own clock after 5 min.

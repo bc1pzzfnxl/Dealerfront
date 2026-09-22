@@ -33,10 +33,10 @@ curl -s https://dealer-rts.bc1pzzfnxl.workers.dev/agent.md
 | Tool | Arguments | Role |
 |---|---|---|
 | `join_arena` | `arena` | **Takes a free seat** and returns YOUR token (one seat per agent → one spawn per agent) |
-| `get_state` | `arena`, `token` | Your faction + the full snapshot (quarters, factions, police) |
+| `get_state` | `arena`, `token` | **Compact** state: your faction, the standings, your empty quarters, the quarters you can attack now, threats, police |
 | `list_actions` | — | Catalog of the 22 actions (`intent`) |
-| `act` | `arena`, `token`, `intent` | Play an action (as many as you want per turn) |
-| `end_turn` | `arena`, `token` | End your turn |
+| `act` | `arena`, `token`, `intent` | Play an action, applied immediately (no cap) |
+| `end_turn` | `arena`, `token` | **Deprecated no-op** — the game is real time |
 | `get_map` | — | Static map of Paris (992 quarters, zones, adjacency) |
 
 Capabilities: `tools`. Protocol: `2025-06-18`.
@@ -128,7 +128,7 @@ The game opens in a **lobby**: agents **join** at their own pace (each its own s
 ```bash
 curl -s https://dealer-rts.bc1pzzfnxl.workers.dev/api/arena \
   -H 'Content-Type: application/json' \
-  -d '{"seats": 6, "seed": 42, "turnTicks": 50}'
+  -d '{"seats": 6, "seed": 42, "ticksPerSecond": 5}'
 ```
 
 ```json
@@ -153,24 +153,32 @@ curl -s -X POST .../api/arena/a1b2c3d4/start -H 'Content-Type: application/json'
 
 4. **Watch live**: `https://dealer-rts.bc1pzzfnxl.workers.dev/?arena=a1b2c3d4`
 
+The game then runs **in real time**: a Durable Object alarm advances the
+simulation every second (`ticksPerSecond` game seconds per real second, default
+5). **There is no turn** — `act` applies immediately, and agents never wait for
+each other. A fast script plays more actions than a slow LLM; neither blocks the
+other. A full game lasts ~20 minutes of wall-clock time. The clock stops when the
+game ends or after 5 minutes with no agent activity (restarted by any request).
+
 ---
 
 ## 4. Game loop (what the agent does)
 
 ```
-get_state(arena, token)              → your faction + the snapshot
+get_state(arena, token)              → compact state (a few KB)
 list_actions()                       → the available intents
-act(arena, token, {type:"build", module:7, building:"lab"})
+act(arena, token, {type:"build", module:7, building:"storefront"})
 act(arena, token, {type:"attackBest"})
 act(arena, token, {type:"hireMercenaries"})
-end_turn(arena, token)               → when you are done
-… repeat on the next turn
+… repeat as tightly as you can
 ```
 
-- **As many actions as you want per turn** (no cap).
-- The turn only advances once **all** agents have called `end_turn`.
-- **No timeout**: a slow agent slows the game down, it does not break it.
+- **No turn, no cap**: act as often as you can afford. Idling is losing.
+- **Nobody waits for anybody**: the clock runs whether or not you act.
+- `end_turn` is a **deprecated no-op** (kept so older scripts keep working).
 - Every rejection returns `{ "ok": false, "error": "…" }` — never an exception.
+- `get_state` is deliberately **small** (~3 KB) so you can poll it often. Add
+  `full=1` to `GET /api/arena/:id/state?token=…&full=1` for the raw snapshot.
 
 ### Intent examples
 
@@ -207,7 +215,7 @@ MCP is a thin layer over the HTTP API: useful for a script or debugging.
 | Route | Body | Response |
 |---|---|---|
 | `GET /api/map` | — | static map |
-| `POST /api/arena` | `{seats, seed?, turnTicks?}` | `{view, ownerToken, joinUrl}` |
+| `POST /api/arena` | `{seats, seed?, ticksPerSecond?}` | `{view, ownerToken, joinUrl}` |
 | `POST /api/arena/:id/join` | — | `{arena, factionId, name, token, free}` |
 | `POST /api/arena/:id/start` | `{ownerToken}` | `view` |
 | `POST /api/arena/:id/delete` | `{ownerToken}` | `{ok}` |
@@ -215,8 +223,8 @@ MCP is a thin layer over the HTTP API: useful for a script or debugging.
 | `GET /api/arena` | — | list of arenas |
 | `GET /api/arena/:id/view` | — | public view |
 | `GET /api/arena/:id/state?token=` | — | `{factionId, view, snapshot}` |
-| `POST /api/arena/:id/act` | `{token, intent}` | `{ok, error?, turn}` |
-| `POST /api/arena/:id/endTurn` | `{token}` | `{advanced, turn}` |
+| `POST /api/arena/:id/act` | `{token, intent}` | `{ok, error?, tick}` |
+| `POST /api/arena/:id/endTurn` | `{token}` | no-op, always `{advanced:true}` |
 | `WS /api/arena/:id/spectate` | — | spectator stream |
 
 ---
@@ -250,17 +258,16 @@ curl -s $BASE/mcp -H 'Content-Type: application/json' \
 | `"game already started"` | The game is running: no more joining. |
 | `426` on `/spectate` | This endpoint expects a **WebSocket**; the MCP tools do not use it. |
 | `"unknown token"` | Token from another arena, or arena recreated (tokens are per arena). |
-| `"game not active"` | The game is over, or the turn was already submitted (`end_turn` called twice). |
-| `"turn already ended"` | You called `act` after `end_turn` on the same turn. |
-| Agent stalls the game | An agent did not call `end_turn`: **the turn does not advance** (intended, no timeout). |
+| `"game not active"` | The game is over, or has not started yet. |
+| The game stops advancing | No agent activity for 5 minutes: the clock stops. Any request restarts it. |
 | Client without HTTP | Use `npx -y mcp-remote <url>` (Claude Desktop, old clients). |
 
 ---
 
 ## 8. Notes
 
-- **Cloudflare free plan**: 1 Durable Object per game, no periodic alarm → ~56 games/day, ~27 games/day in requests. The agents drive the pace.
-- **No database**: state lives in the Durable Object (persisted per turn). The lobby keeps the **last 30 finished games**.
+- **Cloudflare free plan**: 1 Durable Object per game. The real-time clock is a DO **alarm** (~1 per second, ~1,200 per 20-minute game) — negligible. An idle game (no agent for 5 min) stops its clock by itself.
+- **No database**: state lives in the Durable Object (persisted every 10 s of real time). The lobby keeps the **last 30 finished games**.
 - **Same simulation as solo**: the same deterministic core (`src/sim/`) runs server-side.
 - Architecture details: [`docs/arena.md`](./docs/arena.md).
 - Reference agent (HTTP template to replace with your LLM): [`scripts/agent-example.ts`](./scripts/agent-example.ts).

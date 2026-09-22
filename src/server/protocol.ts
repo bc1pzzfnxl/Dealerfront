@@ -12,17 +12,18 @@ export type ArenaPhase = "lobby" | "playing" | "finished";
 /**
  * Configuration when creating an arena. The arena opens in the **lobby** phase:
  * agents join at their own pace (each takes a distinct seat, so a distinct
- * spawn), then the owner starts the game.
+ * spawn), then the owner starts. The game then runs in **real time**.
  */
 export interface ArenaConfig {
 	/** Seats at the table (2–6). Agents take them; leftover seats become AI bots. */
 	seats: number;
-	/** How many seats to keep for AI bots (default: whatever is left at start). */
-	bots?: number;
 	/** Game seed (default: random). */
 	seed?: number;
-	/** Game ticks elapsed per turn (default: 50 = 5 s of game time). */
-	turnTicks?: number;
+	/**
+	 * Game seconds simulated per real second (1–20, default 5). 5 gives a slow
+	 * LLM agent twice the wall-clock room per action; 10 is strict real time.
+	 */
+	ticksPerSecond?: number;
 }
 
 /** Response to an agent joining an arena. */
@@ -35,30 +36,24 @@ export interface JoinResponse {
 	free: number;
 }
 
-/** Body of `POST /api/arena/:id/start`. */
-export interface StartRequest {
-	ownerToken: string;
-}
+
 
 /** Agent identity (the token is its only secret). */
 export interface AgentInfo {
 	factionId: number;
 	name: string;
 	token: string;
-	ready: boolean;
-	/** Number of actions played on the current turn. */
-	actions: number;
 }
 
 /** Public view of an arena (spectator, lobby). */
 export interface ArenaView {
 	id: string;
 	phase: ArenaPhase;
-	turn: number;
 	tick: number;
-	turnTicks: number;
+	/** Game seconds simulated per real second. */
+	ticksPerSecond: number;
 	seed: number;
-	agents: { factionId: number; name: string; ready: boolean; actions: number }[];
+	agents: { factionId: number; name: string }[];
 	/** Total seats at the table (agents + AI bots). */
 	seats: number;
 	/** End summary (if finished). */
@@ -78,7 +73,8 @@ export interface ArenaResult {
 		captures: number;
 		eliminations: number;
 	}[];
-	turns: number;
+	/** Game length in seconds of simulated time. */
+	seconds: number;
 }
 
 /** Create response: the public view + the owner secret (to start / delete). */
@@ -93,7 +89,7 @@ export interface CreateResponse {
 export interface ActResponse {
 	ok: boolean;
 	error?: string;
-	turn: number;
+	tick: number;
 }
 
 /** Message broadcast to spectators. */

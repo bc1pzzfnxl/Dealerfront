@@ -1,18 +1,23 @@
 /**
  * Arena — one Durable Object **per game**. Holds the authoritative `World`,
- * receives agent intents (HTTP), advances the simulation **at the agents'
- * pace** (one turn = `turnTicks` ticks, triggered when everyone is done), and
- * broadcasts state to spectators (WebSocket).
+ * receives agent intents (HTTP/MCP), and broadcasts state to spectators (WS).
  *
- * Lifecycle: **lobby → playing → finished**. The owner opens the table, agents
+ * Lifecycle: **lobby → playing → finished**. The owner opens a table, agents
  * **join** at their own pace (each takes a distinct seat, hence a distinct
- * spawn — nobody shares a quarter), then the owner **starts** the game.
+ * spawn), then the owner **starts**.
+ *
+ * **The game runs in real time.** A Durable Object *alarm* advances the
+ * simulation every second, so agents act whenever they can and never wait for
+ * each other: an LLM taking 30 s per decision simply plays fewer actions than a
+ * script, instead of freezing the table. The old turn barrier made the fastest
+ * agent hostage to the slowest (and a 260-turn game took hours).
  * See docs/arena.md.
  */
 
 import { DurableObject } from "cloudflare:workers";
 import { applyIntent, type Intent } from "../sim/intents";
 import { World, type WorldSnapshot } from "../sim/world";
+import { compactState } from "./agent-view";
 import type {
 	ArenaConfig,
 	ArenaPhase,
@@ -26,18 +31,34 @@ import type {
 
 interface ArenaState {
 	seed: number;
-	turnTicks: number;
-	turn: number;
 	phase: ArenaPhase;
 	ownerToken: string;
 	agents: AgentInfo[];
 	/** Seats at the table. Agents take them; leftover seats become AI bots. */
 	seats: number;
+	/** Game seconds simulated per real second. */
+	ticksPerSecond: number;
+	/** Wall clock of the last agent request — used to stop idle games. */
+	lastActivity: number;
+	/** Alarms since the last snapshot write. */
+	alarms: number;
 }
 
 const MIN_SEATS = 2;
 /** Hard cap: the faction name palette has 6 entries. */
 const MAX_SEATS = 6;
+/** Real time between simulation steps. */
+const ALARM_MS = 1000;
+/**
+ * Default game speed: 5 game seconds per real second. Half of real time, which
+ * gives a slow (LLM) agent twice the wall-clock room to think per action. The
+ * host can raise it to 10 for a strict real-time game.
+ */
+const DEFAULT_TICKS_PER_SECOND = 5;
+/** Stop simulating after this long with no agent activity (free-plan courtesy). */
+const IDLE_STOP_MS = 5 * 60 * 1000;
+/** Persist the world every N alarms rather than every second. */
+const SAVE_EVERY_ALARMS = 10;
 
 export class Arena extends DurableObject<Env> {
 	private arena: ArenaState | null = null;
@@ -68,20 +89,50 @@ export class Arena extends DurableObject<Env> {
 		if (this.result) await this.ctx.storage.put("result", this.result);
 	}
 
+	/** Arms the simulation clock if it is not already running. */
+	private async schedule(): Promise<void> {
+		const current = await this.ctx.storage.getAlarm();
+		if (current === null) await this.ctx.storage.setAlarm(Date.now() + ALARM_MS);
+	}
+
+	/**
+	 * One real second of game time. Re-arms itself; stops when the game is over
+	 * or when nobody has touched the table for a while.
+	 */
+	async alarm(): Promise<void> {
+		await this.load();
+		const arena = this.arena;
+		if (!arena || arena.phase !== "playing" || !this.world) return;
+		// Nobody is playing: stop burning Durable Object time. The next request
+		// re-arms the clock.
+		if (Date.now() - arena.lastActivity > IDLE_STOP_MS) return;
+
+		for (let i = 0; i < arena.ticksPerSecond; i += 1) this.world.step();
+		arena.alarms += 1;
+
+		if (this.world.outcome !== null) {
+			arena.phase = "finished";
+			this.result = this.buildResult();
+			await this.save();
+			this.broadcast();
+			return;
+		}
+		if (arena.alarms % SAVE_EVERY_ALARMS === 0) await this.save();
+		this.broadcast();
+		await this.schedule();
+	}
+
 	private view(id: string): ArenaView {
 		const arena = this.arena!;
 		return {
 			id,
 			phase: arena.phase,
-			turn: arena.turn,
 			tick: this.world?.tick ?? 0,
-			turnTicks: arena.turnTicks,
+			ticksPerSecond: arena.ticksPerSecond,
 			seed: arena.seed,
 			agents: arena.agents.map((agent) => ({
 				factionId: agent.factionId,
 				name: agent.name,
-				ready: agent.ready,
-				actions: agent.actions,
 			})),
 			seats: arena.seats,
 			result: this.result,
@@ -109,21 +160,22 @@ export class Arena extends DurableObject<Env> {
 		return (this.ctx.id.name ?? this.ctx.id.toString()) as string;
 	}
 
-	/**
-	 * Opens the table in the **lobby** phase. No world yet: it is built at
-	 * `start`, once the seats are known.
-	 */
+	/** Opens the table in the **lobby** phase. The world is built at `start`. */
 	private async create(id: string, config: ArenaConfig): Promise<CreateResponse> {
 		const seats = Math.max(MIN_SEATS, Math.min(MAX_SEATS, Math.floor(config.seats)));
 		const seed = config.seed ?? Math.floor(Math.random() * 2 ** 31);
 		this.arena = {
 			seed,
-			turnTicks: Math.max(1, config.turnTicks ?? 50),
-			turn: 0,
 			phase: "lobby",
 			ownerToken: crypto.randomUUID(),
 			agents: [],
 			seats,
+			ticksPerSecond: Math.max(
+				1,
+				Math.min(20, Math.floor(config.ticksPerSecond ?? DEFAULT_TICKS_PER_SECOND)),
+			),
+			lastActivity: Date.now(),
+			alarms: 0,
 		};
 		this.world = null;
 		this.result = null;
@@ -151,10 +203,9 @@ export class Arena extends DurableObject<Env> {
 			factionId,
 			name: `Seat ${factionId + 1}`,
 			token: crypto.randomUUID(),
-			ready: false,
-			actions: 0,
 		};
 		arena.agents.push(agent);
+		arena.lastActivity = Date.now();
 		await this.save();
 		this.broadcast();
 		return {
@@ -167,53 +218,37 @@ export class Arena extends DurableObject<Env> {
 	}
 
 	/**
-	 * Starts the game (owner only). Seats nobody took are filled with **AI bots**,
-	 * and only the agents are `controlled` — the bots are driven by the AI while
-	 * the agents wait for their turn.
+	 * Starts the game (owner only). Seats nobody took become **AI bots**, and
+	 * only the agents are `controlled` — the bots are driven by the AI.
 	 */
 	private async start(id: string, ownerToken: string): Promise<ArenaView | { error: string }> {
 		await this.load();
 		const arena = this.arena!;
 		if (arena.ownerToken !== ownerToken) return { error: "not the owner" };
 		if (arena.phase !== "lobby") return { error: "already started" };
-		// With no agent the turn can never be ended: the game would freeze at
-		// tick 0 forever. Refuse rather than open a dead table.
 		if (arena.agents.length === 0) return { error: "no agent joined yet" };
 		const world = new World(arena.seed, {
 			factionCount: arena.seats,
 			controlled: arena.agents.map((agent) => agent.factionId),
 		});
-		// The world names the cartels from their real spawn; mirror that on the seats.
 		for (const agent of arena.agents) {
 			agent.name = world.factions[agent.factionId]?.name ?? agent.name;
-			agent.ready = false;
-			agent.actions = 0;
 		}
 		this.world = world;
 		arena.phase = "playing";
+		arena.lastActivity = Date.now();
+		arena.alarms = 0;
 		await this.save();
+		await this.schedule();
 		this.broadcast();
 		return this.view(id);
-	}
-
-	/**
-	 * Force-advances one turn without waiting for the agents (owner only). The
-	 * "no timeout" rule is deliberate, but a stalled LLM session must not freeze
-	 * the table forever.
-	 */
-	private async skip(ownerToken: string): Promise<{ advanced: boolean; turn: number }> {
-		await this.load();
-		const arena = this.arena!;
-		if (arena.ownerToken !== ownerToken) return { advanced: false, turn: arena.turn };
-		if (arena.phase !== "playing") return { advanced: false, turn: arena.turn };
-		for (const agent of arena.agents) agent.ready = true;
-		return this.endTurn(arena.agents[0]!.token);
 	}
 
 	/** Deletes the arena and its stored world (owner only). */
 	private async destroy(ownerToken: string): Promise<{ ok: boolean; error?: string }> {
 		await this.load();
 		if (this.arena!.ownerToken !== ownerToken) return { ok: false, error: "not the owner" };
+		await this.ctx.storage.deleteAlarm();
 		await this.ctx.storage.deleteAll();
 		this.arena = null;
 		this.world = null;
@@ -221,46 +256,23 @@ export class Arena extends DurableObject<Env> {
 		return { ok: true };
 	}
 
-	/** Applies an agent intent. */
+	/** Applies an agent intent, immediately and without any turn gating. */
 	private async act(
 		token: string,
 		intent: Intent,
-	): Promise<{ ok: boolean; error?: string; turn: number }> {
+	): Promise<{ ok: boolean; error?: string; tick: number }> {
 		await this.load();
 		const arena = this.arena!;
 		const agent = arena.agents.find((candidate) => candidate.token === token);
-		if (!agent) return { ok: false, error: "unknown token", turn: arena.turn };
-		if (arena.phase !== "playing") return { ok: false, error: "game not active", turn: arena.turn };
-		if (agent.ready) return { ok: false, error: "turn already ended", turn: arena.turn };
+		if (!agent) return { ok: false, error: "unknown token", tick: this.world?.tick ?? 0 };
+		if (arena.phase !== "playing") {
+			return { ok: false, error: "game not active", tick: this.world?.tick ?? 0 };
+		}
+		arena.lastActivity = Date.now();
 		const result = applyIntent(this.world!, agent.factionId, intent);
-		if (result.ok) agent.actions += 1;
-		return { ok: result.ok, error: result.error, turn: arena.turn };
-	}
-
-	/** Marks the agent ready; when everyone is, advances one turn. */
-	private async endTurn(token: string): Promise<{ advanced: boolean; turn: number }> {
-		await this.load();
-		const arena = this.arena!;
-		const agent = arena.agents.find((candidate) => candidate.token === token);
-		if (!agent || arena.phase !== "playing") return { advanced: false, turn: arena.turn };
-		agent.ready = true;
-		if (!arena.agents.every((candidate) => candidate.ready)) {
-			return { advanced: false, turn: arena.turn };
-		}
-		// Everyone is done: advance the simulation.
-		for (let i = 0; i < arena.turnTicks; i += 1) this.world!.step();
-		arena.turn += 1;
-		for (const candidate of arena.agents) {
-			candidate.ready = false;
-			candidate.actions = 0;
-		}
-		if (this.world!.outcome !== null) {
-			arena.phase = "finished";
-			this.result = this.buildResult();
-		}
-		await this.save();
-		this.broadcast();
-		return { advanced: true, turn: arena.turn };
+		// The clock may have been stopped by an idle timeout: restart it.
+		await this.schedule();
+		return { ok: result.ok, error: result.error, tick: this.world!.tick };
 	}
 
 	private buildResult(): ArenaResult {
@@ -278,18 +290,24 @@ export class Arena extends DurableObject<Env> {
 				eliminations: faction.eliminations,
 			};
 		});
-		return { outcome: world.endReason, ranking, turns: this.arena!.turn };
+		return { outcome: world.endReason, ranking, seconds: Math.round(world.tick / 10) };
 	}
 
-	/** Agent view: full snapshot (the agent filters it itself). */
-	private async agentView(token: string): Promise<unknown> {
+	/**
+	 * Agent view: the **compact** state (a few KB, decision-oriented) rather than
+	 * the raw 30 KB snapshot. `full=1` still returns the raw snapshot.
+	 */
+	private async agentView(token: string, full: boolean): Promise<unknown> {
 		await this.load();
 		const agent = this.arena!.agents.find((candidate) => candidate.token === token);
 		if (!agent) return { error: "unknown token" };
+		this.arena!.lastActivity = Date.now();
+		await this.schedule();
 		return {
 			factionId: agent.factionId,
 			view: this.view(this.arenaId()),
-			snapshot: this.world?.snapshot() ?? null,
+			state: this.world ? compactState(this.world, agent.factionId) : null,
+			snapshot: full ? (this.world?.snapshot() ?? null) : undefined,
 		};
 	}
 
@@ -310,11 +328,6 @@ export class Arena extends DurableObject<Env> {
 		if (path.endsWith("/start")) {
 			const body = (await request.json()) as { ownerToken: string };
 			return Response.json(await this.start(id, body.ownerToken));
-		}
-
-		if (path.endsWith("/skip")) {
-			const body = (await request.json()) as { ownerToken: string };
-			return Response.json(await this.skip(body.ownerToken));
 		}
 
 		if (path.endsWith("/delete")) {
@@ -347,7 +360,7 @@ export class Arena extends DurableObject<Env> {
 
 		if (path.endsWith("/state")) {
 			const token = url.searchParams.get("token") ?? "";
-			return Response.json(await this.agentView(token));
+			return Response.json(await this.agentView(token, url.searchParams.get("full") === "1"));
 		}
 
 		if (path.endsWith("/act")) {
@@ -355,9 +368,14 @@ export class Arena extends DurableObject<Env> {
 			return Response.json(await this.act(body.token, body.intent));
 		}
 
+		/**
+		 * Kept as a no-op so scripts written for the turn-based arena keep
+		 * working: there is no turn to end any more.
+		 */
 		if (path.endsWith("/endTurn")) {
-			const body = (await request.json()) as { token: string };
-			return Response.json(await this.endTurn(body.token));
+			await this.load();
+			this.arena!.lastActivity = Date.now();
+			return Response.json({ advanced: true, tick: this.world?.tick ?? 0 });
 		}
 
 		return new Response("Not Found", { status: 404 });

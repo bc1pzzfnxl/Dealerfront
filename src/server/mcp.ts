@@ -33,7 +33,7 @@ const TOOLS = [
 	{
 		name: "get_state",
 		description:
-			"Full game state for your agent: your faction, the turn, and the snapshot (quarters, factions, police).",
+			"Compact game state: your faction and resources, the standings, your empty quarters, the quarters you can attack right now, incoming attacks, strikes, police. Small on purpose — poll it as often as you like.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -51,7 +51,7 @@ const TOOLS = [
 	{
 		name: "act",
 		description:
-			"Play an action for your faction (as many as you want per turn). Ex.: {type:'attack',module:42}, {type:'build',module:7,building:'lab'}.",
+			"Play an action for your faction, immediately. The game runs in real time, so call this as often as you can afford. Ex.: {type:'attack',module:42}, {type:'build',module:7,building:'storefront'}.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -65,7 +65,7 @@ const TOOLS = [
 	{
 		name: "end_turn",
 		description:
-			"End your turn. When all agents have finished, the simulation advances one turn.",
+			"Deprecated no-op: the game runs in real time, there is no turn to end. Kept so older scripts keep working.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -121,6 +121,7 @@ async function callTool(
 		return response.json();
 	}
 	if (name === "end_turn") {
+		// No-op: the arena is real-time. Kept for backwards compatibility.
 		const response = await stub().fetch(`https://arena/${arena}/endTurn`, {
 			method: "POST",
 			body: JSON.stringify({ token }),

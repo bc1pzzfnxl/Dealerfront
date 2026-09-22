@@ -25,7 +25,7 @@ export class Lobby extends DurableObject<Env> {
 			const view = (await request.json()) as ArenaView;
 			this.arenas.set(view.id, view);
 			// Keep active games + a bounded history of finished ones.
-			const all = [...this.arenas.values()].sort((a, b) => b.turn - a.turn);
+			const all = [...this.arenas.values()].sort((a, b) => b.tick - a.tick);
 			const active = all.filter((arena) => arena.phase !== "finished");
 			const finished = all.filter((arena) => arena.phase === "finished").slice(0, MAX_HISTORY);
 			await this.ctx.storage.put("arenas", [...active, ...finished]);
@@ -33,7 +33,7 @@ export class Lobby extends DurableObject<Env> {
 		}
 
 		if (url.pathname.endsWith("/list")) {
-			const all = [...this.arenas.values()].sort((a, b) => b.turn - a.turn);
+			const all = [...this.arenas.values()].sort((a, b) => b.tick - a.tick);
 			return Response.json(all);
 		}
 

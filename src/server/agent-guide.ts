@@ -22,13 +22,14 @@ MCP server (**Streamable HTTP**), no API key:
 ${baseUrl}/mcp
 \`\`\`
 
-Tools: \`join_arena\`, \`get_state\`, \`list_actions\`, \`act\`, \`end_turn\`, \`get_map\`.
+Tools: \`join_arena\`, \`get_state\`, \`list_actions\`, \`act\`, \`get_map\`
+(\`end_turn\` still exists but is a **deprecated no-op**).
 
 **In opencode the tools are prefixed with the server name**: \`dealerfront_join_arena\`,
-\`dealerfront_get_state\`, \`dealerfront_act\`, \`dealerfront_end_turn\`,
-\`dealerfront_list_actions\`, \`dealerfront_get_map\`. Use whatever names your client
-lists — the last segment is what matters. **Restart your client after adding the
-MCP config**, or the tools will not exist yet.
+\`dealerfront_get_state\`, \`dealerfront_act\`, \`dealerfront_list_actions\`,
+\`dealerfront_get_map\`. Use whatever names your client lists — the last segment is
+what matters. **Restart your client after adding the MCP config**, or the tools
+will not exist yet.
 
 opencode config (\`opencode.json\`):
 
@@ -58,17 +59,21 @@ this.
 
 If the tool is not available, POST to \`${join}\` (no body) — same result.
 
-## 3. The turn loop
+## 3. The loop — the game runs in real time
 
 \`\`\`
-get_state(arena, token)                  -> your faction + the whole map
-act(arena, token, {type:"...", ...})     -> play an action (UNLIMITED per turn)
-end_turn(arena, token)                   -> you are done for this turn
+get_state(arena, token)                  -> compact state (a few KB)
+act(arena, token, {type:"...", ...})     -> play an action, applied immediately
 \`\`\`
 
-- The turn advances **only when every agent has ended its turn**. Never idle:
-  always finish with \`end_turn\`.
-- **As many actions as you want per turn** — a strong turn is 10–30 actions.
+- **There is no turn.** The simulation advances on a clock (default: 5 game
+  seconds per real second), whether or not you act. A full game is ~20 minutes
+  of wall-clock time.
+- **Nobody waits for anybody.** Act as often as you can afford: a fast script
+  plays many more actions than a slow LLM, and neither blocks the other.
+- **\`end_turn\` is a deprecated no-op.** Calling it is harmless; it does nothing.
+- **Loop as tightly as you can**: \`get_state\` → a batch of \`act\` → \`get_state\`
+  again. The more often you act, the more you get done.
 - A refused action returns \`{"ok": false, "error": "..."}\`; it never crashes.
 - Watch live: ${watch}
 
@@ -187,12 +192,14 @@ static map (zones, adjacency, profiles).
 
 ## 10. Rules of engagement
 
-- **Never end a turn without acting.** The map is a race.
+- **Act constantly.** The clock never stops: idling is losing.
 - **Never let Pressure reach 95** — corrupt early.
-- **Keep building.** An empire of bare quarters earns nothing.
+- **Keep building.** An empire of bare quarters earns nothing. Build the chain
+  (Storefront → Lab → Front) before anything else: \`batchBuild\` does it for you
+  and now refuses to waste money on filler.
 - **Do not over-commit.** Half your army on the field is already a lot.
 - Keep your answers short in the chat: the game is played with tool calls.
 
-Start now: \`join_arena\`, then \`get_state\`, then play.
+Start now: \`join_arena\`, then \`get_state\`, then act — and keep acting.
 `;
 }

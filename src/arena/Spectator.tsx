@@ -77,13 +77,13 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 					<div className="brand">
 						<h1>Arena {id}</h1>
 						<span className="brand-sub">
-							{view.phase === "finished" ? "Finished" : "In progress"} · turn {view.turn} · tick{" "}
-							{view.tick}
+							{view.phase === "finished" ? "Finished" : "Live"} · {view.ticksPerSecond}× ·{" "}
+							{Math.floor(view.tick / 600)} min of game time
 						</span>
 					</div>
 					<div className="top-stats">
 						{view.agents.map((agent) => (
-							<div className="stat" key={agent.factionId} title={`${agent.name} — actions this turn`}>
+							<div className="stat" key={agent.factionId} title={agent.name}>
 								<span
 									className="stat-label"
 									style={{ color: FACTION_COLORS[agent.factionId] }}
@@ -93,7 +93,6 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 								<strong>
 									{world.modulesOwned(agent.factionId)}
 									<em> · {Math.round(world.controlRatio(agent.factionId) * 100)}%</em>
-									{agent.ready ? " ✓" : ""}
 								</strong>
 							</div>
 						))}
@@ -165,7 +164,9 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 									</code>
 								</div>
 							))}
-							<p className="hint-inline">Duration: {view.result.turns} turns.</p>
+							<p className="hint-inline">
+								Duration: {Math.round(view.result.seconds / 60)} min of game time.
+							</p>
 						</section>
 					) : null}
 				</aside>
