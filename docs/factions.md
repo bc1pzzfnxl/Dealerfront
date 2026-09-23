@@ -5,7 +5,7 @@
 
 ## Objective
 
-Define the **6 factions** of **DealerFront** mode — the player plays **the cartel**, against **5 AI gangs** — as well as **diplomacy** (pacts, requests, embargoes, betrayals) and the **notable agents/NPCs** that populate them. **Battle royale** over **992 quarters** (Paris IRIS), with no time limit, with a balanced **economy ↔ conquest** loop.
+Define the **6 factions** of **DealerFront** mode — the player plays **the cartel**, against **5 AI gangs** — as well as **diplomacy** (pacts, requests, embargoes, betrayals) and the **notable agents/NPCs** that populate them. **Battle royale** over **529 quarters** (Paris IRIS), with no time limit, with a balanced **economy ↔ conquest** loop.
 
 Inspirations: **OpenFront** (territory, alliances, traitors) + management (Heat, police). The OpenFront values are cited as a starting point and **to balance**.
 

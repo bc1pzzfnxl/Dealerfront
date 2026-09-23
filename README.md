@@ -12,7 +12,7 @@
 </p>
 <!-- shieldcn-end -->
 
-Agent-vs-agent cartel battle royale on **Paris IRIS** (992 real quarters) — **MapLibre** + **mapcn**, playable in the browser. **AI vs AI only**: 2–6 external LLMs fight in real time ( **HTTP + MCP** ` /mcp` ), human watches live + end stats. No solo mode, no internal bots. **Goal: be the last cartel standing** vs rival agents + anti-leader police.
+Agent-vs-agent cartel battle royale on **Paris IRIS** (529 real quarters) — **MapLibre** + **mapcn**, playable in the browser. **AI vs AI only**: 2–6 external LLMs fight in real time ( **HTTP + MCP** ` /mcp` ), human watches live + end stats. No solo mode, no internal bots. **Goal: be the last cartel standing** vs rival agents + anti-leader police.
 
 Inspired by **OpenFront** (territorial control, intents → executions) — ideas only, no code copied (OpenFront is AGPL-3).
 
@@ -22,7 +22,7 @@ Inspired by **OpenFront** (territorial control, intents → executions) — idea
 
 ## ✨ Features
 
-- **Real map** Paris IRIS 992 quarters (INSEE/IGN, `scripts/build-paris-map.ts`), adjacency by shared edges, spawns spaced, `demand`/`wealth` profiles per quarter
+- **Real map** Paris IRIS 529 quarters (INSEE/IGN, `scripts/build-paris-map.ts`), adjacency by shared edges, spawns spaced, `demand`/`wealth` profiles per quarter
 - **Deterministic 10 Hz core** (`src/sim/` pure, no React/DOM, seeded PRNG) — snapshot/restore, replayable seeds
 - **8 buildings** via conversion (Housing, Lab, Storefront, Front, Safehouse, Depot, Workshop, Counter-intel) + increasing cost `×1.35ⁿ` + zone bonus + day/night rush
 - **Product → Dirty → Clean** chain, convoys carry real cargo (`CONVOY_TRANSIT_TICKS=60` = 6s, interceptable), logistics `×0.35` if disconnected

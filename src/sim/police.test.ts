@@ -121,7 +121,14 @@ describe("police", () => {	it("targets the leader (on a tie, the lowest id)", ()
 
 	it("a Storefront's activity heats the quarter, then falls back", () => {
 		const world = new World(1);
-		const module = firstNeutral(world);
+		let module = firstNeutral(world);
+		// Coarse map may give a police zone first — pick a non-police one for heat test
+		for (let i = 0; i < world.territory.count; i += 1) {
+			if (world.territory.owner[i] === NEUTRAL && !world.policeZone[i]) {
+				module = i;
+				break;
+			}
+		}
 		world.territory.owner[module] = 1;
 		world.territory.control[module] = 100;
 		world.territory.building[module] = BUILDING_INDEX.storefront;
@@ -173,7 +180,13 @@ describe("heat & laundering (anti-lock)", () => {
 
 	it("a Storefront's heat stabilizes below 100 (normal demand)", () => {
 		const world = new World(1);
-		const module = firstNeutral(world);
+		let module = firstNeutral(world);
+		for (let i = 0; i < world.territory.count; i += 1) {
+			if (world.territory.owner[i] === NEUTRAL && !world.policeZone[i]) {
+				module = i;
+				break;
+			}
+		}
 		world.territory.owner[module] = world.player.id;
 		world.territory.control[module] = 100;
 		world.territory.building[module] = BUILDING_INDEX.storefront;

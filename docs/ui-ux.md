@@ -45,7 +45,7 @@ Define a **remote command** interface: read the situation at a glance (possessio
 
 | Screen | Content |
 |---|---|
-| **City selection** | Paris (992 IRIS quarters) |
+| **City selection** | Paris (529 IRIS quarters) |
 | **Game view** | God-view map + overlays + HUD + command |
 | **End recap** | Score, final control, cause, causal chain |
 
@@ -98,7 +98,7 @@ Define a **remote command** interface: read the situation at a glance (possessio
 
 ### Screens (3)
 
-- **City selection**: **Paris** map (992 IRIS quarters) + objective reminder, click = start.
+- **City selection**: **Paris** map (529 IRIS quarters) + objective reminder, click = start.
 - **Game view**: god-view map + overlays + HUD.
 - **End recap**: cause, Clean cash, control, **score + rank**, quarters taken, gangs eliminated, raids/seizures, duration.
 

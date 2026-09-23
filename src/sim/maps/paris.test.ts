@@ -4,9 +4,9 @@ import { PARIS_MAP, PARIS_NEIGHBORS, PARIS_ZONES } from "./paris";
 
 /** Paris map guardrails (generated data) + integration run. */
 describe("Paris map (IRIS)", () => {
-	it("has 992 named quarters and a valid zone", () => {
-		expect(PARIS_ZONES).toHaveLength(992);
-		expect(PARIS_MAP.neighbors).toHaveLength(992);
+	it("has named quarters and a valid zone", () => {
+		expect(PARIS_ZONES).toHaveLength(529);
+		expect(PARIS_MAP.neighbors).toHaveLength(529);
 		expect(PARIS_ZONES.every((zone) => typeof zone === "string")).toBe(true);
 	});
 
@@ -29,7 +29,7 @@ describe("Paris map (IRIS)", () => {
 
 	it("simulates an agent-driven game on the real map", () => {
 		const world = new World(0);
-		expect(world.territory.count).toBe(992);
+		expect(world.territory.count).toBe(529);
 		// No internal AI: every faction expands through intents only.
 		for (let i = 0; i < 1500 && world.outcome === null; i += 1) {
 			if (i % 20 === 0) {

@@ -26,7 +26,7 @@ Score = Clean_cash × (1 + b_control + b_diversity + b_discretion)
 | Component | Role | Detail |
 |---|---|---|
 | **Clean cash** | Score base | Actually laundered money. |
-| **Final control** | Main bonus | Share of the 992 controlled quarters (victory objective). |
+| **Final control** | Main bonus | Share of the 529 controlled quarters (victory objective). |
 | **Diversity** | Moderate bonus | Number of distinct quarters/fronts exploited. |
 | **Discretion** | Bonus | Time spent below police Pressure thresholds. |
 | **Penalties** | Malus | Seizures, quarters lost. |

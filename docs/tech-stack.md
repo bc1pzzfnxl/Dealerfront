@@ -21,7 +21,7 @@ Fix the structuring technical choices of god-view mode: territorial control simu
 | Parameter | Value | Status |
 |---|---|---|
 | Simulation tick | 10 Hz (100 ms) | fixed |
-| Map | Paris IRIS — 992 real quarters | fixed |
+| Map | Paris IRIS — 529 real quarters | fixed |
 | Factions | 4 | fixed |
 | Rendering | mapcn (Map / MapGeoJSON / MapArc / MapControls) on MapLibre | fixed |
 | Determinism | versioned map + seeded simulation | fixed |
@@ -45,7 +45,7 @@ Fix the structuring technical choices of god-view mode: territorial control simu
 
 ## Validation criteria
 
-- [x] The simulation holds at 10 Hz with 6 factions over 992 quarters.
+- [x] The simulation holds at 10 Hz with 6 factions over 529 quarters.
 - [ ] God-view rendering is smooth (overlays, instancing).
 - [x] A replayed seed reproduces the run and the AI (identical map).
 - [ ] The core has no browser dependency (Worker-ready).
@@ -63,6 +63,6 @@ Fix the structuring technical choices of god-view mode: territorial control simu
 
 ### Real map (v3)
 
-- **Paris IRIS**: 992 real quarters, zones derived from the IRIS type, market profiles (`demand`/`wealth`), adjacency by shared edges (`scripts/build-paris-map.ts`).
+- **Paris IRIS**: 529 real quarters, zones derived from the IRIS type, market profiles (`demand`/`wealth`), adjacency by shared edges (`scripts/build-paris-map.ts`).
 - **Rendering**: **mapcn** (`Map`/`MapGeoJSON`/`MapArc`/`MapControls`) on MapLibre; possession + Control + heat via `feature-state`, convoys as animated dots.
 - **Old mode removed**: procedural 16×16/24×24 grid and isometric 3D rendering (Three.js / R3F) removed.

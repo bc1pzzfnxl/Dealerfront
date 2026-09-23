@@ -387,7 +387,7 @@ export class World {
 	/** Police heat per quarter (0–100): rises with crime, falls back. */
 	readonly heat: Float32Array;
 	/** Quarter under surveillance (police zone or neighbor of one). */
-	private readonly policeZone: Uint8Array;
+	readonly policeZone: Uint8Array;
 
 	constructor(seed: number, options?: WorldOptions) {
 		this.city = options?.map ?? PARIS_MAP;

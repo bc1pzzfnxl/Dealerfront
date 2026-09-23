@@ -1,7 +1,7 @@
 # Tech — Gear progression
 
 > Status: **v1 (DealerFront)** — cartel tech tree, 3 branches × 5 tiers.
-> Part of the god-view mode (6 factions, 992 quarters, battle royale).
+> Part of the god-view mode (6 factions, 529 quarters, battle royale).
 
 ## Objective
 

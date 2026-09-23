@@ -1,7 +1,7 @@
 /**
  * Compact agent state — a **decision-oriented** view of the world.
  *
- * The raw `WorldSnapshot` is ~30 KB, of which ~23 KB is seven 992-entry
+ * The raw `WorldSnapshot` is ~30 KB, of which ~23 KB is seven 529-entry
  * territory arrays. Feeding that to an LLM on every poll is pure noise: it
  * costs tokens and parsing time for numbers the agent cannot use. This view
  * keeps only what an agent acts on, and stays a few KB.

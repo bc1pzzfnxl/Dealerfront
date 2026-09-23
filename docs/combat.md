@@ -11,7 +11,7 @@ Define DealerFront's **territorial** combat: how a faction spends its **Members*
 
 ### Abstract influence model
 
-- **Quarter** = IRIS quarter of the real map (**992 quarters**). Each quarter has an **owner** (faction, neutral) and a **Control 0–100**.
+- **Quarter** = IRIS quarter of the real map (**529 quarters**). Each quarter has an **owner** (faction, neutral) and a **Control 0–100**.
 - **Influence** = "troop resource" **per faction**, stored in a **global pool** (no per-unit logistics). It is the only combat currency.
 - Influence propagates **quarter to quarter** via **BFS on the street adjacency graph**: you can only attack a quarter **bordering** an owned quarter (border = street edge). Out of range = no attack.
 - A **front** can cover several bordering quarters; the committed Influence packet is **split** according to `borderSize` (number of contested bordering quarters).
@@ -89,7 +89,7 @@ Equivalent to OpenFront's nuke/MIRV, **at quarter scale** (not map scale).
 
 | Parameter | Value | Status |
 |---|---|---|
-| Quarters | **992** (Paris IRIS) | fixed |
+| Quarters | **529** (Paris IRIS) | fixed |
 | Factions | **6** (player + AI) | fixed |
 | Simulation tick | **100 ms** (10 Hz) | fixed |
 | Control | 0–100 | fixed |
@@ -161,7 +161,7 @@ Equivalent to OpenFront's nuke/MIRV, **at quarter scale** (not map scale).
 | # | Question | Decision |
 |---|---|---|
 | 1 | Combat model | Abstract Influence (pool) → Control 0–100, 100 ms tick, BFS on streets |
-| 2 | Quarter | = IRIS quarter; 992 real quarters |
+| 2 | Quarter | = IRIS quarter; 529 real quarters |
 | 3 | Neutral expansion | Garrison `G_n` + losses `mag/5` + clamped `tickFraction` |
 | 4 | Faction attack | Ratio × terrain bonus formula + `D_eff` (adapted from OpenFront) |
 | 5 | Safehouse defense | Attacker losses `×5`, slowness `×3` |

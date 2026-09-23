@@ -42,7 +42,7 @@ Pacing is driven by **causality** (control + Heat), not by a hard clock.
 | Duration | unlimited (until elimination) | fixed |
 | Victory condition | last survivor (no threshold) | fixed |
 | Number of factions | 6 | fixed |
-| Quarters | 992 (Paris IRIS) | fixed |
+| Quarters | 529 (Paris IRIS) | fixed |
 | Endgame | causal (victory/defeat) | fixed |
 
 ## Edge cases

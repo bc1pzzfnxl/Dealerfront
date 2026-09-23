@@ -68,7 +68,7 @@ Unsettled values are **TBD** and listed in `open-questions.md`.
 
 | Term | Definition |
 |---|---|
-| **Quarter** | Real IRIS quarter; unit of territory (992 total). |
+| **Quarter** | Real IRIS quarter; unit of territory (529 total). |
 | **Influence** | A faction's troop resource (pool), used to conquer/defend. |
 | **Control** | Durability of an owned quarter (0–100); drops to 0 → capture. |
 | **Product** | Resource produced by Labs, sold. |

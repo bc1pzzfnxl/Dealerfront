@@ -30,7 +30,7 @@ Lab ──Product──> Storefront ──Dirty cash──> Front ──Clean ca
 
 ### 2. Quarter model and buildings
 
-- The map is a **real city** (Paris IRIS, **992 quarters**); each quarter has an **owner**, a **Control 0–100** and a market **profile** (`territory.md`, `procgen.md`).
+- The map is a **real city** (Paris IRIS, **529 quarters**); each quarter has an **owner**, a **Control 0–100** and a market **profile** (`territory.md`, `procgen.md`).
 - The city **pre-exists**: the player **does not build in a void**: they **convert/buy out** the existing buildings of an owned quarter, according to the quarter's **zone** (see § 4).
 - An owned quarter holds **one** functional building out of the 8.
 
@@ -138,7 +138,7 @@ The generated city contains "neutral" buildings (apartments, shops, warehouses, 
 | Parameter | Starting value | Status |
 |---|---|---|
 | Simulation tick | 100 ms (10 Hz) | fixed |
-| Quarters | 992 (Paris IRIS) | fixed |
+| Quarters | 529 (Paris IRIS) | fixed |
 | Building slots / quarter | 3 (to balance) | to balance |
 | Product/lab/tick | 2 | to balance |
 | Product → Dirty cash rate | 1 Product = 15 Dirty cash | to balance |
@@ -198,7 +198,7 @@ The generated city contains "neutral" buildings (apartments, shops, warehouses, 
 |---|---|---|
 | 1 | Nature of resources | 4 abstract resources: Product, Dirty cash, Clean cash, Members |
 | 2 | Conquest/economy separation | Members are not bought; the economy funds tech and the score |
-| 3 | Quarter | IRIS quarter (992 real quarters), owner + Control 0–100 + market profile |
+| 3 | Quarter | IRIS quarter (529 real quarters), owner + Control 0–100 + market profile |
 | 4 | Buildings | 7: Lab, Storefront, Front, Safehouse, Workshop, Counter-intel, Depot |
 | 5 | Placement | The city pre-exists; the player **converts** existing buildings |
 | 6 | Conversion cost | 50% of cost and duration, owned quarter + compatible zone |

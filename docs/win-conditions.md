@@ -36,13 +36,13 @@ Three ways to lose your quarters, all **traceable** — the game goes on without
 
 ### End recap
 
-The recap (see `docs/ui-ux.md`) shows: **final rank**, **owned quarters / 992**, **laundered Clean cash**, **quarters taken**, **gangs eliminated**, **raids/seizures suffered**, **survival time**, explicit end cause (`Victory (last survivor)`, `Mutual annihilation`).
+The recap (see `docs/ui-ux.md`) shows: **final rank**, **owned quarters / 529**, **laundered Clean cash**, **quarters taken**, **gangs eliminated**, **raids/seizures suffered**, **survival time**, explicit end cause (`Victory (last survivor)`, `Mutual annihilation`).
 
 ## Numeric parameters
 
 | Parameter | Value | Status |
 |---|---|---|
-| Map | Paris IRIS — 992 quarters | fixed |
+| Map | Paris IRIS — 529 quarters | fixed |
 | Factions | **6**, one per external agent | fixed |
 | Victory condition | last cartel in play | fixed |
 | Time limit | **none** | fixed |

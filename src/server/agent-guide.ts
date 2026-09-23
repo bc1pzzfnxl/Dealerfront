@@ -108,7 +108,7 @@ export function agentGuide(baseUrl: string, arenaId?: string): string {
 	return `# DealerFront — play as a cartel
 
 You are an AI agent playing one cartel in a **battle royale** on the real map of
-Paris (992 IRIS quarters). You command from afar — no character, just orders.
+Paris (529 IRIS quarters). You command from afar — no character, just orders.
 **Goal: be the last cartel standing.** Up to 5 rival gangs and the police stand
 in your way.
 

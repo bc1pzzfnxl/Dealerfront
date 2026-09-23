@@ -8,7 +8,8 @@ import { CONTACT_NAMES } from "./police";
 import { World } from "./world";
 
 /** Quarter adjacent to the player spawn (map adjacency). */
-const ADJACENT = 6;
+import { PARIS_MAP } from "./maps/paris";
+const ADJACENT = PARIS_MAP.neighbors[0]?.[0] ?? 6;
 
 describe("diplomacy", () => {
 	it("starts with no pact and an initial relation", () => {

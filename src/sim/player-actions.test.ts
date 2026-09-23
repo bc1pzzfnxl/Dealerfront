@@ -18,11 +18,12 @@ import { CONTACT_NAMES, POLICE } from "./police";
 import { STRIKE, TECH, techCost } from "./tech";
 import { NEUTRAL } from "./territory";
 import { World } from "./world";
+import { PARIS_MAP } from "./maps/paris";
 
 /** Player spawn (first starting quarter of the map). */
 const SPAWN = 0;
 /** Immediate neighbor of the spawn (map adjacency). */
-const ADJACENT = 6;
+const ADJACENT = PARIS_MAP.neighbors[SPAWN]?.[0] ?? 6;
 
 /** First neutral module of the map. */
 function firstNeutral(world: World): number {

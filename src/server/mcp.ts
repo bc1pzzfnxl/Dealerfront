@@ -135,7 +135,7 @@ const TOOLS = [
 	{
 		name: "get_map",
 		description:
-			"Static map of Paris (992 quarters: zones, adjacency, profiles). CALL ONCE per arena and cache — immutable for the whole game (~30KB / ~7k tokens). Calling again wastes tokens.",
+			"Static map of Paris (529 quarters: zones, adjacency, profiles). CALL ONCE per arena and cache — immutable for the whole game (~30KB / ~7k tokens). Calling again wastes tokens.",
 		inputSchema: { type: "object", properties: {} },
 	},
 ] as const;

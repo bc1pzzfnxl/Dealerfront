@@ -10,7 +10,7 @@ Define **taking control of the city**: who owns what, how you expand your territ
 
 ### Quarter = real area
 
-- Territory unit = **IRIS quarter** of the real map (Paris, **992 quarters**, see `procgen.md`).
+- Territory unit = **IRIS quarter** of the real map (Paris, **529 quarters**, see `procgen.md`).
 - Each quarter has: an **owner** (faction or **neutral**), a **Control ∈ [0, 100]** and a market **profile** (`economy.md`).
 - **Adjacency**: two quarters are neighbors if they **share a border** (common edges; a mere corner does not count). Expansion and attacks propagate by adjacency (BFS).
 
@@ -46,7 +46,7 @@ Define **taking control of the city**: who owns what, how you expand your territ
 
 | Parameter | Starting value | Status |
 |---|---|---|
-| Map | Paris IRIS — 992 real quarters | fixed |
+| Map | Paris IRIS — 529 real quarters | fixed |
 | Factions | 6 (player + 5 AI) | fixed |
 | Max Control | 100 | fixed |
 | Initial Control (captured quarter) | ~30 | to balance |
@@ -89,7 +89,7 @@ Define **taking control of the city**: who owns what, how you expand your territ
 
 | # | Question | Decision |
 |---|---|---|
-| 1 | Territory unit | IRIS quarter (992 real quarters) |
+| 1 | Territory unit | IRIS quarter (529 real quarters) |
 | 2 | Model | Owner + Control 0–100 + Members pool |
 | 3 | Expansion | By adjacency (BFS), cost in Members |
 | 4 | Anti-snowball | Isolated clusters lost (OpenFront style) |
