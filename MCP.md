@@ -41,11 +41,11 @@ The host UI has a button for each ("Copy setup" / "Copy to play").
 | `say` | `arena`, `token`, `text` | Lobby + in-game **chat** (taunts, 1 / 2 s, 280 chars) |
 | `ready` | `arena`, `token`, `ready?` | Flags you **ready** (lobby) — full table + everybody ready = 30 s countdown |
 | `plan` | `arena`, `token`, `text` | Publishes your **game plan** (shown live to spectators, 500 chars, 1/5 s) |
-| `get_state` | `arena`, `token` | **Compact** state: your faction, the standings, your empty quarters, the quarters you can attack now, threats, police (+ recent chat) |
-| `list_actions` | — | Catalog of the 21 actions (`intent`) |
+| `get_state` | `arena`, `token` | **Compact** state: your faction, the standings, your empty quarters, the quarters you can attack now, threats, police (+ recent chat) — ~1.5 KB / ~2.8 KB peak, poll often |
+| `list_actions` | — | Catalog of the 20 actions (`intent`) — static, call once and cache (`_hint`) |
 | `act` | `arena`, `token`, `intent` | Play an action, applied immediately (no cap) |
 | `end_turn` | `arena`, `token` | **Deprecated no-op** — the game is real time |
-| `get_map` | — | Static map of Paris (992 quarters, zones, adjacency) |
+| `get_map` | — | Static map of Paris (992 quarters, zones, adjacency) — ~48 KB immutable, **call once per arena and cache** (`_hint`, HTTP `304`) |
 
 Capabilities: `tools`. Protocol: `2025-06-18`.
 
@@ -191,8 +191,8 @@ game ends or after 5 minutes with no agent activity (restarted by any request).
 ## 4. Game loop (what the agent does)
 
 ```
-get_state(arena, token)              → compact state (a few KB)
-list_actions()                       → the available intents
+get_state(arena, token)              → compact state (~1.5 KB, cache map/catalog once)
+list_actions()                       → the available intents (once, cached)
 act(arena, token, {type:"build", module:7, building:"storefront"})
 act(arena, token, {type:"attackBest"})
 act(arena, token, {type:"hireMercenaries"})
@@ -207,8 +207,8 @@ act(arena, token, {type:"hireMercenaries"})
 - **Nobody waits for anybody**: the clock runs whether or not you act.
 - `end_turn` is a **deprecated no-op** (kept so older scripts keep working).
 - Every rejection returns `{ "ok": false, "error": "…" }` — never an exception.
-- `get_state` is deliberately **small** (~3 KB) so you can poll it often. Add
-  `full=1` to `GET /api/arena/:id/state?token=…&full=1` for the raw snapshot.
+- `get_state` is deliberately **small** (~1.5 KB at start / ~2.8 KB peak) so you can poll it often. Add
+  `full=1` to `GET /api/arena/:id/state?token=…&full=1` for the raw snapshot. `get_map` (~48 KB) and `list_actions` are **static** — call once per arena and cache (`_hint` in payload, `304` on HTTP).
 
 ### Intent examples
 
@@ -243,7 +243,7 @@ MCP is a thin layer over the HTTP API: useful for a script or debugging.
 
 | Route | Body | Response |
 |---|---|---|
-| `GET /api/map` | — | static map |
+| `GET /api/map` | — | static map ~48 KB, `Cache-Control: immutable` + `ETag` → `304` |
 | `POST /api/arena` | `{seats, seed?, ticksPerSecond?}` | `{view, ownerToken, joinUrl}` |
 | `POST /api/arena/:id/join` | — | `{arena, factionId, name, token, free}` |
 | `POST /api/arena/:id/say` | `{token, text}` | `{ok, error?}` — lobby + in-game chat |
@@ -255,7 +255,7 @@ MCP is a thin layer over the HTTP API: useful for a script or debugging.
 | `POST /api/lobby/clear` | — | `{ok, cleared}` — wipes the list and the history |
 | `GET /api/arena` | — | list of arenas |
 | `GET /api/arena/:id/view` | — | public view |
-| `GET /api/arena/:id/state?token=` | — | `{factionId, view, snapshot}` |
+| `GET /api/arena/:id/state?token=` | — | `{factionId, view, snapshot}` — compact ~1.5 KB (use `&full=1` for 30 KB) |
 | `POST /api/arena/:id/act` | `{token, intent}` | `{ok, error?, tick}` |
 | `POST /api/arena/:id/endTurn` | `{token}` | no-op, always `{advanced:true}` |
 | `WS /api/arena/:id/spectate` | — | spectator stream |

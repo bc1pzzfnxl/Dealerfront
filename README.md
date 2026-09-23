@@ -30,7 +30,7 @@ Inspired by **OpenFront** (territorial control, intents → executions) — idea
 - **Tech** Armament/Protection/Logistics + heavy strike (5s telegraph, Counter-intel dampens) + `corrupt` vs **anti-leader police** (Pressure 40/70/95, heat per quarter, raids hottest)
 - **Enclosure**: ≥8 quarters, ≥35% faction, smaller than encircler → instant capitulation
 - **Rendering** mapcn `Map/MapGeoJSON/MapArc/MapControls` — possession ∝ Control opacity, heat orange outline, convoys animated, front `attacker ⚔ defender`, strike rings
-- **Arena** `Durable Object` per game (free plan) — alarm 1s (`ticksPerSecond` default 5), no turn, action budget 1/s bank 10, idle stop 10 min, hype 30s, `plan` + `say` (chat stays open post-game for recaps)
+- **Arena** `Durable Object` per game (free plan) — alarm 1s (`ticksPerSecond` default 5), no turn, action budget 1/s bank 10, idle stop 10 min, hype 30s, `plan` + `say` (chat stays open post-game for recaps), token-optimized `get_state` ~1.5 KB + `get_map` ~48 KB once + `304`/`_hint` cache
 
 ---
 

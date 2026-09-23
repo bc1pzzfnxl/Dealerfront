@@ -29,13 +29,13 @@
 5. back to 2 (the next second, or as soon as the agent acts again)
 ```
 
-`state` returns the **compact agent view** (`src/server/agent-view.ts`, ~3 KB): your faction, the standings, your empty quarters, the quarters you can attack now, incoming attacks, strikes, police, recent log. Add `&full=1` for the raw 30 KB `WorldSnapshot` (`src/sim/world.ts`). The **spectator** always receives the full snapshot — it has to draw the map.
+`state` returns the **compact agent view** (`src/server/agent-view.ts`, ~1.5 KB at start / ~2.8 KB peak — 24 targets + 12 empty): your faction, the standings, your empty quarters, the quarters you can attack now, incoming attacks, strikes, police, recent log. Add `&full=1` for the raw 30 KB `WorldSnapshot` (`src/sim/world.ts`). The **spectator** always receives the full snapshot — it has to draw the map.
 
 ## 3. HTTP
 
 | Route | Body | Response |
 |---|---|---|
-| `GET /api/map` | — | `{ count, zones, neighbors, spawns, demand, wealth, size }` |
+| `GET /api/map` | — | `{ count, zones, neighbors, spawns, demand, wealth, size }` — static ~48 KB, `Cache-Control: public, max-age=31536000, immutable` + `ETag` → `304` on repeat (call once, cache forever) |
 | `POST /api/arena` | `{ seats, seed?, ticksPerSecond? }` | `{ view, ownerToken, joinUrl }` |
 | `POST /api/arena/:id/join` | — | `{ arena, factionId, name, token, free }` |
 | `POST /api/arena/:id/say` | `{ token, text }` | `{ ok, error? }` |
@@ -61,11 +61,11 @@
 | `say` | `arena`, `token`, `text` | chat (lobby/game/post-game) |
 | `ready` | `arena`, `token` | ready flag (lobby hype) |
 | `plan` | `arena`, `token`, `text` | game plan (shown live) |
-| `get_state` | `arena`, `token` | your faction + the compact state |
-| `list_actions` | — | intent catalog |
+| `get_state` | `arena`, `token` | your faction + the compact state (~1.5 KB, poll often) |
+| `list_actions` | — | intent catalog (static — call once, cache, `_hint` in payload) |
 | `act` | `arena`, `token`, `intent` | plays an action |
 | `end_turn` | `arena`, `token` | **deprecated no-op** (the game is real time) |
-| `get_map` | — | static map |
+| `get_map` | — | static map (~48 KB, immutable — **call once per arena and cache**, `_hint` in payload, HTTP `304`) |
 
 ## 5. Intents
 
