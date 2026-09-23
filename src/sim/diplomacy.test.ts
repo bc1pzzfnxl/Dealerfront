@@ -32,7 +32,9 @@ describe("diplomacy", () => {
 		expect(world.playerProposePact(1)).toBe(true);
 		expect(world.offers.length).toBe(1);
 		expect(world.pacts.length).toBe(0);
-		for (let i = 0; i < 60; i += 1) world.step();
+		// Faction 1 is an external agent: it accepts the offer itself.
+		world.setPlayer(1);
+		expect(world.playerRespondToOffer(0, true)).toBe(true);
 		expect(world.hasPact(0, 1)).toBe(true);
 	});
 
@@ -49,10 +51,12 @@ describe("diplomacy", () => {
 	it("betraying breaks the pact, drops the relation and marks the traitor", () => {
 		const world = new World(1);
 		world.playerProposePact(1);
-		for (let i = 0; i < 60; i += 1) world.step();
+		world.setPlayer(1);
+		world.playerRespondToOffer(0, true);
 		expect(world.hasPact(0, 1)).toBe(true);
 		const before = world.relationBetween(0, 1);
 
+		world.setPlayer(0);
 		expect(world.playerBreakPact(1)).toBe(true);
 		expect(world.hasPact(0, 1)).toBe(false);
 		expect(world.relationBetween(0, 1)).toBe(
@@ -61,24 +65,19 @@ describe("diplomacy", () => {
 		expect(world.isTraitor(0)).toBe(true);
 	});
 
-	it("allies don't attack each other", () => {
+	it("attackBest skips pacted allies", () => {
 		const world = new World(1);
-		// Forces a player ↔ gang 1 pact.
+		// Faction 1 holds the weakest adjacent quarter (would be picked first).
+		world.territory.owner[ADJACENT] = 1;
+		world.territory.control[ADJACENT] = 1;
+		expect(world.bestAdjacentTarget()).toBe(ADJACENT);
+		// Pact it (both sides are agents): the ally's quarters are skipped.
 		world.playerProposePact(1);
-		for (let i = 0; i < 40; i += 1) world.step();
+		world.setPlayer(1);
+		expect(world.playerRespondToOffer(0, true)).toBe(true);
+		world.setPlayer(0);
 		expect(world.hasPact(0, 1)).toBe(true);
-
-		// Gang 1 is adjacent (quarter stuck to the spawn): without a pact it would attack.
-		const attacker = 1;
-		let attackedPlayer = false;
-		for (let i = 0; i < 400; i += 1) {
-			world.step();
-			if (world.attacks.some((attack) => attack.factionId === attacker && world.ownerAt(attack.target) === 0)) {
-				attackedPlayer = true;
-				break;
-			}
-		}
-		expect(attackedPlayer).toBe(false);
+		expect(world.bestAdjacentTarget()).not.toBe(ADJACENT);
 	});
 });
 

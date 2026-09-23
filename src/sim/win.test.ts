@@ -18,7 +18,7 @@ function giveNeutral(world: World, factionId: number, count: number): void {
 	}
 }
 
-/** Eliminates all AI factions (0 quarters) to leave only the player. */
+/** Eliminates every faction but 0 (0 quarters each). */
 function eliminateRivals(world: World): void {
 	for (let i = 0; i < world.territory.count; i += 1) {
 		const owner = world.territory.owner[i]!;
@@ -48,7 +48,21 @@ describe("end of game (battle royale)", () => {
 		expect(world.endReason).toContain("Last cartel");
 	});
 
-	it("defeat when the player has no quarter left", () => {
+	it("eliminating a faction doesn't end the game", () => {
+		const world = new World(1);
+		for (let i = 0; i < world.territory.count; i += 1) {
+			if (world.territory.owner[i] === 0) {
+				world.territory.owner[i] = NEUTRAL;
+				world.territory.control[i] = 60;
+			}
+		}
+		world.step();
+		expect(world.factions[0]!.eliminated).toBe(true);
+		expect(world.aliveCount()).toBe(5);
+		expect(world.outcome).toBeNull();
+	});
+
+	it("mutual annihilation ends the game with no winner", () => {
 		const world = new World(1);
 		for (let i = 0; i < world.territory.count; i += 1) {
 			if (world.territory.owner[i]! >= 0) {
@@ -57,26 +71,33 @@ describe("end of game (battle royale)", () => {
 			}
 		}
 		world.step();
+		expect(world.aliveCount()).toBe(0);
 		expect(world.outcome).toBe("defeat");
-		expect(world.endReason).toContain("eliminated");
+		expect(world.endReason).toContain("annihilation");
 	});
 
-	it("declares bankruptcy after a window at zero", () => {
+	it("bankruptcy dismantles the broke faction, game goes on", () => {
 		const world = new World(1);
-		world.player.dirtyCash = 0;
-		world.player.cleanCash = 0;
-		for (let i = 0; i < 320 && world.outcome === null; i += 1) world.step();
-		expect(world.outcome).toBe("defeat");
-		expect(world.endReason).toContain("Bankruptcy");
+		const broke = world.factions[0]!;
+		broke.dirtyCash = 0;
+		broke.cleanCash = 0;
+		for (let i = 0; i < 320 && world.modulesOwned(0) > 0; i += 1) world.step();
+		expect(world.modulesOwned(0)).toBe(0);
+		expect(broke.eliminated).toBe(true);
+		expect(world.outcome).toBeNull();
 	});
 
 	it("resets the bankruptcy window if cash recovers", () => {
 		const world = new World(1);
-		world.player.dirtyCash = 0;
+		const broke = world.factions[0]!;
+		broke.dirtyCash = 0;
+		broke.cleanCash = 0;
 		for (let i = 0; i < 100; i += 1) {
 			world.step();
-			if (i === 50) world.player.dirtyCash = 500;
+			if (i === 50) broke.dirtyCash = 500;
 		}
+		expect(broke.eliminated).toBe(false);
+		expect(world.modulesOwned(0)).toBeGreaterThan(0);
 		expect(world.outcome).toBeNull();
 	});
 

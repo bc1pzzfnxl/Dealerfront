@@ -1,19 +1,31 @@
 /**
  * Arena contract — snapshot/restore, determinism, multi-faction intents.
+ * No bot: every faction is driven by external agents through `applyIntent`.
  * See docs/arena.md.
  */
 
 import { describe, expect, it } from "vitest";
-import { createRng } from "./rng";
-import { playOut } from "./bot";
 import { applyIntent, type Intent } from "./intents";
 import { World } from "./world";
 import { NEUTRAL } from "./territory";
 
+/** Drives every faction with intents, then steps — the agents' side of the table. */
+function drive(world: World, ticks: number): void {
+	for (let tick = 0; tick < ticks && world.outcome === null; tick += 1) {
+		if (tick % 20 === 0) {
+			for (const faction of world.factions) {
+				applyIntent(world, faction.id, { type: "batchBuild" });
+				applyIntent(world, faction.id, { type: "attackBest" });
+			}
+		}
+		world.step();
+	}
+}
+
 describe("snapshot", () => {
 	it("restores the state identically", () => {
 		const a = new World(1);
-		playOut(a, createRng(42), 500);
+		drive(a, 500);
 		const snap = a.snapshot();
 		const b = new World(1);
 		b.applySnapshot(snap);
@@ -27,13 +39,13 @@ describe("snapshot", () => {
 
 	it("stays deterministic after restoration (RNG included)", () => {
 		const a = new World(1);
-		playOut(a, createRng(42), 300);
+		drive(a, 300);
 		const snap = a.snapshot();
-		playOut(a, createRng(7), 200);
+		drive(a, 200);
 
 		const b = new World(1);
 		b.applySnapshot(snap);
-		playOut(b, createRng(7), 200);
+		drive(b, 200);
 		expect(Array.from(b.territory.owner)).toEqual(Array.from(a.territory.owner));
 		expect(b.factions.map((f) => f.members)).toEqual(a.factions.map((f) => f.members));
 	});
@@ -63,16 +75,17 @@ describe("intents", () => {
 		expect(result.error).toBeTruthy();
 	});
 
-	it("an arena (all factions controlled) doesn't play on its own", () => {
-		const world = new World(1, { factionCount: 3, controlled: [0, 1, 2] });
+	it("factions never act on their own (external agents only)", () => {
+		const world = new World(1, { factionCount: 3 });
 		const before = world.factions.map((f) => world.modulesOwned(f.id));
 		for (let i = 0; i < 500; i += 1) world.step();
 		const after = world.factions.map((f) => world.modulesOwned(f.id));
 		expect(after).toEqual(before);
+		expect(world.attacks).toEqual([]);
 	});
 
 	it("in an arena, an agent can build then attack", () => {
-		const world = new World(1, { factionCount: 2, controlled: [0, 1] });
+		const world = new World(1, { factionCount: 2 });
 		// Faction 1: give it cash to build on a converted quarter.
 		const faction = world.factions[1]!;
 		faction.dirtyCash = 100_000;

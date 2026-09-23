@@ -123,21 +123,19 @@ The **autonomous agents** of the old system become **faction NPCs** (owned by a 
 | 7 | Relations | Attack ∝ difficulty (−60 to −100) |
 | 8 | Agents | Merged: roles = faction NPCs |
 | 9 | Population | 8–12 notable agents / run |
-| 10 | Anti-snowball | Remaining AIs + police target the leader |
+| 10 | Anti-snowball | Police targets the leader |
 | 11 | `agents.md` | Absorbed by this file |
 
 ---
 
 ## Implementation (P1–P4) — values in force
 
-> **Authoritative** section for `src/sim/factions.ts` and `src/sim/bot.ts`. The diplomacy described above **is not yet implemented** (P5).
+> **Authoritative** section for `src/sim/factions.ts`. The diplomacy described above **is not yet implemented** (P5).
 
-- **Number of factions**: `FACTION_COUNT = 6` (player + 5 gangs), battle royale.
-- **Names**: the player is the **Cartel**; the AI gangs are named after their **real position** on the map (North/South/East/West + combinations, deduplicated) to avoid any inconsistency between the name and the geography.
+- **Number of factions**: `FACTION_COUNT = 6`, battle royale, every faction driven by an external agent (no internal AI, no bots).
+- **Names**: factions are named after their **real position** on the map (North/South/East/West + combinations, deduplicated) to avoid any inconsistency between the name and the geography.
 - **Colors**: `#6FB7E8`, `#E0A030`, `#7FD08A`, `#A97BD8`, `#E23B2E`, `#2FB0A0` (color = faction information).
-- **Starting resources**: Members **3,000**, Dirty cash **2,000** — **identical for all** (AI asymmetry comes from behavior, not the start).
-- **AI**: one decision every **25 ticks (2.5 s)**; build / tech / hitman / attack according to `chooseBuildType` (see `economy.md`).
-- **Balancing bot**: `bot.ts` (`autoPlay` / `playOut`) — same policy as the AI, with a configurable cadence to simulate a human pace (env `CADENCE`).
+- **Starting resources**: Members **3,000**, Dirty cash **2,000** — **identical for all**.
 - **Diplomacy**: implemented in v1 (see P8 section below). **Notable agents/NPCs** and **variable difficulty**: not implemented.
 
 ---

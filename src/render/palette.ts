@@ -42,3 +42,18 @@ export function factionDisplayColor(index: number, hex: string, colorblind: bool
 	if (!colorblind) return hex;
 	return FACTION_GRAYSCALE[index % FACTION_GRAYSCALE.length]!;
 }
+
+/**
+ * Zone border colors (functional, not decorative): which buildings a quarter
+ * accepts (docs/economy.md). Muted hues — fills stay faction-owned.
+ */
+export const ZONE_COLORS: Record<ZoneType, string> = {
+	residential: "#6fa8dc",
+	commercial: "#e69138",
+	nightlife: "#a64dc9",
+	industrial: "#808080",
+	park: "#6aa84f",
+	police: "#274e9c",
+	laundry: "#46bdc6",
+	vacant: "#d9d9d9",
+};

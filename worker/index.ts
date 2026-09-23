@@ -6,7 +6,7 @@
  * See docs/arena.md.
  */
 
-import { agentGuide } from "../src/server/agent-guide";
+import { agentGuide, setupGuide } from "../src/server/agent-guide";
 import { mapPayload } from "../src/server/map-payload";
 import type { ArenaConfig } from "../src/server/protocol";
 import { handleMcp } from "../src/server/mcp";
@@ -51,6 +51,15 @@ export default {
 			});
 		}
 
+		// Universal MCP setup prompt (once per harness): opencode, Claude Code,
+		// Cursor, VS Code, Claude Desktop, generic Streamable HTTP.
+		if (pathname === "/setup.md" || pathname === "/api/setup.md") {
+			const origin = new URL(request.url).origin;
+			return new Response(setupGuide(origin), {
+				headers: { "Content-Type": "text/markdown; charset=utf-8", ...CORS },
+			});
+		}
+
 		// MCP server (LLM agents): JSON-RPC Streamable HTTP.
 		if (pathname === "/mcp" || pathname === "/mcp/") return handleMcp(request, env);
 
@@ -83,11 +92,18 @@ export default {
 			return json(await (await lobby.fetch("https://lobby/clear")).json());
 		}
 
+		// Forgets one arena id from the list (dead or outdated table).
+		if (pathname === "/api/lobby/remove" && request.method === "POST") {
+			const lobby = env.LOBBY.get(env.LOBBY.idFromName("lobby"));
+			return json(await (await lobby.fetch("https://lobby/remove", request)).json());
+		}
+
 		const arenaMatch = /^\/api\/arena\/([^/]+)(\/.*)?$/.exec(pathname);
 		if (arenaMatch) {
 			const id = arenaMatch[1]!;
 			const response = await handleArena(request, env, id);
-			// After an action/turn, update the lobby.
+			// After an action/turn, update the lobby — but only with a real
+			// view (dead tables answer {error}, never list them).
 			if (request.method === "POST") {
 				const stub = env.ARENA.get(env.ARENA.idFromName(id));
 				if (pathname.endsWith("/delete")) {
@@ -96,11 +112,15 @@ export default {
 						body: JSON.stringify({ id }),
 					});
 				} else {
-					const view = await (await stub.fetch(`https://arena/${id}/view`)).json();
-					await env.LOBBY.get(env.LOBBY.idFromName("lobby")).fetch("https://lobby/update", {
-						method: "POST",
-						body: JSON.stringify(view),
-					});
+					const body = (await (await stub.fetch(`https://arena/${id}/view`)).json()) as {
+						id?: unknown;
+					};
+					if (body && typeof body.id === "string") {
+						await env.LOBBY.get(env.LOBBY.idFromName("lobby")).fetch("https://lobby/update", {
+							method: "POST",
+							body: JSON.stringify(body),
+						});
+					}
 				}
 			}
 			return response;

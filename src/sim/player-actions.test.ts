@@ -683,11 +683,17 @@ describe("end of game", () => {
 		expect(world.playerEmbargo(1)).toBe(false);
 	});
 
-	it("refuses all actions after a defeat", () => {
+	it("refuses all actions after the game is over", () => {
 		const world = new World(1);
-		world.police.pressure = POLICE.liquidation + 1;
+		for (let i = 0; i < world.territory.count; i += 1) {
+			const owner = world.territory.owner[i]!;
+			if (owner > 0) {
+				world.territory.owner[i] = NEUTRAL;
+				world.territory.control[i] = 60;
+			}
+		}
 		world.step();
-		expect(world.outcome).toBe("defeat");
+		expect(world.outcome).toBe("victory");
 		world.player.members = 100000;
 		world.player.dirtyCash = 100000;
 		world.player.cleanCash = 100000;
@@ -1162,17 +1168,5 @@ describe("mercenaries (Dirty cash → Members)", () => {
 		expect(player.members).toBeGreaterThan(0);
 		expect(player.dirtyCash).toBe(1_000_000 - cost);
 		expect(world.mercCost()).toBeGreaterThan(cost);
-	});
-});
-
-describe("contract against a gang (Clean cash)", () => {
-	it("pays a gang to focus its offensive on a rival", () => {
-		const world = new World(1);
-		const player = world.player;
-		player.cleanCash = 1_000_000;
-		expect(world.playerCanFundContract(1)).toBe(true);
-		expect(world.playerFundContract(1, 2)).toBe(true);
-		expect(world.factions[1]!.contractTarget).toBe(2);
-		expect(world.factions[1]!.contractUntil).toBeGreaterThan(world.tick);
 	});
 });

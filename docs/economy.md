@@ -125,7 +125,6 @@ The generated city contains "neutral" buildings (apartments, shops, warehouses, 
 - **Armament stockpile** (`ARMAMENT`): buying armament with **Clean cash** gives `+20%` attack for **40 s**, stackable up to **×6**, **increasing** cost (`3000 × 1.5^n`) — a permanent sink. You invest before an offensive: money decides the military tempo.
 - **Upkeep** (`BUILDING_UPKEEP`): each building costs **Dirty cash/tick** (Housing 0.5; Lab/Storefront/Safehouse/Depot 1; Front/Watcher 1.5; Workshop 2). If it is not covered, `upkeepPaid = false` → **production ×0.5** (`UNPAID_UPKEEP_FACTOR`) and **blind watchers**. Big empires are expensive to run.
 - **Mercenaries** (`MERC`): **Dirty cash → Members** immediately (`+400`), increasing cost (`4000 × 1.4^n`), capped by the Members cap. *(Exception to the "Members cannot be bought" pillar: it is a war lever, bounded by the cap.)*
-- **Contract** (`CONTRACT`): **Clean cash** → pay a gang to **attack the leader** for 60 s. Increasing cost (`6000 × 1.5^n`).
 - **Quarter buyout** (`BUY`): convert **Clean cash** into **territory** without fighting. Target = **adjacent neutral** quarter. Cost `4000 × size × (1 + 0.15 × owned quarters)`, 10 s recharge, established control 25. Permanent **tech vs expansion** trade-off: the same Clean cash buys armament, tech **or** map.
 
 ### 6. Economic objective
@@ -249,9 +248,9 @@ The generated city contains "neutral" buildings (apartments, shops, warehouses, 
 - `production/tick = (8 × quarters + 25 × housing) × (1 − members/max) × (1 + 0.2 × logistics)`
 - Capture of a quarter: its **building is destroyed** (reset to empty).
 
-### Target composition (AI and bot)
+### Target composition (agents)
 
-`chooseBuildType` (`buildings.ts`) fills the **largest deficit** relative to this composition, instead of taking "the first affordable" (which filled everything with housing → 0 Clean cash). Order **upstream → downstream**: Lab before Storefront.
+`chooseBuildType` (`buildings.ts`) fills the **largest deficit** relative to this composition, instead of taking "the first affordable" (which filled everything with housing → 0 Clean cash). Order **upstream → downstream**: Lab before Storefront. External agents use it through `batchBuild`; there is no internal builder.
 
 | Type | Target share |
 |---|---|
@@ -289,7 +288,7 @@ An owned and **empty** quarter can only be converted to types **compatible with 
 | **Vacant lot** | New construction only: Lab, Storefront, Front, Safehouse, Depot, Workshop (**no Recruitment**: nothing to requisition) |
 
 - Each faction's **spawn** is forced onto a "built" zone: you can always bootstrap.
-- **Bootstrapping**: as long as the chain (Lab → Storefront → Front) is incomplete, the AI/bot builds **only** the missing step (avoids wasting the budget).
+- **Bootstrapping**: as long as the chain (Lab → Storefront → Front) is incomplete, `batchBuild` places **only** the missing step (avoids wasting the budget).
 - The UI shows the **zone**, the list of possible conversions, and "incompatible zone" on rejected buttons.
 
 ### To do (spec §4)

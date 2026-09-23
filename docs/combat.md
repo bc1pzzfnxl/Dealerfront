@@ -139,7 +139,7 @@ Equivalent to OpenFront's nuke/MIRV, **at quarter scale** (not map scale).
 - `docs/territory.md` — quarters, ownership, Control, street adjacency (BFS), borders.
 - `docs/tech.md` — Protection (`P_tech`), hitmen (unlock, levels), counter-intel.
 - `docs/economy.md` — Safehouse, Depot, Workshop, costs in Clean cash, Product loot.
-- `docs/factions.md` — Influence pool, AI (attack frequency, bot `attackAmount`), diplomacy/betrayal.
+- `docs/factions.md` — Influence pool, diplomacy/betrayal.
 - `docs/win-conditions.md` — control threshold, faction elimination at 0 quarters.
 - `docs/procgen.md` — quarter terrain, neutral garrisons, `structureMinDist`.
 - `docs/scoring.md` — traceability of strikes and victims in the recap.

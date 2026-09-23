@@ -1,7 +1,8 @@
 /**
  * World — DealerFront simulation (god view).
  * Quarters (ownership + control + building), factions (Members + economy),
- * brawls, AI. Pure, deterministic, fixed step 10 Hz.
+ * brawls. Pure, deterministic, fixed step 10 Hz. Every faction is driven by
+ * an external agent (no internal AI): the world only simulates.
  * See docs/territory.md, docs/economy.md, docs/combat.md.
  */
 
@@ -31,7 +32,7 @@ import { SIM_HZ, START_HOUR, TICKS_PER_HOUR } from "./constants";
 import { PARIS_CENTROIDS, PARIS_MAP } from "./maps/paris";
 import { createRng, type Rng } from "./rng";
 import { createFactions, FACTION_COUNT, type Faction } from "./factions";
-import { STRIKE, TECH, TECH_BRANCHES, type TechBranch, techCost } from "./tech";
+import { STRIKE, TECH, type TechBranch, techCost } from "./tech";
 import { CONTACT_NAMES, POLICE, policeTier, type PoliceState, type PoliceTier } from "./police";
 import {
 	DIPLOMACY,
@@ -84,16 +85,6 @@ const MERC = {
 	costGrowth: 1.4,
 } as const;
 
-/**
- * Contract: pay a gang to **attack a rival** (Clean cash). The gang focuses its
- * offensive on the target for the duration of the contract.
- */
-const CONTRACT = {
-	costClean: 6000,
-	costGrowth: 1.5,
-	durationTicks: 600,
-} as const;
-
 const BUY = {
 	baseCostClean: 4000,
 	perOwned: 0.15,
@@ -101,7 +92,6 @@ const BUY = {
 	control: 25,
 } as const;
 const CONTROL_REGEN = 1.2;
-/** Max simultaneous assaults per faction: no "click everywhere". */
 /** Troop movement before the siege (ticks). */
 export const TRAVEL_TICKS = 12;
 /** Simultaneous build crews per faction. */
@@ -111,16 +101,6 @@ const BUILD_CREWS = 2;
 const LOOT_RATIO = 0.2;
 /** Bust: heist to steal loot without destroying (gated by Armament). */
 const BUST = { costSale: 2000, costMembers: 600, requiredArmament: 1, cooldownTicks: 250 } as const;
-/**
- * Share of its army an AI is willing to leave on the field at once. Each front
- * commits `attackRatio` (20%), so 0.5 capped it at ~3 fronts — far more timid
- * than a player, who pushes every border at once. The reserve still matters
- * (committed troops are not defending), it just no longer strangles the war.
- */
-const AI_MAX_COMMIT = 0.7;
-/** Fronts an AI pushes per decision (mirrors the balancing bot's policy). */
-const AI_FRONTS = 2;
-const AI_INTERVAL = 20;
 const MIN_COMMIT = 400;
 /** Raid: weakens an adjacent quarter without capturing it. */
 const RAID = { costSale: 2500, costMembers: 800, control: 35, cooldownTicks: 300 } as const;
@@ -224,7 +204,7 @@ const ZONE_DEFENSE: Record<ZoneType, number> = {
 };
 
 /** Battle royale: no time limit — you play until elimination. */
-const BANKRUPT_TICKS = 300; // 30 s with no cash → defeat
+const BANKRUPT_TICKS = 300; // 30 s with no cash → elimination
 /** Encirclement: minimum cluster size to capitulate (avoids stingy loss). */
 const ENCIRCLE_MIN_SIZE = 8;
 /** Encirclement: the cluster must weigh at least this share of the faction to capitulate. */
@@ -233,13 +213,8 @@ const ENCIRCLE_SHARE = 0.35;
 export interface WorldOptions {
 	/** Map played (default: Paris). */
 	map?: CityGrid;
-	/** Number of factions (default: 6). */
+	/** Number of factions (default: 6). Every faction is driven by an external agent. */
 	factionCount?: number;
-	/**
-	 * Factions **controlled by an agent** (no AI on them). Solo: `[0]` (the
-	 * player). Arena: all factions are controlled.
-	 */
-	controlled?: readonly number[];
 }
 
 /**
@@ -277,9 +252,6 @@ export interface WorldSnapshot {
 	pending: PendingEvent | null;
 	/** PRNG state (determinism after restoration). */
 	rngState: number;
-	/** AI cadence and bankruptcy counter (determinism). */
-	aiCooldowns: number[];
-	brokeTicks: number;
 	outcomeRecorded: boolean;
 }
 
@@ -354,34 +326,6 @@ export interface Strike {
 
 export type Outcome = null | "victory" | "defeat";
 
-/** Floating text (juice) anchored to a quarter, ephemeral. */
-export interface Floater {
-	module: number;
-	text: string;
-	kind: "gain" | "loss" | "info";
-	until: number;
-}
-
-/** **Player** events (audio/UX feedback), drained by the UI. */
-export type GameEvent =
-	| "attack"
-	| "capture"
-	| "lost"
-	| "raid"
-	| "strike"
-	| "tech"
-	| "pact"
-	| "betray"
-	| "embargo"
-	| "corrupt"
-	| "build"
-	| "bust"
-	| "intercept"
-	| "event"
-	| "alert"
-	| "victory"
-	| "defeat";
-
 export class World {
 	readonly city: CityGrid;
 	readonly territory: Territory;
@@ -403,10 +347,7 @@ export class World {
 	readonly pacts: Pact[] = [];
 	readonly offers: PactOffer[] = [];
 	readonly embargoes: Embargo[] = [];
-	/** Player events waiting to be consumed by the UI. */
-	private readonly events: GameEvent[] = [];
-	private readonly floaters: Floater[] = [];
-	/** Pending build orders, per faction. */
+	/** Whether the end of the game was already recorded. */
 	private outcomeRecorded = false;
 	/** Index of the current corrupt contact (changes if burned). */
 	private contactIndex: number;
@@ -415,8 +356,6 @@ export class World {
 	endReason = "";
 
 	private readonly rng: Rng;
-	private brokeTicks = 0;
-	private readonly aiCooldowns: number[] = [];
 	/** Symmetric pairwise relations (0–100). */
 	private relations: number[][] = [];
 	/** Pact proposal cooldown per pair (tick). */
@@ -455,7 +394,6 @@ export class World {
 		this.heat = new Float32Array(this.city.modules.length);
 		this.policeZone = this.buildPoliceZone();
 		this.factions = createFactions(options?.factionCount ?? FACTION_COUNT, START_MEMBERS);
-		this.controlled = new Set(options?.controlled ?? [0]);
 		this.rng = createRng((seed ^ 0x9e3779b9) >>> 0);
 		this.contactIndex = seed % CONTACT_NAMES.length;
 
@@ -487,7 +425,6 @@ export class World {
 			const module = spawns[index]!;
 			this.territory.owner[module] = faction.id;
 			this.territory.control[module] = 100;
-			this.aiCooldowns.push(20 + (faction.id % 3) * 15);
 		});
 		this.relations = this.factions.map(() =>
 			this.factions.map(() => DIPLOMACY.initialRelation),
@@ -508,10 +445,8 @@ export class World {
 
 	/** "Active" faction for `player*` methods (default: 0). */
 	private playerId = 0;
-	/** Factions driven by an agent (never by the AI). */
-	readonly controlled: Set<number>;
 
-	/** Switches the active faction (arena: each agent acts on its turn). */
+	/** Switches the active faction (arena: before applying an agent intent). */
 	setPlayer(factionId: number): void {
 		if (factionId >= 0 && factionId < this.factions.length) this.playerId = factionId;
 	}
@@ -558,8 +493,6 @@ export class World {
 			log: [...this.log],
 			pending: this.pending ? { ...this.pending } : null,
 			rngState: this.rng.state(),
-			aiCooldowns: [...this.aiCooldowns],
-			brokeTicks: this.brokeTicks,
 			outcomeRecorded: this.outcomeRecorded,
 		};
 	}
@@ -600,9 +533,6 @@ export class World {
 		this.log.push(...snap.log);
 		this.pending = snap.pending ? { ...snap.pending } : null;
 		this.rng.setState(snap.rngState);
-		this.aiCooldowns.length = 0;
-		this.aiCooldowns.push(...snap.aiCooldowns);
-		this.brokeTicks = snap.brokeTicks;
 		this.outcomeRecorded = snap.outcomeRecorded;
 		// Restore the cargo on the road *before* `recount()` rebuilds the routes,
 		// so `updateSupply` can carry it over. Persisted snapshots may predate it.
@@ -758,11 +688,8 @@ export class World {
 		faction.armamentUntil = this.tick + ARMAMENT.durationTicks;
 		faction.armamentUses += 1;
 		if (factionId === this.player.id) {
-			const anchor = this.playerAnchor();
 			const bonus = Math.round(ARMAMENT.bonusPerLevel * 100);
-			if (anchor >= 0) this.float(anchor, `⚔ armament +${bonus} %`, "gain");
 			this.pushLog(`Armament +${bonus} % (${ARMAMENT.durationTicks / SIM_HZ} s)`);
-			this.events.push("tech");
 		}
 		return true;
 	}
@@ -805,10 +732,7 @@ export class World {
 		faction.mercUses += 1;
 		const gained = Math.round(faction.members - before);
 		if (factionId === this.player.id) {
-			const anchor = this.playerAnchor();
-			if (anchor >= 0) this.float(anchor, `+${gained} mercenaries`, "gain");
 			this.pushLog(`Mercenaries: +${gained} Members (−${cost.toLocaleString("en-US")} dirty)`);
-			this.events.push("capture");
 		}
 		return true;
 	}
@@ -819,48 +743,6 @@ export class World {
 
 	playerHireMercenaries(): boolean {
 		return this.hireMercenaries(this.player.id);
-	}
-
-	/** Cost of the next contract against a gang (Clean cash, increasing). */
-	contractCost(factionId = this.player.id): number {
-		return Math.round(
-			CONTRACT.costClean * CONTRACT.costGrowth ** this.factions[factionId]!.contractUses,
-		);
-	}
-
-	canFundContract(factionId: number, targetId: number): boolean {
-		if (this.outcome !== null) return false;
-		if (targetId === factionId) return false;
-		if (this.factions[targetId]?.eliminated) return false;
-		if (this.hasPact(factionId, targetId)) return false;
-		return this.factions[factionId]!.cleanCash >= this.contractCost(factionId);
-	}
-
-	/** Pays a gang to attack a rival for the duration of the contract. */
-	fundContract(factionId: number, targetId: number, enemyId: number): boolean {
-		if (!this.canFundContract(factionId, targetId)) return false;
-		if (enemyId === targetId || this.factions[enemyId]?.eliminated) return false;
-		const payer = this.factions[factionId]!;
-		payer.cleanCash -= this.contractCost(factionId);
-		payer.contractUses += 1;
-		const target = this.factions[targetId]!;
-		target.contractTarget = enemyId;
-		target.contractUntil = this.tick + CONTRACT.durationTicks;
-		if (factionId === this.player.id) {
-			const anchor = this.playerAnchor();
-			if (anchor >= 0) this.float(anchor, `🤝 contract: ${target.name}`, "gain");
-			this.pushLog(`Contract: ${target.name} paid to strike ${this.factions[enemyId]!.name}`);
-			this.events.push("pact");
-		}
-		return true;
-	}
-
-	playerCanFundContract(targetId: number): boolean {
-		return this.canFundContract(this.player.id, targetId);
-	}
-
-	playerFundContract(targetId: number, enemyId: number): boolean {
-		return this.fundContract(this.player.id, targetId, enemyId);
 	}
 
 	buyCost(module: number, factionId = this.player.id): number {
@@ -891,9 +773,7 @@ export class World {
 		faction.captures += 1;
 		this.recount();
 		if (factionId === this.player.id) {
-			this.float(module, `🏷 bought (${cost.toLocaleString("en-US")})`, "gain");
 			this.pushLog(`Quarter bought at a premium (module ${module})`);
-			this.events.push("capture");
 		}
 		return true;
 	}
@@ -930,20 +810,9 @@ export class World {
 		faction.cleanCash -= techCost(level + 1);
 		faction.tech[branch] = level + 1;
 		if (factionId === this.player.id) {
-			const anchor = this.playerAnchor();
-			if (anchor >= 0) this.float(anchor, `🔧 ${branch} ${level + 1}`, "gain");
 		}
 		this.pushLog(`Tech ${branch} → ${level + 1}`);
-		if (factionId === this.player.id) this.events.push("tech");
 		return true;
-	}
-
-	/** Player quarter used as anchor for feedback (tech, corruption). */
-	private playerAnchor(): number {
-		for (let i = 0; i < this.territory.count; i += 1) {
-			if (this.territory.owner[i] === this.player.id) return i;
-		}
-		return -1;
 	}
 
 	playerUpgradeTech(branch: TechBranch): boolean {
@@ -974,8 +843,6 @@ export class World {
 	playerStrike(module: number): boolean {
 		if (!this.canStrike(this.player.id, module)) return false;
 		this.launchStrike(this.player.id, module);
-		this.events.push("strike");
-		this.float(module, `💥 strike in ${STRIKE.delayTicks / SIM_HZ}s`, "loss");
 		this.pushLog(`Strike inbound (module ${module}) — ${STRIKE.delayTicks / SIM_HZ}s`);
 		return true;
 	}
@@ -1025,8 +892,6 @@ export class World {
 			this.addHeat(target, HEAT.strike);
 		}
 		if (this.territory.owner[module] === this.player.id) {
-			this.events.push("alert");
-			this.float(module, "💥 strike hit", "loss");
 		}
 		this.pushLog(`Strike impact (module ${module})`);
 	}
@@ -1084,17 +949,11 @@ export class World {
 			);
 			this.contactIndex = (this.contactIndex + 1) % CONTACT_NAMES.length;
 			this.pushLog(`Contact burned (${faction.name}) — new contact: ${this.contactName}`);
-			if (faction.isPlayer) this.events.push("corrupt");
 			return true;
 		}
 		this.police.pressure = Math.max(0, this.police.pressure - POLICE.corruptionReduction);
 		this.police.window = POLICE.corruptionWindow;
-		if (faction.isPlayer) {
-			const anchor = this.playerAnchor();
-			if (anchor >= 0) this.float(anchor, "🤝 −Pressure", "gain");
-		}
 		this.pushLog(`${this.contactName} lowers Pressure (${faction.name})`);
-		if (faction.isPlayer) this.events.push("corrupt");
 		return true;
 	}
 
@@ -1153,7 +1012,6 @@ export class World {
 
 	playerProposePact(factionId: number): boolean {
 		if (!this.proposePact(this.player.id, factionId)) return false;
-		this.events.push("pact");
 		return true;
 	}
 
@@ -1167,7 +1025,6 @@ export class World {
 		this.offers.splice(index, 1);
 		if (accept && !this.hasEmbargo(offer.from, offer.to)) {
 			this.formPact(offer.from, offer.to);
-			this.events.push("pact");
 		} else {
 			this.pushLog(`Pact refused (${this.factions[from]!.name})`);
 		}
@@ -1218,7 +1075,6 @@ export class World {
 			}
 		}
 		this.pushLog(`Embargo declared on ${this.factions[factionId]!.name}`);
-		this.events.push("embargo");
 		return true;
 	}
 
@@ -1229,7 +1085,6 @@ export class World {
 		if (!pact) return false;
 		this.pacts.splice(this.pacts.indexOf(pact), 1);
 		this.betray(this.player.id, factionId);
-		this.events.push("betray");
 		return true;
 	}
 
@@ -1286,38 +1141,6 @@ export class World {
 			return;
 		}
 		this.dropRelation(attacker, owner, DIPLOMACY.attackRelationHit);
-	}
-
-	private aiDiplomacy(factionId: number): void {
-		for (let index = this.offers.length - 1; index >= 0; index -= 1) {
-			const offer = this.offers[index]!;
-			if (offer.to !== factionId) continue;
-			const accept =
-				this.relationBetween(offer.from, factionId) >= DIPLOMACY.acceptRelation &&
-				this.modulesOwned(offer.from) <=
-					this.modulesOwned(factionId) * DIPLOMACY.acceptPowerRatio + 2;
-			this.offers.splice(index, 1);
-			if (accept) this.formPact(offer.from, offer.to);
-		}
-
-		for (let index = this.pacts.length - 1; index >= 0; index -= 1) {
-			const pact = this.pacts[index]!;
-			if (pact.a !== factionId && pact.b !== factionId) continue;
-			const other = pact.a === factionId ? pact.b : pact.a;
-			if (this.relationBetween(factionId, other) < DIPLOMACY.betrayRelation && this.rng() < 0.1) {
-				this.pacts.splice(index, 1);
-				this.betray(factionId, other);
-			}
-		}
-
-		if (this.rng() >= DIPLOMACY.aiOfferChance) return;
-		for (const other of this.factions) {
-			if (other.id === factionId) continue;
-			if (!this.canProposePact(factionId, other.id)) continue;
-			if (this.relationBetween(factionId, other.id) < DIPLOMACY.acceptRelation) continue;
-			this.proposePact(factionId, other.id);
-			break;
-		}
 	}
 
 	private updateDiplomacyTimers(): void {
@@ -1427,7 +1250,6 @@ export class World {
 		if (targets.length > 0) this.recount();
 		const leaderFaction = this.factions[leader]!;
 		leaderFaction.raidsSuffered += 1;
-		if (leaderFaction.isPlayer) this.events.push("raid");
 		if (multiple) {
 			leaderFaction.cleanCash *= 1 - POLICE.seizureRatio;
 			leaderFaction.seizures += 1;
@@ -1438,27 +1260,29 @@ export class World {
 		this.pushLog(`Police raid on ${this.factions[leader]!.name} (${targets.length})`);
 	}
 
-	/** Liquidation: player defeat, or dismantling of a dominant AI gang. */
+	/** Liquidation: the leader collapses, whatever its seat — the game goes on. */
 	private policeLiquidation(leader: number): void {
-		const faction = this.factions[leader]!;
 		this.police.liquidations += 1;
-		if (faction.isPlayer) {
-			this.outcome = "defeat";
-			this.endReason = "Police liquidation: your cartel has fallen.";
-			this.pushLog("Police liquidation of the Cartel");
-			return;
-		}
+		this.dismantle(leader, "police liquidation");
+		this.police.pressure = POLICE.multiThreshold;
+	}
+
+	/**
+	 * Collapse of a faction (bankruptcy, police liquidation): its quarters go
+	 * neutral — up for grabs — and the battle royale continues without it.
+	 */
+	private dismantle(factionId: number, reason: string): void {
+		const faction = this.factions[factionId]!;
 		for (let i = 0; i < this.territory.count; i += 1) {
-			if (this.territory.owner[i] !== leader) continue;
+			if (this.territory.owner[i] !== factionId) continue;
 			this.territory.owner[i] = NEUTRAL;
 			this.territory.control[i] = NEUTRAL_GARRISON;
 			this.territory.building[i] = NO_BUILDING;
 			this.cancelConstruction(i);
 		}
 		this.recount();
-		this.police.pressure = POLICE.multiThreshold;
 		faction.eliminated = true;
-		this.pushLog(`${faction.name} dismantled by the police`);
+		this.pushLog(`${faction.name} eliminated (${reason})`);
 	}
 
 	canAttack(factionId: number, module: number): boolean {
@@ -1470,7 +1294,6 @@ export class World {
 		if (this.outcome !== null) return false;
 		if (!this.canAttack(this.player.id, module)) return false;
 		if (!this.attackFrom(this.player.id, module)) return false;
-		this.events.push("attack");
 		return true;
 	}
 
@@ -1537,13 +1360,11 @@ export class World {
 		if (!this.playerCanBuild(module, type)) return false;
 		const conversion = this.isConversion(module);
 		this.startBuild(this.player.id, module, type);
-		this.float(module, `🏗 ${BUILDINGS[type].label}`, "info");
 		this.pushLog(
 			conversion
 				? `${BUILDINGS[type].label} upgraded (module ${module})`
 				: `Build site ${BUILDINGS[type].label} (module ${module})`,
 		);
-		this.events.push("build");
 		return true;
 	}
 
@@ -1585,8 +1406,6 @@ export class World {
 		this.cancelConstruction(module);
 		this.addHeat(module, HEAT.operation);
 		this.recount();
-		this.events.push("raid");
-		this.float(module, `raid −${RAID.control}`, "loss");
 		this.pushLog(`Raid on module ${module}`);
 		return true;
 	}
@@ -1598,16 +1417,6 @@ export class World {
 
 	playerSetLaunderRatio(ratio: number): void {
 		this.player.launderRatio = Math.max(0, Math.min(1, ratio));
-	}
-
-	/** Active floating texts (juice). */
-	activeFloaters(): readonly Floater[] {
-		return this.floaters;
-	}
-
-	private float(module: number, text: string, kind: Floater["kind"]): void {
-		this.floaters.push({ module, text, kind, until: this.tick + 14 });
-		if (this.floaters.length > 24) this.floaters.shift();
 	}
 
 	/** Number of Watchers covering a quarter (radius 1) — UI pre-check. */
@@ -1667,21 +1476,10 @@ export class World {
 		const guards = this.guardedBy(owner, module);
 		if (guards >= 2) {
 			this.pushLog(`Bust foiled (watchers, module ${module})`);
-			this.events.push("alert");
 			return true;
 		}
-		const gained = this.loot(this.player.id, owner, type, guards >= 1 ? LOOT_RATIO * 0.5 : LOOT_RATIO);
+		this.loot(this.player.id, owner, type, guards >= 1 ? LOOT_RATIO * 0.5 : LOOT_RATIO);
 		this.addHeat(module, HEAT.operation);
-		this.events.push("bust");
-		this.float(
-			module,
-			gained.sale
-				? `bust +${Math.round(gained.sale)} dirty`
-				: gained.clean
-					? `bust +${Math.round(gained.clean)} clean`
-					: `bust +${Math.round(gained.members)} members`,
-			"gain",
-		);
 		this.pushLog(`Bust successful (module ${module})`);
 		return true;
 	}
@@ -1714,10 +1512,8 @@ export class World {
 		const route = this.convoyTo(module)!;
 		this.player.members -= INTERCEPT.costMembers;
 		this.player.interceptCooldown = INTERCEPT.cooldownTicks;
-		const gained = this.takeCargo(this.player, route);
+		this.takeCargo(this.player, route);
 		this.addHeat(module, HEAT.operation);
-		this.events.push("intercept");
-		this.float(module, `interception +${Math.round(gained)}`, "gain");
 		this.pushLog(`Convoy intercepted (module ${module})`);
 		return true;
 	}
@@ -1750,13 +1546,19 @@ export class World {
 		const event = this.pending;
 		if (!event || this.outcome !== null) return false;
 		const player = this.player;
-		const anchor = this.playerAnchor();
+		// Heat sink for event fallout: the faction's first owned quarter.
+		let home = -1;
+		for (let i = 0; i < this.territory.count; i += 1) {
+			if (this.territory.owner[i] === player.id) {
+				home = i;
+				break;
+			}
+		}
 		if (event.id === "livraison") {
 			if (choice === 0) {
 				player.dirtyCash += 3500;
-				if (anchor >= 0) {
-					this.addHeat(anchor, HEAT.operation * 3);
-					this.float(anchor, "+3,500 dirty", "gain");
+				if (home >= 0) {
+					this.addHeat(home, HEAT.operation * 3);
 				}
 				this.pushLog("Delivery accepted: +3,500 dirty, heat rising");
 			} else {
@@ -1772,7 +1574,7 @@ export class World {
 				player.dirtyCash += 3000;
 				player.cleanCash += 3000;
 				this.police.pressure = Math.min(POLICE.max, this.police.pressure + 8);
-				if (anchor >= 0) this.addHeat(anchor, HEAT.operation * 4);
+				if (home >= 0) this.addHeat(home, HEAT.operation * 4);
 				this.pushLog("Informant silenced: +6,000, Pressure +8");
 			}
 		} else if (event.id === "front") {
@@ -1791,7 +1593,6 @@ export class World {
 					this.territory.building[free] = BUILDING_INDEX.front;
 					this.territory.builtAt[free] = this.tick;
 					this.recount();
-					this.float(free, "🏛 Free Front", "gain");
 					this.pushLog(`Rival Front bought out (module ${free})`);
 				} else {
 					// No free premises: compensate with Clean cash (choice is never useless).
@@ -1803,7 +1604,6 @@ export class World {
 				this.pushLog("Front resold: +5,000 dirty");
 			}
 		}
-		this.events.push("event");
 		this.pending = null;
 		return true;
 	}
@@ -1869,12 +1669,6 @@ export class World {
 		return { sale, clean, members };
 	}
 
-	/** Consumes player events accumulated since the last render. */
-	drainEvents(): GameEvent[] {
-		if (this.events.length === 0) return [];
-		return this.events.splice(0, this.events.length);
-	}
-
 	/**
 	 * Batch build plan: develops empty owned quarters according to the target
 	 * composition. Numbers for preview (without the queue).
@@ -1926,9 +1720,9 @@ export class World {
 			const bootstrap = missingEconomyStep(scratch, (t) =>
 				this.canAfford(player, t, CONVERSION_COST),
 			);
-			// Same discipline as the AI: while the chain is incomplete, build only
-			// the missing step — otherwise a broke cartel spams Housing (paid in
-			// Members) and never earns a single coin.
+		// While the chain is incomplete, build only the missing step —
+		// otherwise a broke cartel spams Housing (paid in Members) and never
+		// earns a single coin.
 			if (bootstrap === null && chainIncomplete(scratch)) break;
 			const type =
 				bootstrap ??
@@ -2054,8 +1848,6 @@ export class World {
 			if (this.territory.pending[i] !== NO_BUILDING && this.territory.owner[i] !== NEUTRAL) {
 				this.territory.building[i] = this.territory.pending[i]!;
 				this.territory.builtAt[i] = this.tick;
-				const type = BUILDING_TYPES[this.territory.building[i]!];
-				if (type) this.float(i, `${BUILDINGS[type].label} ready`, "gain");
 				completed = true;
 			}
 			this.territory.pending[i] = NO_BUILDING;
@@ -2110,8 +1902,6 @@ export class World {
 					this.territory.building[neighbor] === BUILDING_INDEX.counter,
 			);
 			if (lookout) {
-				this.events.push("alert");
-				this.float(module, "Bust!", "loss");
 				this.pushLog(`Alert: enemy bust (module ${module})`);
 			}
 		}
@@ -2140,19 +1930,12 @@ export class World {
 		this.resolveStrikes();
 		this.resolveEncirclements();
 		this.updateDiplomacyTimers();
-		this.think();
-		for (let i = this.floaters.length - 1; i >= 0; i -= 1) {
-			if (this.floaters[i]!.until <= this.tick) this.floaters.splice(i, 1);
-		}
 		this.updateTreasury();
 		this.updateHeat();
 		this.updatePolice();
 		this.maybeTriggerEvent();
 		this.checkOutcome();
-		if (this.outcome !== null && !this.outcomeRecorded) {
-			this.outcomeRecorded = true;
-			this.events.push(this.outcome === "victory" ? "victory" : "defeat");
-		}
+		if (this.outcome !== null) this.outcomeRecorded = true;
 	}
 
 	/** Production: members (Housing/quarters) and product (Labs). */
@@ -2326,29 +2109,12 @@ export class World {
 			taker.captures += cluster.length;
 			this.addHeat(cluster[0]!, HEAT.capture);
 			if (owner === this.player.id) {
-				this.events.push("lost");
-				this.float(cluster[0]!, `encircled −${cluster.length}`, "loss");
 			} else if (encircler === this.player.id) {
-				this.events.push("capture");
-				this.float(cluster[0]!, `encirclement +${cluster.length}`, "gain");
 			}
 			this.pushLog(`${taker.name} encircles ${victim.name} (${cluster.length})`);
 			changed = true;
 		}
 		if (changed) this.recount();
-	}
-
-	/**
-	 * Share of a faction's army currently out on the field (0–1). Committing
-	 * everything leaves the homeland empty: the pool is also your defense.
-	 */
-	committedShare(factionId: number): number {
-		let committed = 0;
-		for (const attack of this.attacks) {
-			if (attack.factionId === factionId) committed += attack.troops;
-		}
-		const total = (this.factions[factionId]?.members ?? 0) + committed;
-		return total > 0 ? committed / total : 0;
 	}
 
 	/**
@@ -2452,22 +2218,7 @@ export class World {
 				if (attack.factionId === this.police.target) this.police.crime += 1;
 				// Loot: buildings are valuable objectives.
 				if (destroyed && previous !== NEUTRAL && previous !== attack.factionId) {
-					const gained = this.loot(attack.factionId, previous, destroyed);
-					if (attack.factionId === this.player.id && (gained.sale || gained.clean || gained.members)) {
-						const label = gained.sale
-							? `+${Math.round(gained.sale)} dirty`
-							: gained.clean
-								? `+${Math.round(gained.clean)} clean`
-								: `+${Math.round(gained.members)} members`;
-						this.float(attack.target, `loot ${label}`, "gain");
-					}
-				}
-				if (attack.factionId === this.player.id) {
-					this.events.push("capture");
-					this.float(attack.target, "+1 quarter", "gain");
-				} else if (previous === this.player.id) {
-					this.events.push("lost");
-					this.float(attack.target, "−1 quarter", "loss");
+					this.loot(attack.factionId, previous, destroyed);
 				}
 			} else if (attack.troops <= 0) {
 				this.territory.control[attack.target] = control;
@@ -2476,284 +2227,6 @@ export class World {
 				this.territory.control[attack.target] = control;
 			}
 		}
-	}
-
-	private think(): void {
-		for (let i = 0; i < this.factions.length; i += 1) {
-			if (this.controlled.has(i)) continue;
-			this.aiCooldowns[i] = (this.aiCooldowns[i] ?? 0) - 1;
-			if ((this.aiCooldowns[i] ?? 0) > 0) continue;
-			this.aiCooldowns[i] = AI_INTERVAL;
-			// Housekeeping and war must not compete for the same decision: an AI
-			// that spends its turn building never attacks, and is permanently on
-			// the back foot. So these are all *additive* — the assault below always
-			// gets its chance.
-			this.aiDiplomacy(i);
-			this.aiDefend(i);
-			if (this.rng() < 0.4) this.aiBuild(i);
-
-			// Tech: levels up a branch if a Workshop allows it.
-			if (this.rng() < 0.3) {
-				for (const branch of TECH_BRANCHES) {
-					if (this.upgradeTech(i, branch)) break;
-				}
-			}
-			// Defensive corruption: the targeted leader bribes the police if it can afford it.
-			if (
-				this.police.target === i &&
-				this.police.pressure >= POLICE.multiThreshold &&
-				this.canCorrupt(i)
-			) {
-				this.corruptPolice(i);
-			}
-			if (this.rng() < 0.3) this.aiOperate(i);
-			if (this.rng() < 0.2) this.aiIntercept(i);
-			if (this.rng() < 0.15) this.aiStrike(i);
-			this.aiSpend(i);
-			// Push a couple of fronts. The first is **force concentration**: reinforce
-			// the ongoing assault before opening a new one. The rest expand the war.
-			const pushed = new Set<number>();
-			for (let push = 0; push < AI_FRONTS; push += 1) {
-				// Keep a reserve: the pool you commit is the pool that is not defending.
-				if (this.committedShare(i) > AI_MAX_COMMIT) break;
-				const active = this.attacks.find(
-					(attack) => attack.factionId === i && !pushed.has(attack.target),
-				);
-				const focus =
-					active && this.canAttack(i, active.target)
-						? active.target
-						: this.pickAiTarget(i);
-				if (focus === null || pushed.has(focus)) break;
-				pushed.add(focus);
-				if (!this.attackFrom(i, focus)) break;
-			}
-		}
-	}
-
-	/**
-	 * AI spending. Clean cash must **leave the treasury** or the cartels just
-	 * hoard millions doing nothing (they were ending games with 2–4 M unspent).
-	 * Armament, quarter buyouts and contracts are the clean sinks; mercenaries
-	 * convert surplus Dirty cash into troops.
-	 */
-	private aiSpend(factionId: number): void {
-		const faction = this.factions[factionId]!;
-		// Armament: repeatable firepower — the cheapest real sink.
-		if (this.canBuyArmament(factionId) && faction.cleanCash > this.armamentCost(factionId) * 2) {
-			this.buyArmament(factionId);
-		}
-		// Buyout: Clean cash → territory without committing a single troop.
-		if (faction.buyCooldown <= 0 && faction.cleanCash > 20000) {
-			for (let i = 0; i < this.territory.count; i += 1) {
-				if (faction.cleanCash < this.buyCost(i, factionId) * 3) continue;
-				if (!this.canBuy(factionId, i)) continue;
-				this.buyQuarter(factionId, i);
-				break;
-			}
-		}
-		// Contract: pay a rival to bleed the leader.
-		const leader = this.findLeader();
-		if (leader >= 0 && leader !== factionId && faction.cleanCash > 40000) {
-			for (const other of this.factions) {
-				if (other.id === factionId || other.id === leader) continue;
-				if (other.eliminated || other.contractUntil > this.tick) continue;
-				if (this.fundContract(factionId, other.id, leader)) break;
-			}
-		}
-		// Mercenaries: surplus Dirty cash → Members. Troops are the war currency,
-		// so a treasury that just sits there is a wasted army.
-		if (faction.dirtyCash > this.mercCost(factionId) * 2) this.hireMercenaries(factionId);
-	}
-
-	private aiStrike(factionId: number): boolean {
-		for (let i = 0; i < this.territory.count; i += 1) {
-			if (!this.canAttack(factionId, i)) continue;
-			if (!this.canStrike(factionId, i)) continue;
-			this.launchStrike(factionId, i);
-			return true;
-		}
-		return false;
-	}
-
-	private aiBuild(factionId: number): boolean {
-		const faction = this.factions[factionId]!;
-		if (this.activeConstructions(factionId) >= BUILD_CREWS) return false;
-		const counts = this.buildingCounts(factionId);
-		const owned = this.modulesOwned(factionId);
-		// Bootstrap: as long as a chain step is missing, build only that.
-		const bootstrap = missingEconomyStep(counts, (t) =>
-			this.canAfford(faction, t, CONVERSION_COST),
-		);
-		// Save up for the missing chain step instead of building filler.
-		if (bootstrap === null && chainIncomplete(counts)) return false;
-		for (let i = 0; i < this.territory.count; i += 1) {
-			if (this.territory.owner[i] !== factionId) continue;
-			if (this.territory.building[i] !== NO_BUILDING) continue;
-			if (this.territory.construction[i]! > 0) continue;
-			const zone = this.city.modules[i]!;
-			const type = chooseBuildType(
-				counts,
-				owned,
-				(t) =>
-					this.canAfford(faction, t, this.buildCostFactor(factionId, i, t)) &&
-					canBuildInZone(zone, t) &&
-					(bootstrap === null || t === bootstrap),
-				{ workshop: TECH.maxLevel },
-			);
-			if (type === null) continue;
-			this.startBuild(factionId, i, type);
-			return true;
-		}
-		return false;
-	}
-
-	/** Reactive defense: places a Safehouse on an attacked, empty owned quarter. */
-	private aiDefend(factionId: number): boolean {
-		const faction = this.factions[factionId]!;
-		if (!this.attacks.length) return false;
-		// We don't sacrifice the economic bootstrap: a complete chain is required.
-		if (
-			this.buildingCount(factionId, "lab") === 0 ||
-			this.buildingCount(factionId, "storefront") === 0
-		) {
-			return false;
-		}
-		for (const attack of this.attacks) {
-			const target = attack.target;
-			if (this.territory.owner[target] !== factionId) continue;
-			if (this.territory.building[target] !== NO_BUILDING) continue;
-			if (this.territory.construction[target]! > 0) continue;
-			if (!canBuildInZone(this.city.modules[target]!, "safehouse")) continue;
-			if (!this.canAfford(faction, "safehouse", this.buildCostFactor(factionId, target, "safehouse"))) return false;
-			this.startBuild(factionId, target, "safehouse");
-			return true;
-		}
-		return false;
-	}
-
-	/** AI operations: bust of an enemy building (gated by Armament). */
-	private aiOperate(factionId: number): boolean {
-		const faction = this.factions[factionId]!;
-		if (faction.bustCooldown > 0) return false;
-		// We don't launch operations before having an established economy and a surplus.
-		if (this.buildingCount(factionId, "lab") === 0 || this.buildingCount(factionId, "storefront") === 0) {
-			return false;
-		}
-		if (faction.dirtyCash < 6000) return false;
-		for (let i = 0; i < this.territory.count; i += 1) {
-			if (!this.canAttack(factionId, i)) continue;
-			const owner = this.territory.owner[i]!;
-			if (owner === NEUTRAL || owner === factionId) continue;
-			const type = this.buildingAt(i);
-			if (!type) continue;
-			if (this.guardedBy(owner, i) > 0) continue;
-			if (
-				faction.tech.armament >= BUST.requiredArmament &&
-				faction.dirtyCash >= BUST.costSale &&
-				faction.members >= BUST.costMembers
-			) {
-				faction.dirtyCash -= BUST.costSale;
-				faction.members -= BUST.costMembers;
-				faction.bustCooldown = BUST.cooldownTicks;
-				this.loot(factionId, owner, type);
-				this.addHeat(i, HEAT.operation);
-				if (owner === this.player.id) {
-					this.events.push("bust");
-					this.float(i, "enemy bust", "loss");
-					this.pushLog(`Enemy bust (module ${i})`);
-				}
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/** AI interception: diverts an adjacent enemy convoy. */
-	private aiIntercept(factionId: number): boolean {
-		const faction = this.factions[factionId]!;
-		if (faction.interceptCooldown > 0) return false;
-		if (faction.tech.armament < INTERCEPT.requiredArmament) return false;
-		if (faction.members < INTERCEPT.costMembers) return false;
-		for (let i = 0; i < this.territory.count; i += 1) {
-			const owner = this.territory.owner[i]!;
-			if (owner === NEUTRAL || owner === factionId) continue;
-			if (!this.canAttack(factionId, i)) continue;
-			const route = this.convoyTo(i);
-			if (!route || route.cargo <= 0) continue;
-			faction.members -= INTERCEPT.costMembers;
-			faction.interceptCooldown = INTERCEPT.cooldownTicks;
-			this.takeCargo(faction, route);
-			this.addHeat(i, HEAT.operation);
-			if (owner === this.player.id) {
-				this.events.push("intercept");
-				this.float(i, "convoy intercepted", "loss");
-				this.pushLog(`Convoy intercepted (module ${i})`);
-			}
-			return true;
-		}
-		return false;
-	}
-
-	private pickAiTarget(factionId: number): number | null {
-		const faction = this.factions[factionId]!;
-		// Paid contract: focus the offensive on the designated target.
-		const contract = faction.contractUntil > this.tick ? faction.contractTarget : -1;
-		const leader = this.police.target;
-		// Anti-snowball: a fraction of decisions target the leader, ∝ its domination.
-		const focusChance =
-			leader >= 0 && leader !== factionId
-				? Math.max(0, this.controlRatio(leader) - DIPLOMACY.coalitionFloor) *
-					DIPLOMACY.leaderFocus
-				: 0;
-		const focusLeader = focusChance > 0 && this.rng() < focusChance;
-
-		// Battle royale: finish off the weak so a game concludes.
-		let weakest = -1;
-		let weakestOwned = Number.POSITIVE_INFINITY;
-		for (const faction of this.factions) {
-			if (faction.id === factionId || faction.id === leader) continue;
-			const owned = this.modulesOwned(faction.id);
-			if (owned > 0 && owned < weakestOwned) {
-				weakestOwned = owned;
-				weakest = faction.id;
-			}
-		}
-
-		let best: number | null = null;
-		let bestScore = Number.POSITIVE_INFINITY;
-		let bestLeader: number | null = null;
-		let bestLeaderScore = Number.POSITIVE_INFINITY;
-		let bestWeak: number | null = null;
-		let bestWeakScore = Number.POSITIVE_INFINITY;
-		let bestContract: number | null = null;
-		let bestContractScore = Number.POSITIVE_INFINITY;
-		for (let i = 0; i < this.territory.count; i += 1) {
-			if (!this.canAttack(factionId, i)) continue;
-			const owner = this.territory.owner[i]!;
-			if (owner !== NEUTRAL && this.hasPact(factionId, owner)) continue;
-			const score = this.territory.control[i]! + (this.rng() - 0.5) * 10;
-			if (score < bestScore) {
-				bestScore = score;
-				best = i;
-			}
-			if (owner === leader && leader !== factionId && score < bestLeaderScore) {
-				bestLeaderScore = score;
-				bestLeader = i;
-			}
-			if (owner === weakest && score < bestWeakScore) {
-				bestWeakScore = score;
-				bestWeak = i;
-			}
-			if (owner === contract && score < bestContractScore) {
-				bestContractScore = score;
-				bestContract = i;
-			}
-		}
-		if (bestContract !== null) return bestContract;
-		if (focusLeader && bestLeader !== null) return bestLeader;
-		// Elimination priority: finish off the weakest rival if in range.
-		if (bestWeak !== null && this.rng() < 0.6) return bestWeak;
-		return best;
 	}
 
 	private recount(): void {
@@ -2810,7 +2283,7 @@ export class World {
 			// Elimination is decided by the map, not by *how* the quarters were
 			// lost: an encirclement or a police raid can zero a faction out without
 			// going through the assault path. Without this it lingers forever as an
-			// inert zombie that still gets an AI turn every 2.5 s.
+			// inert zombie.
 			if ((this.owned[faction.id] ?? 0) === 0) faction.eliminated = true;
 			const c = this.counts[faction.id]!;
 			faction.housing = c.housing;
@@ -2950,9 +2423,10 @@ export class World {
 	}
 
 	/** Ticks remaining before bankruptcy (0 if not overdrawn). */
-	bankruptcyTicksLeft(): number {
-		if (this.brokeTicks <= 0) return 0;
-		return Math.max(0, BANKRUPT_TICKS - this.brokeTicks);
+	bankruptcyTicksLeft(factionId = this.player.id): number {
+		const broke = this.factions[factionId]?.brokeTicks ?? 0;
+		if (broke <= 0) return 0;
+		return Math.max(0, BANKRUPT_TICKS - broke);
 	}
 
 	rankings(): number[] {
@@ -3037,30 +2511,30 @@ export class World {
 	}
 
 	private updateTreasury(): void {
-		const player = this.player;
-		if (player.cleanCash <= 0 && player.dirtyCash <= 0) {
-			this.brokeTicks += 1;
-		} else {
-			this.brokeTicks = 0;
+		for (const faction of this.factions) {
+			if (faction.eliminated) continue;
+			if (faction.cleanCash <= 0 && faction.dirtyCash <= 0) {
+				faction.brokeTicks += 1;
+				if (faction.brokeTicks >= BANKRUPT_TICKS) {
+					this.dismantle(faction.id, "bankruptcy");
+				}
+			} else {
+				faction.brokeTicks = 0;
+			}
 		}
 	}
 
-	/** Battle royale: victory for the last survivor, causal defeats. */
+	/** Battle royale: the game ends only on the last survivor. */
 	private checkOutcome(): void {
-		const playerModules = this.modulesOwned(this.player.id);
-		if (playerModules === 0) {
-			this.outcome = "defeat";
-			this.endReason = "Your cartel has been eliminated.";
-			return;
-		}
 		if (this.aliveCount() === 1) {
+			const winner = this.factions.find((faction) => (this.owned[faction.id] ?? 0) > 0)!;
 			this.outcome = "victory";
-			this.endReason = "Last cartel standing — the city is yours.";
+			this.endReason = `Last cartel standing — ${winner.name} takes the city.`;
 			return;
 		}
-		if (this.brokeTicks >= BANKRUPT_TICKS) {
+		if (this.aliveCount() === 0) {
 			this.outcome = "defeat";
-			this.endReason = "Bankruptcy: out of cash for too long.";
+			this.endReason = "Mutual annihilation — no cartel left standing.";
 		}
 	}
 

@@ -11,6 +11,8 @@ export interface ArenaSocket {
 	world: World | null;
 	view: ArenaView | null;
 	connected: boolean;
+	/** The table is gone (deleted) or too old to run — show it plainly. */
+	unavailable: boolean;
 	version: number;
 }
 
@@ -19,37 +21,91 @@ export function useArenaSocket(id: string | null): ArenaSocket {
 	const [world, setWorld] = useState<World | null>(null);
 	const [view, setView] = useState<ArenaView | null>(null);
 	const [connected, setConnected] = useState(false);
+	const [unavailable, setUnavailable] = useState(false);
 	const [version, setVersion] = useState(0);
 
 	useEffect(() => {
 		if (!id) return;
-		const protocol = location.protocol === "https:" ? "wss" : "ws";
-		const socket = new WebSocket(`${protocol}://${location.host}/api/arena/${id}/spectate`);
-		socket.onopen = () => setConnected(true);
-		socket.onclose = () => setConnected(false);
-		socket.onerror = () => setConnected(false);
-		socket.onmessage = (event) => {
-			const message = JSON.parse(event.data as string) as SpectatorMessage;
-			setView(message.view);
-			// A finished game still ships a snapshot: without it a late spectator
-			// would sit on "Connecting…" forever instead of seeing the final map.
-			const snapshot = message.snapshot;
-			if (snapshot) {
-				let mirror = worldRef.current;
-				if (!mirror || mirror.factions.length !== snapshot.factions.length) {
-					mirror = new World(0, {
-						factionCount: snapshot.factions.length,
-						controlled: snapshot.factions.map((faction) => faction.id),
-					});
-					worldRef.current = mirror;
-					setWorld(mirror);
+		let stopped = false;
+		let socket: WebSocket | null = null;
+		let reconnectTimer: number | null = null;
+		let attempt = 0;
+
+		const connect = () => {
+			if (stopped) return;
+			const protocol = location.protocol === "https:" ? "wss" : "ws";
+			socket = new WebSocket(`${protocol}://${location.host}/api/arena/${id}/spectate`);
+			socket.onopen = () => {
+				attempt = 0;
+				setConnected(true);
+			};
+			socket.onclose = () => {
+				setConnected(false);
+				if (stopped) return;
+				// If we never got a view and never got a world, table likely dead — don't loop forever
+				if (!worldRef.current && !view) {
+					// give it 2 attempts before marking unavailable
+					if (attempt >= 2) setUnavailable(true);
 				}
-				mirror.applySnapshot(snapshot);
-			}
-			setVersion((value) => value + 1);
+				const delay = Math.min(5000, 800 * Math.pow(1.6, attempt));
+				attempt += 1;
+				reconnectTimer = window.setTimeout(connect, delay) as unknown as number;
+			};
+			socket.onerror = () => {
+				try {
+					socket?.close();
+				} catch {
+					// ignore
+				}
+			};
+			socket.onmessage = (event) => {
+				const message = JSON.parse(event.data as string) as SpectatorMessage;
+				if ((message as { error?: string }).error) {
+					setUnavailable(true);
+					return;
+				}
+				setView(message.view);
+				const snapshot = message.snapshot;
+				if (snapshot) {
+					let mirror = worldRef.current;
+					if (!mirror || mirror.factions.length !== snapshot.factions.length) {
+						mirror = new World(0, { factionCount: snapshot.factions.length });
+						worldRef.current = mirror;
+						setWorld(mirror);
+					}
+					mirror.applySnapshot(snapshot);
+				}
+				setVersion((value) => value + 1);
+			};
 		};
-		return () => socket.close();
+
+		connect();
+
+		// Heartbeat: if WS stalls (tab background, DO hibernate), poll view via HTTP to re-arm alarm and keep UI warm
+		const heartbeat = window.setInterval(
+			() => {
+				if (document.visibilityState !== "visible") return;
+				void fetch(`/api/arena/${id}/view`)
+					.then((r) => r.json())
+					.then((v) => {
+						if (v && typeof v.id === "string") setView(v as ArenaView);
+					})
+					.catch(() => {});
+			},
+			45_000,
+		);
+
+		return () => {
+			stopped = true;
+			if (reconnectTimer !== null) clearTimeout(reconnectTimer);
+			clearInterval(heartbeat);
+			try {
+				socket?.close();
+			} catch {
+				// ignore
+			}
+		};
 	}, [id]);
 
-	return { world, view, connected, version };
+	return { world, view, connected, unavailable, version };
 }

@@ -137,7 +137,7 @@ Define the **police** as a **non-playable opposing faction**, **anti-leader (ant
 | Surveillance | 0–39 | Mood (HUD) |
 | **Targeted raid** | 40–69 | 1 leader quarter: **−25 Control**, building **destroyed** |
 | **Multiple raid + seizure** | 70–89 | 3 quarters + **seizure of 10% of Clean cash** |
-| **Liquidation** | ≥ 95 | Player → **defeat**; AI gang → quarters returned to **neutral**, `P` drops to 70 |
+| **Liquidation** | ≥ 95 | Leader **dismantled** (quarters returned to **neutral**), `P` drops to 70 — game continues |
 
 - **Raid cooldown**: **600 ticks (1 min)**.
 

@@ -85,12 +85,14 @@ describe("police", () => {	it("targets the leader (on a tie, the lowest id)", ()
 		expect(world.buildingAt(target)).toBeNull();
 	});
 
-	it("police liquidation defeats the player", () => {
+	it("police liquidation dismantles the leader, game goes on", () => {
 		const world = new World(1);
+		const leader = world.findLeader();
 		world.police.pressure = 99;
 		world.step();
-		expect(world.outcome).toBe("defeat");
-		expect(world.endReason).toContain("liquidation");
+		expect(world.modulesOwned(leader)).toBe(0);
+		expect(world.factions[leader]!.eliminated).toBe(true);
+		expect(world.outcome).toBeNull();
 	});
 
 	it("the police can dismantle a dominant AI gang", () => {

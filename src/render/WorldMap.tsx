@@ -15,9 +15,10 @@ import { FACTION_COLORS } from "../sim/factions";
 import { PARIS_CENTROIDS } from "../sim/maps/paris";
 import parisGeoUrl from "../sim/maps/paris-iris.geojson?url";
 import type { Territory } from "../sim/territory";
+import type { ZoneType } from "../sim/types";
 import type { Attack, ConvoyRoute, Strike } from "../sim/world";
 import { BUILDING_ICONS, buildingIconImage } from "./icons";
-import { factionDisplayColor } from "./palette";
+import { factionDisplayColor, ZONE_COLORS } from "./palette";
 import { useReducedMotion } from "./useReducedMotion";
 
 const SOURCE = "iris";
@@ -50,6 +51,7 @@ interface IrisProps {
 	i: number;
 	code: string;
 	name: string;
+	zone?: ZoneType;
 }
 
 interface ArcDatum {
@@ -71,6 +73,10 @@ interface WorldMapProps {
 	colorblind: boolean;
 	version: number;
 	playerId: number;
+	/** Zone per quarter (city profile): drives the zone border colors. */
+	zones: readonly ZoneType[] | null;
+	/** Zone borders on/off (fills always stay faction-owned). */
+	showZones: boolean;
 	/** Troop-equivalent defending a quarter (front labels). */
 	defenseAt: (module: number) => number;
 	onModuleClick: (module: number) => void;
@@ -81,6 +87,14 @@ interface WorldMapProps {
 
 /** Building icon: MapLibre image id per type (0 = no building). */
 const BUILDING_ICON_ID = (type: BuildingType) => `bld-${type}`;
+
+/** Zone border colors (functional): which buildings a quarter accepts. */
+function zoneMatch(): unknown[] {
+	const match: unknown[] = ["match", ["get", "zone"]];
+	for (const [zone, color] of Object.entries(ZONE_COLORS)) match.push(zone, color);
+	match.push("#0b0e12");
+	return match;
+}
 
 /** Fill color driven by `feature-state` (faction + control). */
 function factionMatch(colorblind: boolean): unknown[] {
@@ -102,12 +116,14 @@ export function WorldMap({
 	convoys,
 	strikes,
 	heat,
-	tick,
-	selected,
-	colorblind,
-	version,
-	playerId,
-	defenseAt,
+  tick,
+  selected,
+  colorblind,
+  version,
+  playerId,
+  zones,
+  showZones,
+  defenseAt,
 	onModuleClick,
 	onModuleHover,
 	onEmptyClick,
@@ -123,7 +139,16 @@ export function WorldMap({
 		fetch(parisGeoUrl)
 			.then((res) => res.json() as Promise<FeatureCollection<Geometry, IrisProps>>)
 			.then((data) => {
-				if (!cancelled) setCollection(data);
+				if (cancelled) return;
+				// Zone is static per quarter: annotate once, the line layer reads it.
+				if (zones) {
+					for (const feature of data.features) {
+						const index = Number(feature.properties?.i);
+						const zone = Number.isFinite(index) ? zones[index] : undefined;
+						if (zone) feature.properties = { ...feature.properties, zone };
+					}
+				}
+				setCollection(data);
 			})
 			.catch(() => {
 				if (!cancelled) setCollection(null);
@@ -131,6 +156,8 @@ export function WorldMap({
 		return () => {
 			cancelled = true;
 		};
+		// Zones never change for a map: annotate on first load only.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	const fillPaint = useMemo(
@@ -152,16 +179,16 @@ export function WorldMap({
 				"case",
 				["boolean", ["feature-state", "selected"], false],
 				"#ffffff",
-				"#0b0e12",
+				...(showZones ? [zoneMatch()] : ["#0b0e12"]),
 			] as never,
 			"line-width": [
 				"case",
 				["boolean", ["feature-state", "selected"], false],
 				2.2,
-				0.5,
+				showZones ? 1 : 0.5,
 			] as never,
 		}),
-		[],
+		[showZones],
 	);
 
 	const arcs = useMemo<ArcDatum[]>(
@@ -217,9 +244,9 @@ export function WorldMap({
 				data={arcs}
 				paint={{
 					"line-color": ["get", "color"],
-					"line-width": 1.6,
-					"line-dasharray": [2, 1.5],
-					"line-opacity": 0.9,
+					"line-width": 2,
+					"line-dasharray": [3, 2.5] as never,
+					"line-opacity": 0.92 as never,
 				}}
 				interactive={false}
 			/>
@@ -519,7 +546,7 @@ function EffectStates({
 				id: "iris-buildings",
 				type: "symbol",
 				source: BUILDING_SOURCE,
-				minzoom: 12.5,
+				minzoom: 10.2,
 				layout: {
 					"icon-image": ["concat", "bld-", ["get", "type"]],
 					"icon-size": [
@@ -527,9 +554,11 @@ function EffectStates({
 						["linear"],
 						["zoom"],
 						10,
-						0.55,
+						0.65,
+						12,
+						0.85,
 						14,
-						0.9,
+						0.95,
 						17,
 						1.15,
 					] as never,
@@ -907,8 +936,9 @@ function Convoys({
 				source: CONVOY_SOURCE,
 				paint: {
 					"line-color": convoyColor(colorblind) as never,
-					"line-width": 1,
-					"line-opacity": 0.35,
+					"line-width": 1.4,
+					"line-opacity": 0.45,
+					"line-dasharray": [3, 3] as never,
 				},
 			});
 		}
@@ -921,7 +951,8 @@ function Convoys({
 					"circle-radius": ["get", "r"] as never,
 					"circle-color": convoyColor(colorblind) as never,
 					"circle-stroke-color": "#0b0e12",
-					"circle-stroke-width": 1,
+					"circle-stroke-width": 1.2,
+					"circle-opacity": 0.95 as never,
 				},
 			});
 		} else {

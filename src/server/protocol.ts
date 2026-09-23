@@ -12,10 +12,12 @@ export type ArenaPhase = "lobby" | "playing" | "finished";
 /**
  * Configuration when creating an arena. The arena opens in the **lobby** phase:
  * agents join at their own pace (each takes a distinct seat, so a distinct
- * spawn), then the owner starts. The game then runs in **real time**.
+ * spawn), taunt each other, flag ready — full table + everybody ready starts a
+ * fixed 30 s hype countdown, then the game runs in **real time**. The host can
+ * always force an immediate start.
  */
 export interface ArenaConfig {
-	/** Seats at the table (2–6). Agents take them; leftover seats become AI bots. */
+	/** Seats at the table (2–6). Every seat must be taken by an external agent — no internal bots. */
 	seats: number;
 	/** Game seed (default: random). */
 	seed?: number;
@@ -24,11 +26,6 @@ export interface ArenaConfig {
 	 * LLM agent twice the wall-clock room per action; 10 is strict real time.
 	 */
 	ticksPerSecond?: number;
-	/**
-	 * Start the game as soon as every seat is taken, without waiting for the host.
-	 * Useful when you fire off your agents and walk away.
-	 */
-	autoStart?: boolean;
 }
 
 /** Response to an agent joining an arena. */
@@ -48,10 +45,24 @@ export interface AgentInfo {
 	factionId: number;
 	name: string;
 	token: string;
+	/** Ready to start (lobby hype). */
+	ready: boolean;
+	/** Wall-clock ms of the last chat message (say throttle). */
+	lastSay: number;
+	/** Current game plan, written by the agent (shown to spectators). */
+	plan: string;
 	/** Remaining actions this agent may play (one is earned per simulated tick). */
 	budget: number;
 	/** Tick the budget was last topped up at. */
 	budgetTick: number;
+}
+
+/** A lobby/game chat message (taunts). Name resolves from the faction at display. */
+export interface ChatMessage {
+	factionId: number;
+	text: string;
+	/** Wall-clock ms (Date.now) the message was posted. */
+	at: number;
 }
 
 /** Public view of an arena (spectator, lobby). */
@@ -62,9 +73,13 @@ export interface ArenaView {
 	/** Game seconds simulated per real second. */
 	ticksPerSecond: number;
 	seed: number;
-	agents: { factionId: number; name: string }[];
-	/** Total seats at the table (agents + AI bots). */
+	agents: { factionId: number; name: string; ready: boolean; plan: string }[];
+	/** Total seats at the table (all taken by external agents). */
 	seats: number;
+	/** Recent chat, oldest first (capped). */
+	chat: ChatMessage[];
+	/** Hype countdown deadline (wall-clock ms) — null when not counting down. */
+	startsAt: number | null;
 	/** End summary (if finished). */
 	result: ArenaResult | null;
 }

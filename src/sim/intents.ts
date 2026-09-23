@@ -25,7 +25,6 @@ export type Intent =
 	| { type: "respondOffer"; from: number; accept: boolean }
 	| { type: "breakPact"; faction: number }
 	| { type: "embargo"; faction: number }
-	| { type: "fundContract"; target: number; enemy: number }
 	| { type: "buyQuarter"; module: number }
 	| { type: "hireMercenaries" }
 	| { type: "buyArmament" }
@@ -81,11 +80,6 @@ export function applyIntent(world: World, factionId: number, intent: Intent): In
 			return ok(world.playerBreakPact(intent.faction), "no pact");
 		case "embargo":
 			return ok(world.playerEmbargo(intent.faction), "embargo impossible");
-		case "fundContract":
-			return ok(
-				world.playerFundContract(intent.target, intent.enemy),
-				"contract impossible",
-			);
 		case "buyQuarter":
 			return ok(world.playerBuy(intent.module), "buyout impossible");
 		case "hireMercenaries":
@@ -121,7 +115,6 @@ export const INTENT_CATALOG: readonly { type: Intent["type"]; doc: string }[] = 
 	{ type: "respondOffer", doc: "Respond to an offer (from, accept)." },
 	{ type: "breakPact", doc: "Betray a pact (faction)." },
 	{ type: "embargo", doc: "Embargo against a faction." },
-	{ type: "fundContract", doc: "Pay a gang (target) to strike a rival (enemy)." },
 	{ type: "buyQuarter", doc: "Buy an adjacent neutral quarter (Clean cash)." },
 	{ type: "hireMercenaries", doc: "Dirty cash → immediate Members." },
 	{ type: "buyArmament", doc: "Clean cash → temporary attack bonus." },

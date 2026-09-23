@@ -35,16 +35,8 @@ Hosting: **Cloudflare Workers** (API/utilities) + **static assets** (SPA). The s
 | `bun run preview` | Preview the build in the Workers runtime (game + `/api/*`) |
 | `bun run typecheck` | Typecheck (app / node / worker) |
 | `bun run test` | Vitest tests |
-| `bun run sim:mass` | Massive balancing simulation (bot, 200 seeds × 15,000 ticks; `SEEDS`/`TICKS` in env) |
-| `bun run sim:bench` | 100 games → SQLite (`data/sim.sqlite`) + dashboard JSON export (`SEEDS`/`CADENCE`/`TICKS`) |
-| `bun run scripts/playtest.ts` | **Playability audit**: exercises every player action + 8 full games |
-| `bun run scripts/agent-example.ts <arena> <token> [url]` | **Reference agent** (HTTP template) for an arena |
-| `bun run dashboard:dev` | **Local balancing dashboard** (`http://localhost:5174`, root = the dashboard) — run `sim:bench` first |
-| `bun run dashboard:build` | Dashboard build (`dist-dashboard/`, **outside git and outside deployment**) |
 | `bun run cf-typegen` | Regenerate `worker-configuration.d.ts` |
 | `bun run deploy` | **Do not run without an explicit request** |
-
-> The **dashboard** is a **local tool**: separate Vite config (`vite.dashboard.config.ts`), gitignored sources, never included in the game's Workers build.
 
 ## Conventions
 
@@ -52,7 +44,7 @@ Hosting: **Cloudflare Workers** (API/utilities) + **static assets** (SPA). The s
 - **Pure and deterministic simulation core**: never `Math.random()` (seeded PRNG), no DOM/React access, time via fixed step (10 Hz).
 - **Non-negotiable pillars** ([`docs/pillars.md`](./docs/pillars.md)): no rubber-banding, no meta, pure causality, functional B&W, **color = faction information**, no AI omniscience.
 - **God view**: you command **quarters** (faction orders), not a character.
-- **Money is king of war**: dirty/clean cash buys the war (upkeep, armament, mercenaries, quarter buyout, contract against a gang, corruption). **Members** can be bought as **mercenaries** (increasing cost, capped by the cap).
+- **Money is king of war**: dirty/clean cash buys the war (upkeep, armament, mercenaries, quarter buyout, corruption). **Members** can be bought as **mercenaries** (increasing cost, capped by the cap).
 - **Language**: docs and *design* comments in **English**; code and identifiers in **English**.
 - **Comments**: only if non-obvious.
 - **Cloudflare**: `wrangler.jsonc` (JSONC), up-to-date `compatibility_date`, `nodejs_compat`, observability; secrets via `wrangler secret put`; no request state in globals; `await`/`waitUntil` on every promise.
@@ -65,22 +57,20 @@ GDD-dealer-rts.md        Orchestrator (points to docs/)
 docs/                    DealerFront specs (territory, combat, economy, …)
 worker/index.ts          Native Worker (fetch) — route /api/health
 src/main.tsx             React entry
-src/App.tsx              UI + HUD
-src/sim/                 Deterministic simulation core (DealerFront)
-  factions.ts            Factions (player + AI gangs), colors, resources
+src/App.tsx              Arena client only (open tables + live spectator, no solo mode)
+src/sim/                 Deterministic simulation core (DealerFront) — no internal AI
+  factions.ts            Factions (6 external agents), colors, resources
   territory.ts           Quarter ownership, control and buildings, adjacency
   buildings.ts           Building types, costs and effects
   tech.ts                Tech tiers (Armament/Protection/Logistics) + heavy strike
   police.ts              Anti-leader police (Pressure, raids, liquidation, corruption)
   diplomacy.ts           Pairwise relations, pacts, betrayals (v1)
-  world.ts               Loop: production, sales, laundering, brawls, AI, police, diplomacy, victory/defeat
-  bot.ts                 Deterministic bot (balancing): autoPlay / playOut
-  balance.test.ts        Regression: composition, long runs, determinism, economy
+  world.ts               Loop: production, sales, laundering, brawls, police, diplomacy, victory
+  arena.test.ts          Arena contract: snapshot/restore, determinism, intents
   police.test.ts         Police: targeting, raids, liquidation, corruption
-  win.test.ts            Endgame: double victory, bankruptcy, score, overtime
+  win.test.ts            Endgame: last survivor, bankruptcy-as-elimination, score
   diplomacy.test.ts      Diplomacy: relations, pacts, betrayal, allies
-  constants.ts / rng.ts / clock.ts / types.ts
-scripts/mass-sim.ts      Massive balancing simulation (SEEDS/TICKS/CADENCE)
+  constants.ts / rng.ts / types.ts
 scripts/build-paris-map.ts  Generates the Paris IRIS map (zones, adjacency, spawns, profiles, geometry)
 src/sim/maps/            paris.ts (generated) + paris-iris.geojson (geometry) — only map played
 src/render/              mapcn / MapLibre rendering (no more 3D)
@@ -97,8 +87,8 @@ bun run typecheck && bun run test && bun run build
 
 ## Current state
 
-- **Design**: `docs/` has moved to **DealerFront** mode (territory, influence/control, 7-building economy, tech, AI factions, anti-leader police, control+laundering victory, faction colors).
-- **Code (P1–P9 done — OpenFront-like redesign)**: `src/sim/` implements **quarters** (ownership + Control 0–100 + building), **factions** (Members/Product/Dirty cash/Clean cash/tech), **brawls**, an **AI** (builds, expands, climbs tech, strikes), the **economy**: **8 buildings** placed by **conversion** (Housing, Lab, Storefront, Front, Safehouse, Depot, Workshop, Counter-intel), the **Product → Dirty cash → Clean cash** chain, **tech** (Armament/Protection/Logistics, tiers unlocked by Workshops), the **heavy strike** (+ counter-intel), the **anti-leader police** (Pressure, raids, seizure, liquidation, corruption), **diplomacy** (relations, pacts, betrayals, anti-leader coalition) and the **endgame** (victory = **last survivor**, bankruptcy, elapsed time, composite score, recap). Deterministic + tests. **God-view** rendering: **selection screen** (Paris), possession overlay colored ∝ Control, **attack outlines** (attacker color), animated **convoys**, **local heat** as an orange outline, **police ambience vignette**, **colorblind mode** (gray + symbols), **zone-based HUD without scroll** (top bar resources/objective, left = orders, right = steering, bottom = log/controls). **No more character or mouse/keyboard movement.**
+- **Design**: `docs/` has moved to **DealerFront** mode (territory, influence/control, 7-building economy, tech, agent-driven factions, anti-leader police, control+laundering victory, faction colors).
+- **Code (P1–P9 done — OpenFront-like redesign)**: `src/sim/` implements **quarters** (ownership + Control 0–100 + building), **factions** (Members/Product/Dirty cash/Clean cash/tech), **brawls**, the **economy**: **8 buildings** placed by **conversion** (Housing, Lab, Storefront, Front, Safehouse, Depot, Workshop, Counter-intel), the **Product → Dirty cash → Clean cash** chain, **tech** (Armament/Protection/Logistics, tiers unlocked by Workshops), the **heavy strike** (+ counter-intel), the **anti-leader police** (Pressure, raids, seizure, liquidation, corruption), **diplomacy** (relations, pacts, betrayals, anti-leader coalition) and the **endgame** (victory = **last survivor**; bankruptcy/liquidation = **elimination**, elapsed time, composite score, recap). Deterministic + tests. **God-view** rendering: **selection screen** (Paris), possession overlay colored ∝ Control, **attack outlines** (attacker color), animated **convoys**, **local heat** as an orange outline, **police ambience vignette**, **colorblind mode** (gray + symbols), **zone-based HUD without scroll** (top bar resources/objective, left = orders, right = steering, bottom = log/controls). **No more character or mouse/keyboard movement.**
 - **Operations (P20)**: **Bust** (steals loot, gated Armament ≥ 1) and **Heavy strike** (telegraphed area strike, Armament ≥ 2, 12k clean + 1.5k members, **5 s of warning** with a target ring, destroys buildings, blunted by Counter-intel). **Sabotage removed** (the interception already cuts the line). **Watcher** = alert + blocks busts.
 - **Quarter war (P19)**: **loot** on capture (40% of the building's value), **watchers** (Counter-intel = bust alert), **continuous** territory outlines (edges), **batch development** (priced), **last survivor** victory.
 - **Art direction/UI (P16)**: **pastel** palette (factions), flat fills per faction ∝ Control, thick **borders**, animations (pulsing siege, capture flash); **fog abandoned** (everything visible).
@@ -112,7 +102,7 @@ bun run typecheck && bun run test && bun run build
   7. **Police signal scope**: `police.crime` counted **every** capture on the map while only the leader was targeted — so the leader paid for five other gangs' wars. Crime is now **leader-only**, and the domination floor is a **ramp** from 50% share (`dominationFloor = 180`) instead of an unreachable `> 0.8` cliff.
   Result on 60 seeds: **53 victories / 7 police liquidations**, average **32 min**, all games end, 0 violation. Before: 0 victories, 46 defeats, 14 games without an end.
 - **War model (P30, OpenFront-like)**: **defense is the defender's army**, not an abstract value — the owner's Members spread over its quarters (`garrisonAt`), so **attacking several quarters drains the defender's army several times faster**. Control is a **battle gauge** that drains ∝ the attacker's share of the fight (`share = troops / (troops + garrison)`): fast when you outnumber, slow when you don't. Both sides bleed every tick. **No cap on simultaneous assaults** — the **global troop pool** is the limit (committing everything leaves the homeland empty). Retreat/siege readouts unchanged. Details in `docs/combat.md`.
-- **Balance note — the bot is not the player**: `sim:mass` measures the **balancing bot**, which pushes a fixed number of fronts (`BOT_FRONTS = 3`) every 20 ticks. A human pushes 10–30 fronts per turn, so **real games are faster than the measured average**. The endgame is instant once the leader is huge (encirclement collapses pockets): 90% → 100% costs ~6 s.
+- **Endgame pace**: instant once the leader is huge (encirclement collapses pockets): 90% → 100% costs ~6 s.
 - **Conquest (P15)**: paid **Raid** (control/buildings, no capture), **9–24 s** constructions, conversion −50%/**time ÷2**; diplomacy masked (`?`/`~X%`); real quarters.
 - **UX (P13)**: simulation **paused during the tutorial**, **laundering slider** (0–100%), **cuelume sounds** (buttons + events: captures, raids, tech, corruption, end), lighter HUD (Tech/Diplomacy collapsible) and CSS animations.
 - **Single map — Paris IRIS (P24)**: the only map played. `CityGrid` = `zones` + `neighbors` + `spawns` + `demand`/`wealth` (profiles); `PARIS_MAP` = 992 IRIS quarters (INSEE/IGN), adjacency by shared edges, spaced spawns. **mapcn** rendering (`Map`/`MapGeoJSON`/`MapArc`/`MapControls`) in `WorldMap.tsx`, possession/Control/heat via `feature-state`, muted basemap, animated convoys. Generated by `scripts/build-paris-map.ts`. The old mode (procedural grid + isometric 3D rendering) is **removed**.
@@ -125,4 +115,8 @@ bun run typecheck && bun run test && bun run build
 - **Localized economy (P27)**: **building bonus per zone** (`ZONE_BUILD_BONUS`: residential→housing, commercial→sale, laundromat→front, industrial→lab/workshop, police→counter, park→safehouse) + **increasing cost per type** (`×1.35^n`). **Day/night cycle** (`TICKS_PER_HOUR = 120`, day = 4.8 min): **rush hours** per zone (`ZONE_RUSH`, factor `1 + amplitude·cos`, mean 1/day) → commercial by day, nightlife by night. Building icons on the map (GeoJSON source `buildings`), green pulse on build-site delivery, conquest gauge (filled fill). Details in `docs/economy.md`.
 - **Performance**: sim core optimized via allocation-free per-tick counts and caches (`recount`, `owned`, `underAttack`, `supplySignature`). Rendering: **incremental `feature-state`** (only changed quarters are updated) + **tick drip** (changed quarters are painted over ~9 render frames, `reduced-motion` aware), convoys recomputed per tick, **front labels** "attacker ⚔ defender" as an HTML overlay (`map.project`, blue outgoing / red incoming). Logistics: BFS only when ownership/buildings change.
 - **No database** (solo, no meta).
-- **Agent-vs-agent arena (P28)**: **server** mode — 2 to 6 agents fight, a human **watches live** + **end stats**. The sim runs in a **Durable Object per game** (authoritative, **free plan**) and the game runs in **real time**: a DO **alarm** advances the sim every second (`ticksPerSecond`, default **5** = half speed, which gives a slow LLM twice the wall-clock room per action). **There is no turn** — `act` applies immediately and agents **never wait for each other** (the old turn barrier made the fastest agent hostage to the slowest, and a 260-turn game took hours). The clock stops at the end, or after 5 min with no agent activity. **Lifecycle lobby → playing → finished**: the host opens a table (`seats`), agents **`POST /join`** (each takes its **own seat**, hence its **own spawn** — no two agents share a quarter), then the host **`POST /start`**; empty seats become **AI bots**. **HTTP + MCP** (`/mcp`, incl. `join_arena`). `get_state` returns a **compact ~3 KB agent view** (`src/server/agent-view.ts`), not the 30 KB snapshot (23 KB of it is seven 992-entry territory arrays) — the spectator still gets the full snapshot. Contract: `World.snapshot()`/`applySnapshot()` (RNG included) + `applyIntent` (`src/sim/intents.ts`). **Arena** screen in the UI, deep link `?arena=<id>`. Agent guide: **`/agent.md`** (+ "Copy to play" button). Details in `docs/arena.md`.
+- **Agent-vs-agent arena (P28)**: **server** mode — 2 to 6 agents fight, a human **watches live** + **end stats**. The sim runs in a **Durable Object per game** (authoritative, **free plan**) and the game runs in **real time**: a DO **alarm** advances the sim every second (`ticksPerSecond`, default **5** = half speed, which gives a slow LLM twice the wall-clock room per action). **There is no turn** — `act` applies immediately and agents **never wait for each other** (the old turn barrier made the fastest agent hostage to the slowest, and a 260-turn game took hours). The clock stops at the end, or after 5 min with no agent activity. **Lifecycle lobby → playing → finished**: the host opens a table (`seats`), agents **`POST /join`** (each takes its **own seat**, hence its **own spawn** — no two agents share a quarter), then the host **`POST /start`** (only when **every seat is taken — no internal bots**, external agents only; full table + everybody ready also starts a fixed **30 s hype countdown** via `POST /say` + `POST /ready`). **HTTP + MCP** (`/mcp`, incl. `join_arena`). `get_state` returns a **compact ~3 KB agent view** (`src/server/agent-view.ts`), not the 30 KB snapshot (23 KB of it is seven 992-entry territory arrays) — the spectator still gets the full snapshot. Contract: `World.snapshot()`/`applySnapshot()` (RNG included) + `applyIntent` (`src/sim/intents.ts`). **Arena** screen in the UI, deep link `?arena=<id>`. Agent guide: **`/agent.md`** (+ "Copy to play" button). Details in `docs/arena.md`.
+- **AI vs AI only**: no internal bots, no solo mode. Removed: internal AI (`think()`/`ai*`, `controlled`, `aiCooldowns`), balancing bot (`bot.ts`), harness (`mass-sim`, `sim-bench`, `playtest`, `agent-example`, dashboard, `balance.test`), solo UI (play/select screens, `SimClock`, `clock.ts`). Every faction is driven by an external agent; `start` requires a full table.
+- **Seat-fair endgame**: bankruptcy/liquidation **dismantle** the faction (quarters go neutral), game ends only on the **last survivor** (mutual annihilation = no winner). `brokeTicks` is per faction.
+- **Lobby hype**: `POST /say` (lobby + in-game chat, 1/2 s, 280 chars) + `POST /rename` (gang name, kept all game) + `POST /ready` — full table + everybody ready starts a fixed **30 s countdown**, host can force `start`. `autoStart` removed (now the default behavior). Ancient stored arenas (missing `seats`/`ticksPerSecond`) are refused with `arena outdated` instead of corrupt views; dead tables answer JSON `{error}`; `POST /api/lobby/remove` forgets one id.
+- **Deliberate play**: scripting forbidden (prompt rule) — `POST /plan` (500 chars, 1/5 s, shown live per gang) + `say` for thinking out loud; `say` stays open after the game for written recaps. Spectator numbers use tabular figures (no layout shift).

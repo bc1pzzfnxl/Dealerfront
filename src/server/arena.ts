@@ -24,6 +24,7 @@ import type {
 	ArenaResult,
 	ArenaView,
 	AgentInfo,
+	ChatMessage,
 	CreateResponse,
 	JoinResponse,
 	SpectatorMessage,
@@ -34,7 +35,7 @@ interface ArenaState {
 	phase: ArenaPhase;
 	ownerToken: string;
 	agents: AgentInfo[];
-	/** Seats at the table. Agents take them; leftover seats become AI bots. */
+	/** Seats at the table. Every seat must be taken by an external agent. */
 	seats: number;
 	/** Game seconds simulated per real second. */
 	ticksPerSecond: number;
@@ -42,8 +43,10 @@ interface ArenaState {
 	lastActivity: number;
 	/** Alarms since the last snapshot write. */
 	alarms: number;
-	/** Start as soon as every seat is taken. */
-	autoStart: boolean;
+	/** Lobby/game chat, oldest first (capped). */
+	chat: ChatMessage[];
+	/** Hype countdown deadline (wall-clock ms) — null when not counting down. */
+	startsAt: number | null;
 }
 
 const MIN_SEATS = 2;
@@ -57,8 +60,8 @@ const ALARM_MS = 1000;
  * host can raise it to 10 for a strict real-time game.
  */
 const DEFAULT_TICKS_PER_SECOND = 5;
-/** Stop simulating after this long with no agent activity (free-plan courtesy). */
-const IDLE_STOP_MS = 5 * 60 * 1000;
+/** Stop simulating after this long with no agent activity (free-plan courtesy). 10 min for slow LLMs. */
+const IDLE_STOP_MS = 10 * 60 * 1000;
 /** Persist the world every N alarms rather than every second. */
 const SAVE_EVERY_ALARMS = 10;
 /**
@@ -68,6 +71,22 @@ const SAVE_EVERY_ALARMS = 10;
  * the state: real-time alone is not a fair pace.
  */
 const MAX_ACTION_BUDGET = 10;
+/**
+ * Hype: once the table is full and every agent is ready, the game starts
+ * after this long — the taunt window. Fixed: one less thing to configure.
+ */
+const HYPE_MS = 30_000;
+/** Chat history kept per arena (the view ships the tail). */
+const CHAT_CAP = 50;
+const VIEW_CHAT = 20;
+/** One chat message per agent every 2 s — taunts, not spam. */
+const SAY_EVERY_MS = 2000;
+const SAY_MAX_CHARS = 280;
+/** Game plans: longer than taunts, at most one every 5 s. */
+const PLAN_EVERY_MS = 5000;
+const PLAN_MAX_CHARS = 500;
+/** Gang names: short, unique per table. */
+const NAME_MAX_CHARS = 24;
 
 export class Arena extends DurableObject<Env> {
 	private arena: ArenaState | null = null;
@@ -79,13 +98,30 @@ export class Arena extends DurableObject<Env> {
 		if (this.arena) return;
 		const stored = await this.ctx.storage.get<ArenaState>("arena");
 		if (!stored) throw new Error("arena does not exist");
+		// Refuse ancient states (pre-realtime builds): the engine's required
+		// fields are missing, and running them would corrupt the view (dropped
+		// JSON keys, stalled clock). Delete the table and open a new one.
+		if (
+			typeof stored.seats !== "number" ||
+			typeof stored.ticksPerSecond !== "number" ||
+			!Array.isArray(stored.agents)
+		) {
+			throw new Error("arena outdated: delete it and open a new table");
+		}
 		this.arena = stored;
+		// Backfill fields added after this arena was stored (chat/ready/hype).
+		if (!Array.isArray(this.arena.chat)) this.arena.chat = [];
+		if (typeof this.arena.startsAt !== "number" && this.arena.startsAt !== null) {
+			this.arena.startsAt = null;
+		}
+		for (const agent of this.arena.agents) {
+			if (typeof agent.ready !== "boolean") agent.ready = false;
+			if (typeof agent.lastSay !== "number") agent.lastSay = 0;
+			if (typeof agent.plan !== "string") agent.plan = "";
+		}
 		const snapshot = await this.ctx.storage.get<WorldSnapshot>("world");
 		if (!snapshot) return;
-		const world = new World(stored.seed, {
-			factionCount: stored.seats,
-			controlled: stored.agents.map((agent) => agent.factionId),
-		});
+		const world = new World(stored.seed, { factionCount: stored.seats });
 		world.applySnapshot(snapshot);
 		this.world = world;
 		this.result = (await this.ctx.storage.get<ArenaResult>("result")) ?? null;
@@ -105,13 +141,25 @@ export class Arena extends DurableObject<Env> {
 	}
 
 	/**
-	 * One real second of game time. Re-arms itself; stops when the game is over
-	 * or when nobody has touched the table for a while.
+	 * One real second. In lobby it ticks the hype countdown; in game it
+	 * advances the simulation. Re-arms itself while there is something to do.
 	 */
 	async alarm(): Promise<void> {
 		await this.load();
 		const arena = this.arena;
-		if (!arena || arena.phase !== "playing" || !this.world) return;
+		if (!arena) return;
+		if (arena.phase === "lobby") {
+			if (arena.startsAt === null) return;
+			if (Date.now() >= arena.startsAt) {
+				arena.startsAt = null;
+				await this.beginGame(this.arenaId());
+				return;
+			}
+			this.broadcast();
+			await this.schedule();
+			return;
+		}
+		if (arena.phase !== "playing" || !this.world) return;
 		// Nobody is playing: stop burning Durable Object time. The next request
 		// re-arms the clock.
 		if (Date.now() - arena.lastActivity > IDLE_STOP_MS) return;
@@ -142,8 +190,12 @@ export class Arena extends DurableObject<Env> {
 			agents: arena.agents.map((agent) => ({
 				factionId: agent.factionId,
 				name: agent.name,
+				ready: agent.ready,
+				plan: agent.plan,
 			})),
 			seats: arena.seats,
+			chat: arena.chat.slice(-VIEW_CHAT),
+			startsAt: arena.startsAt,
 			result: this.result,
 		};
 	}
@@ -185,7 +237,8 @@ export class Arena extends DurableObject<Env> {
 			),
 			lastActivity: Date.now(),
 			alarms: 0,
-			autoStart: config.autoStart === true,
+			chat: [],
+			startsAt: null,
 		};
 		this.world = null;
 		this.result = null;
@@ -213,6 +266,9 @@ export class Arena extends DurableObject<Env> {
 			factionId,
 			name: `Seat ${factionId + 1}`,
 			token: crypto.randomUUID(),
+			ready: false,
+			lastSay: 0,
+			plan: "",
 			budget: MAX_ACTION_BUDGET,
 			budgetTick: 0,
 		};
@@ -220,10 +276,6 @@ export class Arena extends DurableObject<Env> {
 		arena.lastActivity = Date.now();
 		await this.save();
 		this.broadcast();
-		// Filled the table and the host asked for it: go.
-		if (arena.autoStart && arena.agents.length >= arena.seats) {
-			await this.start(id, arena.ownerToken);
-		}
 		return {
 			arena: id,
 			factionId,
@@ -234,30 +286,137 @@ export class Arena extends DurableObject<Env> {
 	}
 
 	/**
-	 * Starts the game (owner only). Seats nobody took become **AI bots**, and
-	 * only the agents are `controlled` — the bots are driven by the AI.
+	 * Starts the game (owner only). Every seat must be taken by an external
+	 * agent — there are no internal bots, so a partial table cannot start.
+	 * Forces an immediate start, skipping any hype countdown.
 	 */
 	private async start(id: string, ownerToken: string): Promise<ArenaView | { error: string }> {
 		await this.load();
 		const arena = this.arena!;
 		if (arena.ownerToken !== ownerToken) return { error: "not the owner" };
 		if (arena.phase !== "lobby") return { error: "already started" };
-		if (arena.agents.length === 0) return { error: "no agent joined yet" };
-		const world = new World(arena.seed, {
-			factionCount: arena.seats,
-			controlled: arena.agents.map((agent) => agent.factionId),
-		});
+		if (arena.agents.length < arena.seats) {
+			return {
+				error: `table not full: ${arena.agents.length}/${arena.seats} seats taken, every seat needs an external agent`,
+			};
+		}
+		return this.beginGame(id);
+	}
+
+	/** Builds the world and flips the table to playing (host or countdown). */
+	private async beginGame(id: string): Promise<ArenaView> {
+		const arena = this.arena!;
+		const world = new World(arena.seed, { factionCount: arena.seats });
 		for (const agent of arena.agents) {
-			agent.name = world.factions[agent.factionId]?.name ?? agent.name;
+			// Names flow BOTH ways so every surface agrees: a gang that named
+			// itself keeps its name in the world (map labels, standings,
+			// agent views); the rest take the map's names.
+			const def = `Seat ${agent.factionId + 1}`;
+			const faction = world.factions[agent.factionId]!;
+			if (agent.name === def) agent.name = faction.name;
+			else faction.name = agent.name;
 		}
 		this.world = world;
 		arena.phase = "playing";
+		arena.startsAt = null;
 		arena.lastActivity = Date.now();
 		arena.alarms = 0;
 		await this.save();
 		await this.schedule();
 		this.broadcast();
 		return this.view(id);
+	}
+
+	/** Gang name (lobby + game). Short, unique per table — this is you. */
+	private async rename(token: string, name: string): Promise<{ ok: boolean; name?: string; error?: string }> {
+		await this.load();
+		const arena = this.arena!;
+		const agent = arena.agents.find((candidate) => candidate.token === token);
+		if (!agent) return { ok: false, error: "unknown token" };
+		if (arena.phase === "finished") return { ok: false, error: "game over" };
+		const clean = name.replace(/\s+/g, " ").trim().slice(0, NAME_MAX_CHARS);
+		if (!clean) return { ok: false, error: "empty name" };
+		if (arena.agents.some((other) => other !== agent && other.name === clean)) {
+			return { ok: false, error: "name taken" };
+		}
+		agent.name = clean;
+		arena.lastActivity = Date.now();
+		await this.save();
+		this.broadcast();
+		return { ok: true, name: clean };
+	}
+
+	/** Lobby/game chat: taunts before the game, trash-talk during it, recaps after. */
+	private async say(token: string, text: string): Promise<{ ok: boolean; error?: string }> {
+		await this.load();
+		const arena = this.arena!;
+		const agent = arena.agents.find((candidate) => candidate.token === token);
+		if (!agent) return { ok: false, error: "unknown token" };
+		const clean = text.replace(/\s+/g, " ").trim().slice(0, SAY_MAX_CHARS);
+		if (!clean) return { ok: false, error: "empty message" };
+		const now = Date.now();
+		if (now - agent.lastSay < SAY_EVERY_MS) {
+			return { ok: false, error: "too fast: one message every 2 s" };
+		}
+		agent.lastSay = now;
+		arena.chat.push({ factionId: agent.factionId, text: clean, at: now });
+		if (arena.chat.length > CHAT_CAP) arena.chat.splice(0, arena.chat.length - CHAT_CAP);
+		arena.lastActivity = now;
+		await this.save();
+		this.broadcast();
+		return { ok: true };
+	}
+
+	/** Game plan, written by the agent (lobby, game, after): shown to spectators. */
+	private async plan(token: string, text: string): Promise<{ ok: boolean; error?: string }> {
+		await this.load();
+		const arena = this.arena!;
+		const agent = arena.agents.find((candidate) => candidate.token === token);
+		if (!agent) return { ok: false, error: "unknown token" };
+		const clean = text.replace(/\s+/g, " ").trim().slice(0, PLAN_MAX_CHARS);
+		if (!clean) return { ok: false, error: "empty plan" };
+		const now = Date.now();
+		if (now - agent.lastSay < PLAN_EVERY_MS) {
+			return { ok: false, error: "too fast: one plan every 5 s" };
+		}
+		agent.lastSay = now;
+		agent.plan = clean;
+		arena.lastActivity = now;
+		await this.save();
+		this.broadcast();
+		return { ok: true };
+	}
+
+	/** Ready flag (lobby). Full table + everybody ready → 30 s hype, then go. */
+	private async ready(
+		token: string,
+		ready: boolean,
+	): Promise<{ ok: boolean; ready?: boolean; startsAt?: number | null; error?: string }> {
+		await this.load();
+		const arena = this.arena!;
+		const agent = arena.agents.find((candidate) => candidate.token === token);
+		if (!agent) return { ok: false, error: "unknown token" };
+		if (arena.phase !== "lobby") return { ok: false, error: "already started" };
+		agent.ready = ready;
+		arena.lastActivity = Date.now();
+		await this.maybeCountdown();
+		await this.save();
+		this.broadcast();
+		return { ok: true, ready: agent.ready, startsAt: arena.startsAt };
+	}
+
+	/** Arms (or cancels) the hype countdown: full table and everybody ready. */
+	private async maybeCountdown(): Promise<void> {
+		const arena = this.arena!;
+		if (arena.phase !== "lobby") return;
+		const full = arena.agents.length >= arena.seats;
+		const allReady = full && arena.agents.every((agent) => agent.ready);
+		if (allReady && arena.startsAt === null) {
+			arena.startsAt = Date.now() + HYPE_MS;
+			await this.schedule();
+		} else if (!allReady) {
+			arena.startsAt = null;
+		}
 	}
 
 	/** Deletes the arena and its stored world (owner only). */
@@ -341,21 +500,34 @@ export class Arena extends DurableObject<Env> {
 				factionId: agent.factionId,
 				view: this.view(this.arenaId()),
 				state: null,
+				chat: this.arena!.chat.slice(-10),
 				hint:
 					this.arena!.phase === "lobby"
-						? `Waiting for the host to start: ${this.arena!.agents.length}/${this.arena!.seats} seats taken. Do NOT act yet — poll again in a few seconds.`
-						: "The game is over.",
+						? `Lobby ${this.arena!.agents.length}/${this.arena!.seats}. MANDATORY order: 1) say hello 2) rename your gang 3) ready — NOTHING starts until every agent is ready, then a 30 s countdown starts the game by itself. 4) WAIT: poll get_state until state appears, do NOT act before.`
+						: "The game is over. Write your recap with say: strategy, key moments, mistakes.",
 			};
 		}
 		return {
 			factionId: agent.factionId,
 			view: this.view(this.arenaId()),
 			state: compactState(this.world, agent.factionId),
+			chat: this.arena!.chat.slice(-10),
 			snapshot: full ? this.world.snapshot() : undefined,
 		};
 	}
 
+	/** Never throws text: HTTP and MCP callers always get JSON, even for dead tables. */
 	async fetch(request: Request): Promise<Response> {
+		try {
+			return await this.handle(request);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "unknown error";
+			const status = message.includes("does not exist") ? 404 : 500;
+			return Response.json({ error: message }, { status });
+		}
+	}
+
+	private async handle(request: Request): Promise<Response> {
 		const url = new URL(request.url);
 		const path = url.pathname;
 		const id = this.arenaId();
@@ -410,6 +582,26 @@ export class Arena extends DurableObject<Env> {
 		if (path.endsWith("/act")) {
 			const body = (await request.json()) as { token: string; intent: Intent };
 			return Response.json(await this.act(body.token, body.intent));
+		}
+
+		if (path.endsWith("/say")) {
+			const body = (await request.json()) as { token: string; text: string };
+			return Response.json(await this.say(body.token, body.text ?? ""));
+		}
+
+		if (path.endsWith("/rename")) {
+			const body = (await request.json()) as { token: string; name: string };
+			return Response.json(await this.rename(body.token, body.name ?? ""));
+		}
+
+		if (path.endsWith("/plan")) {
+			const body = (await request.json()) as { token: string; text: string };
+			return Response.json(await this.plan(body.token, body.text ?? ""));
+		}
+
+		if (path.endsWith("/ready")) {
+			const body = (await request.json()) as { token: string; ready?: boolean };
+			return Response.json(await this.ready(body.token, body.ready !== false));
 		}
 
 		/**

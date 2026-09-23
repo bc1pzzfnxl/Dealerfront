@@ -1,6 +1,7 @@
 # UI/UX — God-view interface (DealerFront)
 
 > Status: **v1 (DealerFront)** — rewritten for cartel mode: control overlays, faction colors, multi-resource HUD.
+> Note: the **solo command HUD** (§ Loop panel, bottom bar, build menus) was removed with solo mode — the client is now arena tables + live spectator only. The map rendering rules below still apply to the spectator.
 
 ## Objective
 

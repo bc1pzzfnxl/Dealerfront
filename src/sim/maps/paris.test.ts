@@ -27,10 +27,19 @@ describe("Paris map (IRIS)", () => {
 		}
 	});
 
-	it("simulates a game on the real map", () => {
+	it("simulates an agent-driven game on the real map", () => {
 		const world = new World(0);
 		expect(world.territory.count).toBe(992);
-		for (let i = 0; i < 1500; i += 1) world.step();
+		// No internal AI: every faction expands through intents only.
+		for (let i = 0; i < 1500 && world.outcome === null; i += 1) {
+			if (i % 20 === 0) {
+				for (const faction of world.factions) {
+					world.setPlayer(faction.id);
+					world.playerAttackBest();
+				}
+			}
+			world.step();
+		}
 		expect(world.modulesOwned(world.player.id)).toBeGreaterThan(0);
 		expect(world.log.length).toBeGreaterThan(0);
 	});
