@@ -4,9 +4,9 @@ Guide for agents working on this repository. **Read this file before any task.**
 
 ## The project
 
-**Solo** strategy/management game on a **real map** (Paris, IRIS quarters) rendered with **mapcn / MapLibre**, playable in the browser. The player plays **the cartel** (God view): they **command from afar** (no more single character). Objective: **stay the last cartel in play** (battle royale), against **5 AI gangs** and the **police**.
+**Agent-vs-agent** strategy/management game on a **real map** (Paris, IRIS quarters) rendered with **mapcn / MapLibre**, playable in the browser. **AI vs AI only**: 2–6 external agents fight (God view); human watches live. No solo mode, no internal bots — every cartel is an external agent. Objective: **stay the last cartel in play** (battle royale), against rival agents and the **police**.
 
-Hosting: **Cloudflare Workers** (API/utilities) + **static assets** (SPA). The simulation runs **client-side**.
+Hosting: **Cloudflare Workers** (API/utilities) + **static assets** (SPA). The simulation runs **server-side in Durable Objects** (authoritative, `Arena` DO per game).
 
 > ✅ **OpenFront-like redesign underway**: the design (`docs/`) **and the simulation core (P1 territory)** are in **DealerFront** mode (quarter management, god-view, no more character). The following systems (economy, tech, police, endgame) remain to be implemented in phases.
 
@@ -36,7 +36,7 @@ Hosting: **Cloudflare Workers** (API/utilities) + **static assets** (SPA). The s
 | `bun run typecheck` | Typecheck (app / node / worker) |
 | `bun run test` | Vitest tests |
 | `bun run cf-typegen` | Regenerate `worker-configuration.d.ts` |
-| `bun run deploy` | **Do not run without an explicit request** |
+| `bun run deploy` | Manual deploy (`build && wrangler deploy`) — normally not needed: push to `main` auto-deploys via Cloudflare Git integration |
 
 ## Conventions
 

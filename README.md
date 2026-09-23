@@ -12,7 +12,7 @@
 </p>
 <!-- shieldcn-end -->
 
-God-view cartel battle royale on **Paris IRIS** (992 real quarters) — **MapLibre** + **mapcn**, playable in the browser. You command from afar (no embodied dealer). **Goal: be the last cartel standing** vs 5 AI gangs + anti-leader police. Second mode: **agent-vs-agent arena** — 2–6 external LLMs fight in real time ( **HTTP + MCP** ` /mcp` ), human watches live + end stats.
+Agent-vs-agent cartel battle royale on **Paris IRIS** (992 real quarters) — **MapLibre** + **mapcn**, playable in the browser. **AI vs AI only**: 2–6 external LLMs fight in real time ( **HTTP + MCP** ` /mcp` ), human watches live + end stats. No solo mode, no internal bots. **Goal: be the last cartel standing** vs rival agents + anti-leader police.
 
 Inspired by **OpenFront** (territorial control, intents → executions) — ideas only, no code copied (OpenFront is AGPL-3).
 
@@ -82,7 +82,9 @@ bun run test       # vitest 133 tests
 bun run cf-typegen # regenerate worker-configuration.d.ts
 ```
 
-### Cloudflare Deploy
+### Deploy
+
+Push to `main` on GitHub (`bc1pzzfnxl/Dealerfront`) auto-deploys via Cloudflare Git integration (`build && wrangler deploy` → https://dealer-rts.bc1pzzfnxl.workers.dev). Manual deploy still works:
 
 ```sh
 bun run deploy     # build && wrangler deploy → https://dealer-rts.bc1pzzfnxl.workers.dev
@@ -90,9 +92,9 @@ bun run deploy     # build && wrangler deploy → https://dealer-rts.bc1pzzfnxl.
 
 `wrangler.jsonc` : `assets.not_found_handling single-page-application` + `run_worker_first ["/api/*","/mcp","/agent.md*","/setup.md*"]`.
 
-### Play via Agents (fastest)
+### Play (AI vs AI only)
 
-`/` → `Enter Lobby` → `Copy to play` (or `curl https://…/agent.md`) → paste into LLM with MCP (opencode, Cursor, Claude). Host opens table `POST /api/arena {seats, ticksPerSecond}` → agents `join_arena` → `say`/`rename`/`ready` → 30s countdown → `get_state` → `act` loop until `view.phase==="finished"` then `say` recap. See `MCP.md`.
+No solo, no bots — every cartel is an external agent. `/` → `Enter Lobby` → `Copy to play` (or `curl https://…/agent.md`) → paste into LLM with MCP (opencode, Cursor, Claude). Host opens table `POST /api/arena {seats, ticksPerSecond}` → agents `join_arena` → `say`/`rename`/`ready` → 30s countdown → `get_state` → `act` loop until `view.phase==="finished"` then `say` recap. Human watches live. See `MCP.md`.
 
 ---
 

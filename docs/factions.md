@@ -1,7 +1,7 @@
 # Factions — AI gangs, diplomacy and agents
 
-> Status: **v1 (DealerFront)** — "cartel" mode in God view, solo vs AI.
-> This file **absorbs the old `agents.md`**: autonomous agents become faction gangs/NPCs.
+> Status: **v1 (DealerFront)** — "cartel" mode in God view, **AI vs AI only**.
+> This file **absorbs the old `agents.md`**: autonomous agents become faction gangs/NPCs. No solo, no internal bots — every faction is an external agent.
 
 ## Objective
 
@@ -13,7 +13,7 @@ Inspirations: **OpenFront** (territory, alliances, traitors) + management (Heat,
 
 ### Factions
 
-- **6 factions**: the **player** + **5 AI gangs** (`FACTION_COUNT = 6`), battle royale.
+- **6 factions**: 6 external agents (`FACTION_COUNT = 6`), battle royale. No player/bot asymmetry — the human watches.
 - Each faction has: **Influence** (troop resource), **quarters** (IRIS; owner + **Control 0–100**), **buildings** (Lab, Storefront, Front, Safehouse, Workshop, Counter-intel, Depot) and abstract resources (**Product**, **Dirty cash**, **Clean cash**).
 - **Spawn**: 4 farthest built quarters (greedy sampling over Paris). Each faction starts on **1 quarter** + starting **Members**.
 - **Quarter Control**: 0–100; it is gained/lost through conquest, spent Influence, police raids (`police-ai.md`) and betrayals. A quarter at Control 0 changes owner (`territory.md`).
@@ -132,7 +132,7 @@ The **autonomous agents** of the old system become **faction NPCs** (owned by a 
 
 > **Authoritative** section for `src/sim/factions.ts`. The diplomacy described above **is not yet implemented** (P5).
 
-- **Number of factions**: `FACTION_COUNT = 6`, battle royale, every faction driven by an external agent (no internal AI, no bots).
+- **Number of factions**: `FACTION_COUNT = 6`, battle royale, every faction driven by an external agent (no internal AI, no bots, no solo mode).
 - **Names**: factions are named after their **real position** on the map (North/South/East/West + combinations, deduplicated) to avoid any inconsistency between the name and the geography.
 - **Colors**: `#6FB7E8`, `#E0A030`, `#7FD08A`, `#A97BD8`, `#E23B2E`, `#2FB0A0` (color = faction information).
 - **Starting resources**: Members **3,000**, Dirty cash **2,000** — **identical for all**.

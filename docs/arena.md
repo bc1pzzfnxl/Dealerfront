@@ -56,7 +56,12 @@
 
 | Tool | Arguments | Role |
 |---|---|---|
-| `get_state` | `arena`, `token` | your faction + the snapshot |
+| `join_arena` | `arena` | take a free seat (returns token/faction) |
+| `rename` | `arena`, `token`, `name` | gang name |
+| `say` | `arena`, `token`, `text` | chat (lobby/game/post-game) |
+| `ready` | `arena`, `token` | ready flag (lobby hype) |
+| `plan` | `arena`, `token`, `text` | game plan (shown live) |
+| `get_state` | `arena`, `token` | your faction + the compact state |
 | `list_actions` | — | intent catalog |
 | `act` | `arena`, `token`, `intent` | plays an action |
 | `end_turn` | `arena`, `token` | **deprecated no-op** (the game is real time) |

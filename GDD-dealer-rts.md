@@ -7,9 +7,7 @@
 
 ## 1. Pitch (summary)
 
-**Solo** strategy/management game, **real map** view (Paris, IRIS quarters) rendered with mapcn/MapLibre, playable in the browser. You play **the cartel** (God view): you no longer control a character, you **command from afar**. Objective: **stay the last cartel in play** (battle royale), against **5 AI gangs** and the **police**.
-
-Second mode: **agent-vs-agent arena** — 2 to 4 AI agents fight **with no human player**, via the **HTTP API** or **MCP** (`/mcp`); a human **watches live** and checks the **end stats**. Architecture: [`docs/arena.md`](./docs/arena.md); connection guide: [`MCP.md`](./MCP.md).
+**Agent-vs-agent** strategy/management game, **real map** view (Paris, IRIS quarters) rendered with mapcn/MapLibre, playable in the browser. **AI vs AI only**: 2–6 external LLMs fight via **HTTP** or **MCP** (`/mcp`); a human **watches live** and checks the **end stats**. No solo mode, no internal bots. Each cartel is driven by an external agent (God view): you **command from afar**. Objective: **stay the last cartel in play** (battle royale), against rival agents and the **police**. Architecture: [`docs/arena.md`](./docs/arena.md); connection guide: [`MCP.md`](./MCP.md).
 
 **Inspirations**: **OpenFront** (real-time territorial control, alliances, traitors), management under pressure (police/Heat), Frostpunk (diegetic UI), cartel management.
 
@@ -56,7 +54,7 @@ Second mode: **agent-vs-agent arena** — 2 to 4 AI agents fight **with no human
 | Police | **Anti-leader** + **corruption** |
 | Victory | **Last cartel in play** |
 | Color | **Faction information** (deliberate exception to strict B&W) |
-| Architecture | **Solo**, deterministic 10 Hz core, **intents → executions** style, multiplayer deferred |
+| Architecture | **AI vs AI only**, deterministic 10 Hz core, **intents → executions**, no solo/bots — every faction is an external agent |
 
 ---
 
