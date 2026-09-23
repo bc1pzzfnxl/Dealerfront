@@ -596,7 +596,34 @@ body {
 	padding: 0.38rem 0.35rem;
 	border-radius: 6px;
 	border: 1px solid transparent;
-	transition: background 130ms var(--ease-out), border-color 130ms var(--ease-out), transform 120ms var(--ease-out);
+	opacity: 1;
+	transform: translateY(0) scale(1);
+	transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out), background 130ms var(--ease-out), border-color 130ms var(--ease-out);
+}
+
+@starting-style {
+	.standing-row {
+		opacity: 0;
+		transform: translateY(4px) scale(0.98);
+	}
+}
+
+/* Stagger group entrance — 35ms, decorative, never blocks interaction */
+.standing-row:nth-child(2) { transition-delay: 0ms; }
+.standing-row:nth-child(3) { transition-delay: 35ms; }
+.standing-row:nth-child(4) { transition-delay: 70ms; }
+.standing-row:nth-child(5) { transition-delay: 105ms; }
+.standing-row:nth-child(6) { transition-delay: 140ms; }
+.standing-row:nth-child(7) { transition-delay: 175ms; }
+
+@media (prefers-reduced-motion: reduce) {
+	.standing-row {
+		transition: opacity 120ms ease, background 120ms ease;
+		transform: none;
+	}
+	@starting-style {
+		.standing-row { opacity: 0; transform: none; }
+	}
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -671,6 +698,20 @@ body {
 	font-style: normal;
 	margin-left: 0.15rem;
 	font-weight: 700;
+	opacity: 1;
+	transform: scale(1);
+	transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+
+@starting-style {
+	.standing-main .num.eco .transit {
+		opacity: 0;
+		transform: scale(0.9);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.standing-main .num.eco .transit { transition: opacity 100ms ease; transform: none; }
 }
 
 .standing-main .num.war {

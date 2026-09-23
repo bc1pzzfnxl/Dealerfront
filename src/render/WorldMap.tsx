@@ -955,6 +955,9 @@ function Convoys({
 					"circle-opacity": 0.95 as never,
 				},
 			});
+			// Intercept feedback — radius shrinks/grows on cargo change, 200ms ease-out, GPU (opacity/radius only)
+			map.setPaintProperty("convoy-dots", "circle-radius-transition", { duration: 200 } as never);
+			map.setPaintProperty("convoy-dots", "circle-opacity-transition", { duration: 200 } as never);
 		} else {
 			map.setPaintProperty("convoy-dots", "circle-color", convoyColor(colorblind) as never);
 			map.setPaintProperty("convoy-routes", "line-color", convoyColor(colorblind) as never);
