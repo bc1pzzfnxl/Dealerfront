@@ -62,8 +62,9 @@ body {
 
 /* Real map (mapcn/MapLibre): fills the viewport, game-style controls. */
 .world-map {
-	position: absolute;
-	inset: 0;
+	position: absolute !important;
+	inset: 0 !important;
+	height: 100% !important;
 }
 
 .map-controls {
