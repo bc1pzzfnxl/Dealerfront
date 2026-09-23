@@ -37,6 +37,7 @@ export interface Faction {
 	launderRatio: number;
 	/** **Per-operation** cooldowns (ticks) — avoids the false choice. */
 	strikeCooldown: number;
+	mortarCooldown: number;
 	raidCooldown: number;
 	bustCooldown: number;
 	interceptCooldown: number;
@@ -115,6 +116,7 @@ export function createFactions(count: number, startMembers: number): Faction[] {
 			buildings: 0,
 			tech: { armament: 0, protection: 0, logistics: 0 },
 			strikeCooldown: 0,
+			mortarCooldown: 0,
 			raidCooldown: 0,
 			bustCooldown: 0,
 			interceptCooldown: 0,

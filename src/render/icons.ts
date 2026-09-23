@@ -1,9 +1,9 @@
 import {
+	Bomb,
 	Boxes,
 	Coins,
 	Droplets,
 	Eye,
-	Factory,
 	FlaskConical,
 	HandCoins,
 	Landmark,
@@ -28,7 +28,7 @@ export const BUILDING_ICONS: Record<BuildingType, typeof FlaskConical> = {
 	front: Landmark,
 	safehouse: Shield,
 	depot: Warehouse,
-	workshop: Factory,
+	mortar: Bomb,
 	counter: Eye,
 };
 

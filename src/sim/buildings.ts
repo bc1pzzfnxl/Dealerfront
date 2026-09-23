@@ -12,7 +12,7 @@ export const BUILDING_TYPES = [
 	"front",
 	"safehouse",
 	"depot",
-	"workshop",
+	"mortar",
 	"counter",
 ] as const;
 
@@ -42,7 +42,7 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
 	front: { type: "front", label: "Front", costSale: 2200, width: 2.0, height: 1.0 },
 	safehouse: { type: "safehouse", label: "Safehouse", costSale: 1800, width: 1.6, height: 0.7 },
 	depot: { type: "depot", label: "Depot", costSale: 1800, width: 2.2, height: 1.4 },
-	workshop: { type: "workshop", label: "Workshop", costClean: 3500, width: 1.6, height: 1.1 },
+	mortar: { type: "mortar", label: "Mortar", costClean: 4000, width: 1.6, height: 1.1 },
 	counter: { type: "counter", label: "Watcher", costClean: 3000, width: 1.2, height: 1.3 },
 };
 
@@ -80,7 +80,7 @@ export const BUILDING_UPKEEP: Record<BuildingType, number> = {
 	front: 1.5,
 	safehouse: 1,
 	depot: 1,
-	workshop: 2,
+	mortar: 2,
 	counter: 1.5,
 };
 
@@ -109,7 +109,7 @@ export const BUILD_TICKS: Record<BuildingType, number> = {
 	front: 180,
 	safehouse: 180,
 	depot: 180,
-	workshop: 240,
+	mortar: 240,
 	counter: 240,
 };
 
@@ -124,7 +124,7 @@ export const BUILDING_EFFECT_LABELS: Record<BuildingType, string> = {
 	front: "launders 60 dirty cash/tick",
 	safehouse: "defense ×1.5",
 	depot: "+2000 max members",
-	workshop: "+1 tech level",
+	mortar: "mortar strike — destroys building, neutralizes zone",
 	counter: "alerts on busts · −15% hitman · hinders busts",
 };
 
@@ -171,12 +171,12 @@ export function chainIncomplete(counts: Record<BuildingType, number>): boolean {
 export const ZONE_BUILDINGS: Record<ZoneType, readonly BuildingType[]> = {
 	// Residential buildings: economic core + defense.
 	residential: ["housing", "lab", "storefront", "front", "safehouse", "counter"],
-	// Shops: economic core + Workshop (back room) + Watcher.
-	commercial: ["housing", "lab", "storefront", "front", "safehouse", "workshop", "counter"],
+	// Shops: economic core + Mortar (back room) + Watcher.
+	commercial: ["housing", "lab", "storefront", "front", "safehouse", "mortar", "counter"],
 	// Nightlife: economic core + Safehouse (back room).
 	nightlife: ["housing", "lab", "storefront", "front", "safehouse"],
-	// Industrial wasteland: everything, plus Depot and Workshop.
-	industrial: ["housing", "lab", "storefront", "front", "safehouse", "depot", "workshop", "counter"],
+	// Industrial wasteland: everything, plus Depot and Mortar.
+	industrial: ["housing", "lab", "storefront", "front", "safehouse", "depot", "mortar", "counter"],
 	// Laundromats: economic core + Counter-intel.
 	laundry: ["housing", "lab", "storefront", "front", "safehouse", "counter"],
 	// Repurposed precincts: economic core (Safehouse, Watcher).
@@ -184,7 +184,7 @@ export const ZONE_BUILDINGS: Record<ZoneType, readonly BuildingType[]> = {
 	// Parks: economic core + hidden Safehouse.
 	park: ["housing", "lab", "storefront", "front", "safehouse"],
 	// Vacant lots: new construction (nothing to repurpose for recruitment).
-	vacant: ["lab", "storefront", "front", "safehouse", "depot", "workshop"],
+	vacant: ["lab", "storefront", "front", "safehouse", "depot", "mortar"],
 };
 
 export function canBuildInZone(zone: ZoneType, type: BuildingType): boolean {
@@ -206,7 +206,7 @@ export const ZONE_BUILD_BONUS: Record<ZoneType, Partial<Record<BuildingType, num
 	// Nightlife: sales and laundering neck and neck.
 	nightlife: { storefront: 1.3, front: 1.3 },
 	// Wasteland: production and tooling.
-	industrial: { lab: 1.5, workshop: 1.4, depot: 1.3 },
+	industrial: { lab: 1.5, mortar: 1.4, depot: 1.3 },
 	// Laundromats: maximum laundering.
 	laundry: { front: 1.6 },
 	// Repurposed precincts: intel.
@@ -268,7 +268,7 @@ export const BUILD_TARGETS: Record<BuildingType, number> = {
 	storefront: 0.15,
 	front: 0.15,
 	depot: 0.05,
-	workshop: 0.05,
+	mortar: 0.05,
 	counter: 0.05,
 	safehouse: 0.05,
 };

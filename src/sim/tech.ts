@@ -50,3 +50,15 @@ export const STRIKE = {
 	counterReductionPerUnit: 0.25,
 	counterReductionMax: 0.7,
 } as const;
+
+/**
+ * Mortar (requires 1 Mortar building): precise, cheap — destroys the
+ * building on the target quarter and makes it neutral. Visible on UI as
+ * "Mortar" building (1 building = 1 function).
+ */
+export const MORTAR = {
+	requiredMortars: 1,
+	costClean: 3000,
+	costMembers: 600,
+	cooldownTicks: 300, // 30s
+} as const;

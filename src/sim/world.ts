@@ -32,7 +32,7 @@ import { SIM_HZ, START_HOUR, TICKS_PER_HOUR } from "./constants";
 import { PARIS_CENTROIDS, PARIS_MAP } from "./maps/paris";
 import { createRng, type Rng } from "./rng";
 import { createFactions, FACTION_COUNT, type Faction } from "./factions";
-import { STRIKE, TECH, type TechBranch, techCost } from "./tech";
+import { MORTAR, STRIKE, TECH, type TechBranch, techCost } from "./tech";
 import { CONTACT_NAMES, POLICE, policeTier, type PoliceState, type PoliceTier } from "./police";
 import {
 	DIPLOMACY,
@@ -46,7 +46,8 @@ import type { CityGrid, ZoneType } from "./types";
 
 const EMPTY_NEIGHBORS: readonly number[] = [];
 
-const NEUTRAL_GARRISON = 60;
+const NEUTRAL_GARRISON = 28; // ponytail: 60→28 makes neutral fall ~2× faster (share = troops/(troops+garrison))
+const NEUTRAL_CONTROL = 35;
 const CAPTURE_CONTROL = 30;
 const START_MEMBERS = 3000;
 const COMMIT_RATIO = 0.2;
@@ -286,7 +287,7 @@ function emptyCounts(): Record<BuildingType, number> {
 		front: 0,
 		safehouse: 0,
 		depot: 0,
-		workshop: 0,
+		mortar: 0,
 		counter: 0,
 	};
 }
@@ -397,7 +398,7 @@ export class World {
 		this.rng = createRng((seed ^ 0x9e3779b9) >>> 0);
 		this.contactIndex = seed % CONTACT_NAMES.length;
 
-		this.territory.control.fill(NEUTRAL_GARRISON);
+		this.territory.control.fill(NEUTRAL_CONTROL);
 		const spawns = this.pickSpawns(this.factions.length);
 		// Spawn is always buildable: force a "built" zone on each spawn.
 		const modules = this.city.modules as ZoneType[];
@@ -790,9 +791,9 @@ export class World {
 		return TECH.defensePerLevel * this.factions[factionId]!.tech.protection;
 	}
 
-	/** Max tech level unlocked by Workshops. */
-	maxTechLevel(factionId: number): number {
-		return Math.min(TECH.maxLevel, this.buildingCount(factionId, "workshop"));
+	/** Max tech level — direct (no Workshop gate). 1 building = 1 function. */
+	maxTechLevel(_factionId: number): number {
+		return TECH.maxLevel;
 	}
 
 	canUpgradeTech(factionId: number, branch: TechBranch): boolean {
@@ -894,6 +895,39 @@ export class World {
 		if (this.territory.owner[module] === this.player.id) {
 		}
 		this.pushLog(`Strike impact (module ${module})`);
+	}
+
+	canMortar(factionId: number, module: number): boolean {
+		if (this.outcome !== null) return false;
+		const owner = this.territory.owner[module];
+		if (owner === factionId || owner === NEUTRAL) return false;
+		if (this.buildingCount(factionId, "mortar") < MORTAR.requiredMortars) return false;
+		if (this.factions[factionId]!.mortarCooldown > 0) return false;
+		const f = this.factions[factionId]!;
+		return f.cleanCash >= MORTAR.costClean && f.members >= MORTAR.costMembers;
+	}
+
+	playerCanMortar(module: number): boolean {
+		return this.canMortar(this.player.id, module);
+	}
+
+	playerMortar(module: number): boolean {
+		if (!this.canMortar(this.player.id, module)) return false;
+		const f = this.factions[this.player.id]!;
+		f.cleanCash -= MORTAR.costClean;
+		f.members -= MORTAR.costMembers;
+		f.mortarCooldown = MORTAR.cooldownTicks;
+		// Destroy building and neutralize
+		if (this.territory.building[module] !== NO_BUILDING) {
+			this.territory.building[module] = NO_BUILDING;
+		}
+		this.cancelConstruction(module);
+		this.territory.owner[module] = NEUTRAL;
+		this.territory.control[module] = NEUTRAL_CONTROL;
+		this.recount();
+		this.addHeat(module, HEAT.strike);
+		this.pushLog(`Mortar hit (module ${module}) — neutralized`);
+		return true;
 	}
 
 	/** Faction with the most quarters (the "leader"), -1 if none. */
@@ -1276,7 +1310,7 @@ export class World {
 		for (let i = 0; i < this.territory.count; i += 1) {
 			if (this.territory.owner[i] !== factionId) continue;
 			this.territory.owner[i] = NEUTRAL;
-			this.territory.control[i] = NEUTRAL_GARRISON;
+			this.territory.control[i] = NEUTRAL_CONTROL;
 			this.territory.building[i] = NO_BUILDING;
 			this.cancelConstruction(i);
 		}
@@ -1914,6 +1948,7 @@ export class World {
 		this.recount();
 		for (const faction of this.factions) {
 			if (faction.strikeCooldown > 0) faction.strikeCooldown -= 1;
+			if (faction.mortarCooldown > 0) faction.mortarCooldown -= 1;
 			if (faction.raidCooldown > 0) faction.raidCooldown -= 1;
 			if (faction.bustCooldown > 0) faction.bustCooldown -= 1;
 			if (faction.interceptCooldown > 0) faction.interceptCooldown -= 1;
@@ -2239,7 +2274,7 @@ export class World {
 			c.front = 0;
 			c.safehouse = 0;
 			c.depot = 0;
-			c.workshop = 0;
+			c.mortar = 0;
 			c.counter = 0;
 			this.owned[f] = 0;
 			this.recruitDemand[f] = 0;
@@ -2294,7 +2329,7 @@ export class World {
 				c.front +
 				c.safehouse +
 				c.depot +
-				c.workshop +
+				c.mortar +
 				c.counter;
 		}
 		this.updateSupply();

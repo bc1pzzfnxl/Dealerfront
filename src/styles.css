@@ -218,7 +218,7 @@ body {
 	position: absolute;
 	inset: 0;
 	display: grid;
-	grid-template-columns: 18rem 1fr 20rem;
+	grid-template-columns: 18rem 1fr 23rem;
 	grid-template-rows: auto minmax(0, 1fr) auto;
 	grid-template-areas:
 		"top top top"
@@ -574,8 +574,8 @@ body {
 
 .standings-head {
 	display: grid;
-	grid-template-columns: minmax(0, 1.6fr) auto auto auto;
-	gap: 0.4rem;
+	grid-template-columns: minmax(0, 1.4fr) auto minmax(0, 1fr) auto;
+	gap: 0.35rem;
 	padding: 0.25rem 0.35rem;
 	font-size: 0.58rem;
 	letter-spacing: 0.08em;
@@ -636,9 +636,16 @@ body {
 
 .standing-main {
 	display: grid;
-	grid-template-columns: minmax(0, 1.6fr) auto auto auto;
-	gap: 0.4rem;
+	grid-template-columns: minmax(0, 1.4fr) auto minmax(0, 1fr) auto;
+	gap: 0.35rem;
 	align-items: center;
+}
+.standing-row:first-child {
+	background: rgba(111, 183, 232, 0.08);
+	border-color: rgba(111, 183, 232, 0.25);
+}
+.standing-row:first-child .faction-name-text {
+	color: var(--accent);
 }
 
 .standing-main .faction-name {

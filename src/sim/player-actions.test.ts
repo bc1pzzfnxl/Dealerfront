@@ -157,7 +157,7 @@ describe("construction — refusals", () => {
 		const world = new World(1);
 		let module = -1;
 		for (let i = 0; i < world.territory.count; i += 1) {
-			if (!world.allowedBuildings(i).includes("workshop")) {
+			if (!world.allowedBuildings(i).includes("mortar")) {
 				module = i;
 				break;
 			}
@@ -167,8 +167,8 @@ describe("construction — refusals", () => {
 		world.territory.control[module] = 100;
 		world.player.dirtyCash = 100000;
 		world.player.cleanCash = 100000;
-		expect(world.playerCanBuild(module, "workshop")).toBe(false);
-		expect(world.playerBuild(module, "workshop")).toBe(false);
+		expect(world.playerCanBuild(module, "mortar")).toBe(false);
+		expect(world.playerBuild(module, "mortar")).toBe(false);
 	});
 
 	it("refuses insufficient resources", () => {
@@ -431,46 +431,29 @@ describe("heavy strike", () => {
 });
 
 describe("tech", () => {
-	it("one Workshop = one max tier, increasing cost", () => {
+	it("direct tech — increasing cost, no Workshop gate (1 building = 1 function)", () => {
 		const world = new World(1);
 		const player = world.player;
 		player.cleanCash = 100000;
-		expect(world.maxTechLevel(player.id)).toBe(0);
-		expect(world.canUpgradeTech(player.id, "armament")).toBe(false);
-		expect(world.playerUpgradeTech("armament")).toBe(false);
-
-		const first = ownConversion(world, player.id, "workshop");
-		expect(first).toBeGreaterThanOrEqual(0);
-		expect(world.playerBuild(first, "workshop")).toBe(true);
-		finishBuild(world, first);
-		expect(world.maxTechLevel(player.id)).toBe(1);
+		expect(world.maxTechLevel(player.id)).toBe(TECH.maxLevel);
+		expect(world.canUpgradeTech(player.id, "armament")).toBe(true);
 
 		const before = player.cleanCash;
 		expect(world.playerUpgradeTech("armament")).toBe(true);
 		expect(player.tech.armament).toBe(1);
 		expect(player.cleanCash).toBe(before - techCost(1));
-		expect(world.canUpgradeTech(player.id, "armament")).toBe(false);
-		expect(world.playerUpgradeTech("armament")).toBe(false);
-
-		const second = ownConversion(world, player.id, "workshop");
-		expect(second).toBeGreaterThanOrEqual(0);
-		expect(world.playerBuild(second, "workshop")).toBe(true);
-		finishBuild(world, second);
-		expect(world.maxTechLevel(player.id)).toBe(2);
+		// next tier costs more
+		expect(world.canUpgradeTech(player.id, "armament")).toBe(true);
 		const beforeSecond = player.cleanCash;
 		expect(world.playerUpgradeTech("armament")).toBe(true);
+		expect(player.tech.armament).toBe(2);
 		expect(player.cleanCash).toBe(beforeSecond - techCost(2));
 	});
 
 	it("refuses a tier without Clean cash", () => {
 		const world = new World(1);
 		const player = world.player;
-		player.cleanCash = BUILDINGS.workshop.costClean! * CONVERSION_COST;
-		const module = ownConversion(world, player.id, "workshop");
-		expect(world.playerBuild(module, "workshop")).toBe(true);
-		finishBuild(world, module);
 		player.cleanCash = 0;
-		expect(world.maxTechLevel(player.id)).toBe(1);
 		expect(world.canUpgradeTech(player.id, "armament")).toBe(false);
 		expect(world.playerUpgradeTech("armament")).toBe(false);
 	});
@@ -478,17 +461,12 @@ describe("tech", () => {
 	it("caps the level at TECH.maxLevel", () => {
 		const world = new World(1);
 		const player = world.player;
-		let placed = 0;
-		for (let i = 0; i < world.territory.count && placed < 6; i += 1) {
-			if (world.territory.owner[i] !== NEUTRAL) continue;
-			world.territory.owner[i] = player.id;
-			world.territory.control[i] = 100;
-			world.territory.building[i] = BUILDING_INDEX.workshop;
-			placed += 1;
+		player.cleanCash = 1000000;
+		for (let i = 0; i < TECH.maxLevel; i += 1) {
+			expect(world.playerUpgradeTech("armament")).toBe(true);
 		}
-		expect(placed).toBe(6);
-		world.step();
-		expect(world.maxTechLevel(player.id)).toBe(TECH.maxLevel);
+		expect(player.tech.armament).toBe(TECH.maxLevel);
+		expect(world.canUpgradeTech(player.id, "armament")).toBe(false);
 	});
 });
 
@@ -762,7 +740,7 @@ describe("zones", () => {
 		expect(world.isConversion(vacant)).toBe(false);
 		// Counter-intel is not buildable on a vacant lot.
 		expect(world.allowedBuildings(vacant)).not.toContain("counter");
-		expect(world.allowedBuildings(vacant)).toContain("workshop");
+		expect(world.allowedBuildings(vacant)).toContain("mortar");
 	});
 });
 

@@ -262,14 +262,14 @@ export function Spectator({ id, onExit }: { id: string; onExit: () => void }) {
 										style={faction.eliminated ? { opacity: 0.52 } : undefined}
 									>
 										<div className="standing-main">
-											<span className="faction-name">
+											<span className="faction-name" title={faction.name}>
 												<span
 													className="swatch"
 													style={{ backgroundColor: FACTION_COLORS[factionId] }}
 												>
 													{FACTION_SYMBOLS[factionId % FACTION_SYMBOLS.length]}
 												</span>
-												<span className="faction-name-text">
+												<span className="faction-name-text" title={faction.name}>
 													{index === 0 && !faction.eliminated ? "👑 " : ""}
 													{faction.name}
 												</span>

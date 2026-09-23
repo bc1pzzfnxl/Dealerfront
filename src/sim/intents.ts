@@ -19,6 +19,7 @@ export type Intent =
 	| { type: "bust"; module: number }
 	| { type: "intercept"; module: number }
 	| { type: "strike"; module: number }
+	| { type: "mortar"; module: number }
 	| { type: "corrupt" }
 	| { type: "upgradeTech"; branch: TechBranch }
 	| { type: "proposePact"; faction: number }
@@ -65,6 +66,8 @@ export function applyIntent(world: World, factionId: number, intent: Intent): In
 			return ok(world.playerIntercept(intent.module), "interception impossible");
 		case "strike":
 			return ok(world.playerStrike(intent.module), "strike impossible");
+		case "mortar":
+			return ok(world.playerMortar(intent.module), "mortar impossible");
 		case "corrupt":
 			return ok(world.playerCorrupt(), "corruption impossible");
 		case "upgradeTech":
@@ -103,12 +106,13 @@ export function applyIntent(world: World, factionId: number, intent: Intent): In
 export const INTENT_CATALOG: readonly { type: Intent["type"]; doc: string }[] = [
 	{ type: "attack", doc: "Assault on an adjacent quarter (module)." },
 	{ type: "attackBest", doc: "Automatic assault on the weakest neighbor." },
-	{ type: "build", doc: "Build (module, building): lab/storefront/front/housing/safehouse/depot/workshop/counter." },
+	{ type: "build", doc: "Build (module, building): lab/storefront/front/housing/safehouse/depot/mortar/counter." },
 	{ type: "batchBuild", doc: "Automatically develop empty quarters." },
 	{ type: "raid", doc: "Raid: destroys a target's control and building." },
 	{ type: "bust", doc: "Bust: steals the loot from an enemy building." },
 	{ type: "intercept", doc: "Interception: steals a convoy and cuts the line." },
 	{ type: "strike", doc: "Heavy strike: telegraphed area strike (buildings + neighbours)." },
+	{ type: "mortar", doc: "Mortar: destroys building, neutralizes zone (requires Mortar)." },
 	{ type: "corrupt", doc: "Bribe the police: lowers Pressure." },
 	{ type: "upgradeTech", doc: "Research a tier (armament/protection/logistics)." },
 	{ type: "proposePact", doc: "Propose a pact (faction)." },

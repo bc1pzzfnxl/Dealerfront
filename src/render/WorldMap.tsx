@@ -386,10 +386,11 @@ function EffectStates({
 						0,
 						0,
 						1,
-						0.75,
+						0.85,
 					] as never,
 				},
 			});
+			map.setPaintProperty("iris-capture", "fill-opacity-transition", { duration: 180 } as never);
 		}
 		if (!map.getLayer("iris-capture-line")) {
 			map.addLayer({
@@ -398,7 +399,7 @@ function EffectStates({
 				source: SOURCE_ID,
 				paint: {
 					"line-color": "#ffffff",
-					"line-width": 3,
+					"line-width": 4,
 					"line-opacity": [
 						"interpolate",
 						["linear"],
@@ -406,11 +407,13 @@ function EffectStates({
 						0,
 						0,
 						1,
-						0.95,
+						1,
 					] as never,
-					"line-blur": 1.5,
+					"line-blur": 2,
 				},
 			});
+			map.setPaintProperty("iris-capture-line", "line-opacity-transition", { duration: 180 } as never);
+			map.setPaintProperty("iris-capture-line", "line-width-transition", { duration: 180 } as never);
 		}
 		if (!map.getLayer("iris-siege")) {
 			map.addLayer({
@@ -426,11 +429,34 @@ function EffectStates({
 						...FACTION_COLORS.flatMap((color, index) => [index, color]),
 						"#ffffff",
 					] as never,
-					"line-width": 2.4,
-					"line-opacity": 0.95,
+					"line-width": [
+						"interpolate",
+						["linear"],
+						["coalesce", ["feature-state", "control"], 100],
+						0,
+						5,
+						30,
+						3.8,
+						100,
+						2.4,
+					] as never,
+					"line-opacity": [
+						"interpolate",
+						["linear"],
+						["coalesce", ["feature-state", "control"], 100],
+						0,
+						1,
+						30,
+						0.95,
+						100,
+						0.85,
+					] as never,
 					"line-dasharray": [1.6, 1.2],
 				},
 			});
+			// contested glow — second outline when control <30, pulsing via opacity transition
+			map.setPaintProperty("iris-siege", "line-opacity-transition", { duration: 300 } as never);
+			map.setPaintProperty("iris-siege", "line-width-transition", { duration: 300 } as never);
 		}
 		// Conquest gauge: the quarter fills with white as its
 		// Control drops. A `fill` stays **contained within the polygon** (a thick
