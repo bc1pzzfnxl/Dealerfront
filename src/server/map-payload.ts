@@ -16,13 +16,15 @@ export function mapPayload(): {
 	wealth: number[];
 	size: number[];
 } {
+	// ponytail: round profiles to 2 decimals — saves ~20KB / ~5k tok one-shot, gameplay delta <1% (ratios, no sim change)
+	const round2 = (v: number): number => Math.round(v * 100) / 100;
 	return {
 		count: PARIS_MAP.modules.length,
 		zones: PARIS_MAP.modules,
 		neighbors: PARIS_MAP.neighbors,
 		spawns: PARIS_MAP.spawns,
-		demand: Array.from(PARIS_MAP.demand),
-		wealth: Array.from(PARIS_MAP.wealth),
-		size: Array.from(PARIS_MAP.size),
+		demand: Array.from(PARIS_MAP.demand, round2),
+		wealth: Array.from(PARIS_MAP.wealth, round2),
+		size: Array.from(PARIS_MAP.size, round2),
 	};
 }

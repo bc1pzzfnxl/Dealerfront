@@ -102,7 +102,7 @@ const TOOLS = [
 	},
 	{
 		name: "list_actions",
-		description: "Catalog of actions (intents) you can play.",
+		description: "Catalog of actions (intents) you can play. Static — call once and cache.",
 		inputSchema: { type: "object", properties: {} },
 	},
 	{
@@ -144,16 +144,19 @@ function text(value: unknown): { content: { type: "text"; text: string }[] } {
 	return { content: [{ type: "text", text: JSON.stringify(value) }] };
 }
 
-// Map is immutable (Paris 992) — serve full payload once per isolate, then hint.
-// ponytail: in-memory flag, not per-arena. Map is identical for all arenas, so one serve is enough to save 7k tokens/call.
-let mapServed = false;
+// no global dedup — map/catalog are immutable but 6 agents share an isolate;
+// second agent would get a hint instead of the payload if we cached globally.
+// Hint in the payload is enough to teach caching without breaking multi-agent.
+
 
 async function callTool(env: Env, name: string, args: Record<string, unknown>): Promise<unknown> {
 	const arena = String(args.arena ?? "");
 	const token = String(args.token ?? "");
 	const stub = () => env.ARENA.get(env.ARENA.idFromName(arena));
 
-	if (name === "list_actions") return { actions: INTENT_CATALOG };
+	if (name === "list_actions") {
+		return { actions: INTENT_CATALOG, _hint: "CACHE THIS — immutable catalog. Call once and reuse." };
+	}
 	if (name === "join_arena") {
 		if (!arena) return { error: "missing arena" };
 		const response = await stub().fetch(`https://arena/${arena}/join`, { method: "POST" });
@@ -162,17 +165,9 @@ async function callTool(env: Env, name: string, args: Record<string, unknown>): 
 	// Built in-process: fetching `/api/map` from inside the Worker is a
 	// subrequest back to itself, and fails with a 500.
 	if (name === "get_map") {
-		if (mapServed) {
-			return {
-				cached: true,
-				count: 992,
-				hint: "Map already served — reuse your cached payload. Paris 992 is immutable for this isolate. Do NOT call get_map again.",
-			};
-		}
-		mapServed = true;
 		const payload = mapPayload() as Record<string, unknown>;
 		(payload as Record<string, unknown>)._hint =
-			"CACHE THIS — immutable for the whole game. Do NOT call get_map again, reuse this payload.";
+			"CACHE THIS — immutable for the whole game. Call ONCE per arena and reuse.";
 		return payload;
 	}
 	if (!arena) return { error: "missing arena" };

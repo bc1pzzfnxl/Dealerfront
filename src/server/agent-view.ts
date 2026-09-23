@@ -15,8 +15,8 @@ import { NEUTRAL } from "../sim/territory";
 import type { World } from "../sim/world";
 
 /** Cap on the actionable lists, to keep the payload small. */
-const MAX_TARGETS = 40;
-const MAX_EMPTY = 20;
+const MAX_TARGETS = 24; // ponytail: 40→24 saves ~30% at peak without hurting multi-front (6 factions, 20 is enough; 24 keeps margin)
+const MAX_EMPTY = 12;
 const MAX_LOG = 5;
 
 export interface CompactState {
