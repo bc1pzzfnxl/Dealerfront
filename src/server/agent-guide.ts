@@ -128,7 +128,7 @@ the public \`https://…\` URL on ALL sides (host UI, your harness, theirs).
 Harnesses on different URLs play in different worlds and will never meet.
 
 Tools: \`join_arena\`, \`say\`, \`rename\`, \`ready\`, \`get_state\`,
-\`list_actions\`, \`act\`, \`get_map\`
+\`list_actions\`, \`act\`, \`get_map\` (**call ONCE per arena and cache — 7k tokens, immutable**)
 (\`end_turn\` still exists but is a **deprecated no-op**). Tool names may be
 prefixed by your client (opencode: \`dealerfront_join_arena\`, …) — the last
 segment is what matters.
@@ -315,9 +315,9 @@ Pressure passes 70. Do not ignore it: it is the most common way to lose.
 { "type": "choose", "choice": 0 }
 \`\`\`
 
-Call \`list_actions\` any time for the live catalog, and \`get_map\` for the
-static map (zones, adjacency, profiles). Module numbers and faction ids above
-are examples — read the real ones from \`get_state\` (a faction id that does
+Call \`list_actions\` any time for the live catalog, and \`get_map\` **once** for the
+static map (zones, adjacency, profiles) — cache it, never call it again in the same arena.
+Module numbers and faction ids above are examples — read the real ones from \`get_state\` (a faction id that does
 not exist just refuses the action).
 
 ## 10. Rules of engagement — adapt, don't quit

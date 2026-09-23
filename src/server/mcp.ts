@@ -134,7 +134,8 @@ const TOOLS = [
 	},
 	{
 		name: "get_map",
-		description: "Static map of Paris (992 quarters: zones, adjacency, profiles).",
+		description:
+			"Static map of Paris (992 quarters: zones, adjacency, profiles). CALL ONCE per arena and cache — immutable for the whole game (~30KB / ~7k tokens). Calling again wastes tokens.",
 		inputSchema: { type: "object", properties: {} },
 	},
 ] as const;
@@ -142,6 +143,10 @@ const TOOLS = [
 function text(value: unknown): { content: { type: "text"; text: string }[] } {
 	return { content: [{ type: "text", text: JSON.stringify(value) }] };
 }
+
+// Map is immutable (Paris 992) — serve full payload once per isolate, then hint.
+// ponytail: in-memory flag, not per-arena. Map is identical for all arenas, so one serve is enough to save 7k tokens/call.
+let mapServed = false;
 
 async function callTool(env: Env, name: string, args: Record<string, unknown>): Promise<unknown> {
 	const arena = String(args.arena ?? "");
@@ -156,7 +161,20 @@ async function callTool(env: Env, name: string, args: Record<string, unknown>): 
 	}
 	// Built in-process: fetching `/api/map` from inside the Worker is a
 	// subrequest back to itself, and fails with a 500.
-	if (name === "get_map") return mapPayload();
+	if (name === "get_map") {
+		if (mapServed) {
+			return {
+				cached: true,
+				count: 992,
+				hint: "Map already served — reuse your cached payload. Paris 992 is immutable for this isolate. Do NOT call get_map again.",
+			};
+		}
+		mapServed = true;
+		const payload = mapPayload() as Record<string, unknown>;
+		(payload as Record<string, unknown>)._hint =
+			"CACHE THIS — immutable for the whole game. Do NOT call get_map again, reuse this payload.";
+		return payload;
+	}
 	if (!arena) return { error: "missing arena" };
 
 	if (name === "get_state") {

@@ -40,7 +40,28 @@ export default {
 			});
 		}
 
-		if (pathname === "/api/map") return json(mapPayload());
+		if (pathname === "/api/map") {
+			const payload = mapPayload();
+			// Static forever (Paris IRIS 992) — cache forever, ETag on hash.
+			const body = JSON.stringify(payload);
+			let hash = 0;
+			for (let i = 0; i < body.length; i += 1) hash = (hash * 31 + body.charCodeAt(i)) >>> 0;
+			const etag = `"paris-${payload.count}-${hash.toString(16)}"`;
+			if (request.headers.get("if-none-match") === etag) {
+				return new Response(null, {
+					status: 304,
+					headers: { ETag: etag, "Cache-Control": "public, max-age=31536000, immutable", ...CORS },
+				});
+			}
+			return new Response(body, {
+				headers: {
+					"Content-Type": "application/json",
+					ETag: etag,
+					"Cache-Control": "public, max-age=31536000, immutable",
+					...CORS,
+				},
+			});
+		}
 
 		// Copy-paste prompt that turns an LLM into an agent. Served both at the
 		// root and under `/api/` (the latter is always routed to the Worker).
