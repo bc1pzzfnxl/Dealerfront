@@ -98,7 +98,7 @@ bun run deploy     # build && wrangler deploy → https://dealer-rts.bc1pzzfnxl.
 
 ## 👤 Author
 
-**Raphael Lopes — [@bc1pzzfnxl](https://github.com/bc1pzzfnxl) · [X @bc1pzzfnxl](https://x.com/bc1pzzfnxl)**
+**[@bc1pzzfnxl](https://github.com/bc1pzzfnxl) · [X @bc1pzzfnxl](https://x.com/bc1pzzfnxl)**
 
 If you use, fork or deploy DealerFront, please keep the author mention. Feedback → https://github.com/bc1pzzfnxl/Dealerfront/issues
 
